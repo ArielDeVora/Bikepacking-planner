@@ -59,10 +59,3 @@ export const BASE_MAPS: BaseMap[] = [
       '<a href="https://cloudless.eox.at" target="_blank">EOxCloudless 2023</a> by EOX IT Services GmbH (Contains modified Copernicus Sentinel data 2023), CC BY-NC-SA 4.0',
   },
 ];
-
-export const TERRAIN_DEM = {
-  tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],
-  maxzoom: 15,
-  attribution:
-    'Elevation: <a href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md" target="_blank">Mapzen Terrain Tiles</a> (SRTM, GMTED2010, ETOPO1 and others)',
-};

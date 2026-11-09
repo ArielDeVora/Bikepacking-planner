@@ -1,4 +1,4 @@
-import { elevationGain, greatCircle, lineLength } from '../lib/geo/geo';
+import { elevationGain, greatCircle, lineLength, simplify } from '../lib/geo/geo';
 import { decodeLine, encodeLine, type Coord } from '../lib/geo/polyline';
 import { newId } from './ids';
 import type { Anchor, GeometryType, Leg, LngLat, Segment, SegmentStats } from './types';
@@ -116,4 +116,28 @@ export function retryFailedLegs(seg: Pick<Segment, 'anchors' | 'legs'>): Segment
     seg.anchors,
     seg.legs.map((l) => (l.status === 'failed' ? { line: l.line, status: 'pending' as const } : l)),
   );
+}
+
+/**
+ * Geometry for an imported track. Each part (e.g. a GPX `trkseg`) becomes one leg, simplified
+ * to within `toleranceM`; gaps between parts are bridged by straight legs.
+ */
+export function importedGeometry(parts: Coord[][], toleranceM = 2): SegmentGeometry {
+  const anchors: Anchor[] = [];
+  const legs: Leg[] = [];
+  for (const raw of parts) {
+    const part = simplify(raw, toleranceM);
+    if (part.length < 2) continue;
+    const start: LngLat = [part[0]![0], part[0]![1]];
+    const prev = anchors.at(-1);
+    if (!prev) anchors.push({ id: newId(), lngLat: start });
+    else if (prev.lngLat[0] !== start[0] || prev.lngLat[1] !== start[1]) {
+      legs.push(makeLeg('manual', prev.lngLat, start));
+      anchors.push({ id: newId(), lngLat: start });
+    }
+    legs.push({ line: encodeLine(part) });
+    const end = part.at(-1)!;
+    anchors.push({ id: newId(), lngLat: [end[0], end[1]] });
+  }
+  return geometry(anchors, legs);
 }

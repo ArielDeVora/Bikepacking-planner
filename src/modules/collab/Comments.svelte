@@ -5,7 +5,7 @@
   import IconButton from '../../lib/ui/IconButton.svelte';
   import { newId } from '../../model/ids';
   import type { Comment } from '../../model/types';
-  import { timeAgo } from './time';
+  import { timeAgo } from '../../lib/time';
 
   let { id, ctx }: { id: string; ctx: ModuleContext } = $props();
   const { t, cloud, commands } = $derived(ctx);

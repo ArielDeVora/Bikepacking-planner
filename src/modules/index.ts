@@ -6,4 +6,7 @@ export const modules: ModuleLoader[] = [
   () => import('./trip-tree'),
   () => import('./routes'),
   () => import('./collab'),
+  () => import('./io'),
+  () => import('./elevation'),
+  () => import('./stats'),
 ];

@@ -3,11 +3,11 @@
   import { icons } from '../lib/icons';
   import IconButton from '../lib/ui/IconButton.svelte';
 
-  let { core }: { core: Core } = $props();
+  let { core, offset = 0 }: { core: Core; offset?: number } = $props();
   const toasts = $derived(core.ui.toasts);
 </script>
 
-<div class="toasts" aria-live="polite">
+<div class="toasts" aria-live="polite" style:bottom="{40 + offset}px">
   {#each $toasts as toast (toast.id)}
     <div class="toast {toast.kind}" role={toast.kind === 'error' ? 'alert' : 'status'}>
       <span>{toast.message}</span>

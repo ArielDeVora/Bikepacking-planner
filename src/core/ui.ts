@@ -72,9 +72,15 @@ export class UiRegistry {
   readonly panelSections = registry<PanelSectionSpec>();
   readonly widgets = registry<WidgetSpec>();
   readonly cardSections = registry<CardSectionSpec>();
+  /** Full-width panels along the bottom of the map (e.g. the elevation profile). */
+  readonly drawers = registry<WidgetSpec>();
 
   #cards = writable(new Map<string, CardRenderer>());
   readonly cards: Readable<Map<string, CardRenderer>> = { subscribe: this.#cards.subscribe };
+
+  #dialog = writable<{ component: AnyComponent; props: Record<string, unknown> } | null>(null);
+  /** The open modal dialog, if any. */
+  readonly dialog: Readable<{ component: AnyComponent; props: Record<string, unknown> } | null> = { subscribe: this.#dialog.subscribe };
 
   #toasts = writable<Toast[]>([]);
   readonly toasts: Readable<Toast[]> = { subscribe: this.#toasts.subscribe };
@@ -92,6 +98,10 @@ export class UiRegistry {
     return this.widgets.add(spec);
   }
 
+  addDrawer(spec: WidgetSpec) {
+    return this.drawers.add(spec);
+  }
+
   addCardSection(spec: CardSectionSpec) {
     return this.cardSections.add(spec);
   }
@@ -104,6 +114,15 @@ export class UiRegistry {
         if (next.get(entityType) === renderer) next.delete(entityType);
         return next;
       });
+  }
+
+  openDialog(component: AnyComponent, props: Record<string, unknown> = {}): void {
+    this.#dialog.set({ component, props });
+  }
+
+  /** Closes once the current event handler has finished, so the dialog can still use its props. */
+  closeDialog(component?: AnyComponent): void {
+    queueMicrotask(() => this.#dialog.update((d) => (!component || d?.component === component ? null : d)));
   }
 
   notify(message: string, kind: Toast['kind'] = 'info', ms = 5000, action?: Toast['action']): void {

@@ -85,7 +85,9 @@
     </div>
   </div>
 
-  {#if MODES[seg.mode].snappable && profiles.length}
+  {#if seg.geomType === 'imported'}
+    <p class="hint muted">{t('segment.importedHint')}</p>
+  {:else if MODES[seg.mode].snappable && profiles.length}
     <label class="check">
       <input type="checkbox" checked={seg.geomType === 'routed'} onchange={(e) => toggleSnap(e.currentTarget.checked)} />
       {seg.mode === 'train' ? t('segment.snapRail') : t('segment.snap')}
@@ -143,7 +145,9 @@
     <textarea value={seg.notes} oninput={(e) => edit('notes', e.currentTarget.value)} onblur={() => commands.seal()}></textarea>
   </label>
 
-  <p class="hint muted">{t('segment.hint')}</p>
+  {#if seg.geomType !== 'imported'}
+    <p class="hint muted">{t('segment.hint')}</p>
+  {/if}
 
   <footer>
     {#if seg.geomType === 'routed'}

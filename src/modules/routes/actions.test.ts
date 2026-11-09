@@ -88,3 +88,16 @@ describe('routes actions', () => {
     expect(store.get(seg.id, 'segment')!.profile).toBe('gravel');
   });
 });
+
+describe('imported segments', () => {
+  it('keep their geometry when the mode changes', () => {
+    const seg = draw();
+    store.apply([{ ...seg, geomType: 'imported' }], 'load');
+    const imported = store.get(seg.id, 'segment')!;
+    commands.run(changeMode(store, imported, 'train', profileOf, 'mode')!);
+    const after = store.get(seg.id, 'segment')!;
+    expect(after.mode).toBe('train');
+    expect(after.geomType).toBe('imported');
+    expect(after.legs).toBe(imported.legs);
+  });
+});

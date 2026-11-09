@@ -76,6 +76,7 @@ export function changeMode(
   label: string,
 ): Command | null {
   if (seg.mode === mode) return null;
+  if (seg.geomType === 'imported') return { label, changes: [edits.update<Segment>(store, seg.id, { mode, profile: undefined })] };
   const geomType = MODES[mode].geomType;
   const profileChanged = profileOf(seg) !== profileOf({ mode, profile: undefined });
   const redraw = geomType !== seg.geomType || (geomType === 'routed' && profileChanged);

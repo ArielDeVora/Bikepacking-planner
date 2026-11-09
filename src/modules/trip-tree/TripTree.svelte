@@ -4,6 +4,7 @@
   import type { ModuleContext } from '../../core/module';
   import { icons } from '../../lib/icons';
   import Icon from '../../lib/ui/Icon.svelte';
+  import { timeAgo } from '../../lib/time';
   import IconButton from '../../lib/ui/IconButton.svelte';
   import type { Entity, Segment, Trip } from '../../model/types';
   import { addStage, deleteStage, moveSegment, moveStage, sortedSegments, sortedStages } from './actions';
@@ -15,13 +16,17 @@
   const shared = $derived(ctx.cloud.shared);
   const members = $derived(ctx.cloud.members);
 
-  const RECENT_MS = 24 * 60 * 60 * 1000;
+  const profile = $derived(ctx.cloud.profile);
 
-  /** Who else changed this in the last day, if anyone. */
-  function recentEditor(e: Entity) {
+  /** Who last changed this entity, in a shared trip. */
+  function lastEditor(e: Entity) {
     void $members;
-    if (!$shared || !e.updatedBy || ctx.cloud.isMine(e.updatedBy) || Date.now() - e.updatedAt > RECENT_MS) return null;
-    return ctx.cloud.profileOf(e.updatedBy) ?? { name: t('collab.someone'), color: 'var(--fg-muted)' };
+    void $profile;
+    if (!$shared || !e.updatedBy) return null;
+    const mine = ctx.cloud.isMine(e.updatedBy);
+    const p = ctx.cloud.profileOf(e.updatedBy);
+    const name = (p?.name || t('collab.someone')) + (mine ? ` (${t('collab.you')})` : '');
+    return { color: p?.color ?? 'var(--fg-muted)', title: t('tree.lastEdit', { name, when: timeAgo(t, e.updatedAt) }) };
   }
 
   const trip = $derived.by(() => {
@@ -95,10 +100,10 @@
   <IconButton icon={icons.plus} label={t('tree.addStage')} size={16} onclick={add} />
 </div>
 
-{#snippet recent(e: Entity)}
-  {@const who = recentEditor(e)}
+{#snippet editor(e: Entity)}
+  {@const who = lastEditor(e)}
   {#if who}
-    <span class="recent" style:border-color={who.color} title={t('tree.recentEdit', { name: who.name })}></span>
+    <span class="editor" style:background={who.color} title={who.title}></span>
   {/if}
 {/snippet}
 
@@ -113,7 +118,7 @@
           <button type="button" class="name" onclick={() => select(stage.id, segs)}>
             <span class="swatch" style:background={stage.color ?? 'var(--accent)'}></span>
             <span class="label">{stage.name}</span>
-            {@render recent(stage)}
+            {@render editor(stage)}
             <span class="km muted">{km(segs)}</span>
           </button>
           <span class="actions">
@@ -140,7 +145,7 @@
                 <button type="button" class="name" onclick={() => select(seg.id, [seg])}>
                   <Icon d={icons[seg.mode]} size={14} />
                   <span class="label">{seg.name}</span>
-                  {@render recent(seg)}
+                  {@render editor(seg)}
                   <span class="km muted">{km([seg])}</span>
                 </button>
                 <span class="actions">
@@ -230,12 +235,12 @@
     text-overflow: ellipsis;
   }
 
-  .recent {
+  .editor {
     flex: none;
     width: 8px;
     height: 8px;
-    border: 2px solid;
     border-radius: 50%;
+    box-shadow: 0 0 0 1.5px var(--bg);
   }
 
   .km {

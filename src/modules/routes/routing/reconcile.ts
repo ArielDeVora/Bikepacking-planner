@@ -22,6 +22,11 @@ export function createReconciler(
   commands: CommandStack,
   queue: RoutingQueue,
   onError: (err: RoutingError) => void,
+  /**
+   * Whether this client should route the segment's pending legs now. Lets the author route their
+   * own edits, so other clients don't send duplicate requests (or stamp the segment as theirs).
+   */
+  shouldRoute: (seg: Segment) => boolean = () => true,
 ): Reconciler {
   const provider = queue.provider;
 
@@ -42,7 +47,7 @@ export function createReconciler(
 
   function scan(segments: Segment[]): void {
     for (const seg of segments) {
-      if (seg.geomType !== 'routed' || seg.deleted) continue;
+      if (seg.geomType !== 'routed' || seg.deleted || !shouldRoute(seg)) continue;
       const profile = profileOf(seg);
       seg.legs.forEach((leg, i) => {
         if (leg.status !== 'pending') return;

@@ -1,6 +1,7 @@
 import { writable } from 'svelte/store';
 import { defineModule } from '../../core/module';
-import { BASE_MAPS, TERRAIN_DEM, type BaseMap } from './bases';
+import { TERRAIN_DEM } from '../../config/terrain';
+import { BASE_MAPS, type BaseMap } from './bases';
 import LayersSection from './LayersSection.svelte';
 
 const rasterLayerId = (base: BaseMap) => `base-${base.id}`;

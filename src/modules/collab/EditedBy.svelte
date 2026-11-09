@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { ModuleContext } from '../../core/module';
-  import { timeAgo } from './time';
+  import { timeAgo } from '../../lib/time';
 
   let { id, ctx }: { id: string; ctx: ModuleContext } = $props();
   const { t, cloud } = $derived(ctx);

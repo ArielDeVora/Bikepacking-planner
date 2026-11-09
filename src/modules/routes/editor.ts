@@ -46,9 +46,11 @@ export class RouteEditor {
     private defaultMode: () => TravelMode,
   ) {}
 
+  /** The selected segment, if its points can be edited (imported tracks can't be, yet). */
   get #active(): Segment | undefined {
     const id = this.renderer.activeId;
-    return id ? this.ctx.store.get(id, 'segment') : undefined;
+    const seg = id ? this.ctx.store.get(id, 'segment') : undefined;
+    return seg?.geomType === 'imported' ? undefined : seg;
   }
 
   attach(): () => void {
@@ -105,9 +107,12 @@ export class RouteEditor {
       return;
     }
     const selected = this.ctx.selection.current[0];
+    const selectedEntity = selected ? store.get(selected) : undefined;
+    const stageId =
+      selectedEntity?.type === 'stage' ? selectedEntity.id : selectedEntity?.type === 'segment' ? selectedEntity.stageId : undefined;
     const { command, segmentId } = createSegment(store, {
       tripId: this.ctx.tripId,
-      stageId: selected && store.get(selected, 'stage') ? selected : undefined,
+      stageId,
       mode: this.defaultMode(),
       points: [this.#start, lngLat],
       label: t('cmd.drawSegment'),

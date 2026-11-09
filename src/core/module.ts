@@ -1,5 +1,5 @@
 import type { Map as MapLibreMap } from 'maplibre-gl';
-import type { Trip } from '../model/types';
+import type { Entity, Trip } from '../model/types';
 import type { EventBus, Events } from './bus';
 import type { Cloud } from './cloud/cloud';
 import type { CommandStack } from './commands';
@@ -35,6 +35,8 @@ export interface TripManager {
   /** Reloads the app on another trip. */
   open(id: string): Promise<void>;
   create(name?: string): Promise<void>;
+  /** Saves a complete trip (e.g. a restored backup) and opens it. */
+  add(entities: Entity[]): Promise<void>;
 }
 
 export type Teardown = () => void;

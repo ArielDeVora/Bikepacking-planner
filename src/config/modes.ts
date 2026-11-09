@@ -21,6 +21,8 @@ export interface ModeConfig {
   snappable: boolean;
   /** Take the stage colour (or the segment's own colour) instead of `style.color`. */
   stageColor: boolean;
+  /** Fill in elevation from terrain data where the line has none (straight or imported legs). */
+  terrain: boolean;
   style: LineStyle;
   /** Map icon at the middle of each line. */
   icon?: 'plane';
@@ -32,6 +34,7 @@ export const MODES: Record<TravelMode, ModeConfig> = {
     geomType: 'routed',
     snappable: true,
     stageColor: true,
+    terrain: true,
     style: { color: '#e8590c', width: 4 },
   },
   walk: {
@@ -39,6 +42,7 @@ export const MODES: Record<TravelMode, ModeConfig> = {
     geomType: 'routed',
     snappable: true,
     stageColor: true,
+    terrain: true,
     style: { color: '#e8590c', width: 3, dash: [0, 2] },
   },
   train: {
@@ -46,6 +50,7 @@ export const MODES: Record<TravelMode, ModeConfig> = {
     geomType: 'manual',
     snappable: true,
     stageColor: false,
+    terrain: false,
     style: { color: '#343a40', width: 4.5, overlay: { color: '#ffffff', width: 2, dash: [3, 3] } },
   },
   bus: {
@@ -53,6 +58,7 @@ export const MODES: Record<TravelMode, ModeConfig> = {
     geomType: 'manual',
     snappable: true,
     stageColor: false,
+    terrain: false,
     style: { color: '#9c36b5', width: 3.5, dash: [3, 1.5] },
   },
   car: {
@@ -60,6 +66,7 @@ export const MODES: Record<TravelMode, ModeConfig> = {
     geomType: 'routed',
     snappable: true,
     stageColor: false,
+    terrain: false,
     style: { color: '#495057', width: 3.5, dash: [1, 1] },
   },
   boat: {
@@ -67,6 +74,7 @@ export const MODES: Record<TravelMode, ModeConfig> = {
     geomType: 'manual',
     snappable: false,
     stageColor: false,
+    terrain: false,
     style: { color: '#1971c2', width: 3, dash: [2, 2] },
   },
   plane: {
@@ -74,6 +82,7 @@ export const MODES: Record<TravelMode, ModeConfig> = {
     geomType: 'greatCircle',
     snappable: false,
     stageColor: false,
+    terrain: false,
     style: { color: '#495057', width: 2, dash: [4, 3], opacity: 0.9 },
     icon: 'plane',
   },

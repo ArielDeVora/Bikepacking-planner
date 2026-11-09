@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { t } from '../../core/i18n';
+import { t } from '../core/i18n';
 import { timeAgo } from './time';
 
 describe('timeAgo', () => {

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { decodeLine } from '../lib/geo/polyline';
 import {
   findPendingLeg,
+  importedGeometry,
   insertAnchor,
   makeLeg,
   moveAnchor,
@@ -91,5 +92,35 @@ describe('segment geometry', () => {
     expect(rebuildLegs(g, 'routed').legs.every((l) => l.status === 'pending')).toBe(true);
     const failed = { ...g, legs: [{ line: g.legs[0]!.line, status: 'failed' as const }, g.legs[1]!] };
     expect(retryFailedLegs(failed).legs.map((l) => l.status)).toEqual(['pending', undefined]);
+  });
+});
+
+describe('imported geometry', () => {
+  it('keeps each part as a leg and bridges gaps', () => {
+    const g = importedGeometry([
+      [
+        [7, 45, 500],
+        [7.001, 45, 510],
+        [7.002, 45.001, 520],
+      ],
+      [
+        [7.003, 45.001, 520],
+        [7.004, 45.002, 530],
+      ],
+      [[8, 46, 0]],
+    ]);
+    expect(g.legs).toHaveLength(3);
+    expect(g.anchors).toHaveLength(4);
+    expect(decodeLine(g.legs[0]!.line)).toHaveLength(3);
+    expect(decodeLine(g.legs[1]!.line)).toEqual([
+      [7.002, 45.001],
+      [7.003, 45.001],
+    ]);
+    expect(g.legs.every((l) => !l.status)).toBe(true);
+    expect(g.stats.ascentM).toBe(30);
+  });
+
+  it('returns nothing for empty input', () => {
+    expect(importedGeometry([[[1, 1]]]).anchors).toEqual([]);
   });
 });

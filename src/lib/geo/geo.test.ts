@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { closestOnPolyline, distance, elevationGain, greatCircle, lineLength } from './geo';
+import { closestOnPolyline, densify, distance, distanceToLine, elevationGain, greatCircle, lineLength, simplify } from './geo';
 
 describe('geo helpers', () => {
   it('measures distances', () => {
@@ -39,5 +39,39 @@ describe('geo helpers', () => {
       [12, 4],
     );
     expect(best).toEqual({ index: 1, point: [10, 4], dist: 2 });
+  });
+});
+
+describe('simplify, densify, distanceToLine', () => {
+  it('drops points on straight lines but keeps corners and climbs', () => {
+    const line: [number, number, number][] = [];
+    for (let i = 0; i <= 100; i++) line.push([7 + i * 0.0001, 45, 500]);
+    for (let i = 1; i <= 100; i++) line.push([7.01, 45 + i * 0.0001, 500]);
+    const out = simplify(line, 2);
+    expect(out).toEqual([line[0], line[100], line[200]]);
+
+    const hill: [number, number, number][] = [
+      [7, 45, 500],
+      [7.0005, 45, 560],
+      [7.001, 45, 500],
+    ];
+    expect(simplify(hill, 2)).toHaveLength(3);
+    expect(simplify([[1, 1], [1, 1], [2, 2]] as [number, number][])).toEqual([
+      [1, 1],
+      [2, 2],
+    ]);
+  });
+
+  it('densifies straight lines', () => {
+    const pts = densify([7, 45], [7.01, 45], 100);
+    expect(pts[0]).toEqual([7, 45]);
+    expect(pts.at(-1)).toEqual([7.01, 45]);
+    expect(pts.length).toBeGreaterThanOrEqual(8);
+    expect(densify([7, 45], [7, 45]).length).toBe(2);
+  });
+
+  it('measures the distance to a line', () => {
+    expect(distanceToLine([7.005, 45.001], [[7, 45], [7.01, 45]])).toBeCloseTo(110.6, 0);
+    expect(distanceToLine([7, 45], [[7, 45]])).toBe(0);
   });
 });

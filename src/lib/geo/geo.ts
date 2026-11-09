@@ -94,3 +94,65 @@ export function closestOnPolyline(points: readonly (readonly [number, number])[]
   }
   return best;
 }
+
+const M_PER_DEG_LAT = 110_574;
+const M_PER_DEG_LNG = 111_320;
+
+/** Local metric coordinates: good enough for small distances such as simplification tolerances. */
+function toMetres(c: readonly number[]): [number, number, number] {
+  return [c[0]! * M_PER_DEG_LNG * Math.cos(rad(c[1]!)), c[1]! * M_PER_DEG_LAT, c[2] ?? 0];
+}
+
+function distToSegment3(p: number[], a: number[], b: number[]): number {
+  const d = [b[0]! - a[0]!, b[1]! - a[1]!, b[2]! - a[2]!];
+  const len2 = d[0]! ** 2 + d[1]! ** 2 + d[2]! ** 2;
+  let t = len2 ? ((p[0]! - a[0]!) * d[0]! + (p[1]! - a[1]!) * d[1]! + (p[2]! - a[2]!) * d[2]!) / len2 : 0;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(p[0]! - (a[0]! + t * d[0]!), p[1]! - (a[1]! + t * d[1]!), p[2]! - (a[2]! + t * d[2]!));
+}
+
+/**
+ * Douglas-Peucker in 3D (metres, elevation included), so that points carrying a change in
+ * elevation are kept too. Drops consecutive duplicates first.
+ */
+export function simplify<T extends readonly number[]>(coords: readonly T[], toleranceM = 2): T[] {
+  const pts = coords.filter((c, i) => i === 0 || c[0] !== coords[i - 1]![0] || c[1] !== coords[i - 1]![1]);
+  if (pts.length < 3) return [...pts];
+  const m = pts.map(toMetres);
+  const keep = new Uint8Array(pts.length);
+  keep[0] = keep[pts.length - 1] = 1;
+  const stack: [number, number][] = [[0, pts.length - 1]];
+  while (stack.length) {
+    const [first, last] = stack.pop()!;
+    let maxD = 0;
+    let index = -1;
+    for (let i = first + 1; i < last; i++) {
+      const d = distToSegment3(m[i]!, m[first]!, m[last]!);
+      if (d > maxD) {
+        maxD = d;
+        index = i;
+      }
+    }
+    if (index >= 0 && maxD > toleranceM) {
+      keep[index] = 1;
+      stack.push([first, index], [index, last]);
+    }
+  }
+  return pts.filter((_, i) => keep[i]);
+}
+
+/** Points on the straight (linear lng/lat) line from a to b, about `stepM` apart, both ends included. */
+export function densify(a: Pos, b: Pos, stepM = 100, maxPoints = 2000): [number, number][] {
+  const n = Math.min(maxPoints - 1, Math.max(1, Math.ceil(distance(a, b) / stepM)));
+  const out: [number, number][] = [];
+  for (let i = 0; i <= n; i++) out.push([a[0] + ((b[0] - a[0]) * i) / n, a[1] + ((b[1] - a[1]) * i) / n]);
+  return out;
+}
+
+/** Shortest distance in metres from a point to a polyline (local approximation). */
+export function distanceToLine(p: Pos, coords: readonly Pos[]): number {
+  const lat0 = rad(p[1]);
+  const xy = (c: Pos): [number, number] => [(c[0] - p[0]) * M_PER_DEG_LNG * Math.cos(lat0), (c[1] - p[1]) * M_PER_DEG_LAT];
+  if (coords.length === 1) return Math.hypot(...xy(coords[0]!));
+  return closestOnPolyline(coords.map(xy), [0, 0])?.dist ?? Infinity;
+}

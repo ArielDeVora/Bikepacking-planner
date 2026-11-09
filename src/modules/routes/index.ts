@@ -2,7 +2,7 @@ import { writable } from 'svelte/store';
 import { edits } from '../../core/commands';
 import { defineModule } from '../../core/module';
 import { icons } from '../../lib/icons';
-import type { TravelMode } from '../../model/types';
+import type { Segment, TravelMode } from '../../model/types';
 import { RouteEditor } from './editor';
 import Legend from './Legend.svelte';
 import { RouteRenderer } from './render';
@@ -29,7 +29,23 @@ export default defineModule({
         'warn',
       );
     };
-    const reconciler = createReconciler(store, ctx.commands, queue, onError);
+    // Someone else's pending legs are routed here only if they stay pending for a while.
+    const STALE_MS = 30_000;
+    const recheck = new Map<string, ReturnType<typeof setTimeout>>();
+    const shouldRoute = (seg: Segment) => {
+      if (ctx.cloud.isMine(seg.updatedBy) || Date.now() - seg.updatedAt > STALE_MS) return true;
+      clearTimeout(recheck.get(seg.id));
+      recheck.set(
+        seg.id,
+        setTimeout(() => {
+          recheck.delete(seg.id);
+          const current = store.get(seg.id, 'segment');
+          if (current) reconciler.scan([current]);
+        }, STALE_MS),
+      );
+      return false;
+    };
+    const reconciler = createReconciler(store, ctx.commands, queue, onError, shouldRoute);
 
     const renderer = new RouteRenderer(map, ctx.layers, store);
     renderer.install();

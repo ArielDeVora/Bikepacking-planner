@@ -11,6 +11,16 @@
   const { t } = $derived(core);
   const sections = $derived(core.ui.panelSections);
   const widgets = $derived(core.ui.widgets);
+  const drawers = $derived(core.ui.drawers);
+  let bottomHeight = $state(0);
+  const dialog = $derived(core.ui.dialog);
+
+  function onKeydown(e: KeyboardEvent) {
+    if ($dialog && e.key === 'Escape') {
+      e.stopPropagation();
+      core.ui.closeDialog();
+    }
+  }
   const theme = $derived(core.theme);
   const status = $derived(core.status);
 
@@ -52,15 +62,31 @@
 {/if}
 
 <Toolbar {core} shifted={panelOpen} />
-{#if $widgets.length}
-  <div class="widgets" class:shifted={panelOpen}>
-    {#each $widgets as widget (widget.id)}
-      <widget.component {...widget.props} />
-    {/each}
+<div class="bottom" class:shifted={panelOpen} bind:clientHeight={bottomHeight}>
+  {#if $widgets.length}
+    <div class="widgets">
+      {#each $widgets as widget (widget.id)}
+        <widget.component {...widget.props} />
+      {/each}
+    </div>
+  {/if}
+  {#each $drawers as drawer (drawer.id)}
+    <drawer.component {...drawer.props} />
+  {/each}
+</div>
+<InfoCard {core} />
+<Toasts {core} offset={bottomHeight} />
+
+{#if $dialog}
+  {@const Dialog = $dialog.component}
+  <div class="backdrop" role="presentation" onclick={(e) => e.target === e.currentTarget && core.ui.closeDialog()}>
+    <div class="dialog" role="dialog" aria-modal="true">
+      <Dialog {...$dialog.props} />
+    </div>
   </div>
 {/if}
-<InfoCard {core} />
-<Toasts {core} />
+
+<svelte:window onkeydowncapture={onKeydown} />
 
 {#if $status === 'loading'}
   <div class="loading" role="status">{t('app.loading')}</div>
@@ -136,24 +162,55 @@
     padding: 4px;
   }
 
-  .widgets {
+  .bottom {
     position: absolute;
     bottom: calc(var(--gap) + 28px);
     left: var(--gap);
+    right: calc(var(--gap) + 44px);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+    transition: left 0.18s ease;
+  }
+
+  .bottom > :global(*) {
+    pointer-events: auto;
+  }
+
+  .bottom.shifted {
+    left: calc(var(--panel-w) + 2 * var(--gap));
+  }
+
+  .widgets {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
     gap: 8px;
-    pointer-events: none;
-    transition: left 0.18s ease;
+    pointer-events: none !important;
   }
 
   .widgets > :global(*) {
     pointer-events: auto;
   }
 
-  .widgets.shifted {
-    left: calc(var(--panel-w) + 2 * var(--gap));
+  .backdrop {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: var(--gap);
+    background: rgb(0 0 0 / 0.35);
+  }
+
+  .dialog {
+    width: min(560px, 100%);
+    max-height: calc(100% - 2 * var(--gap));
+    overflow-y: auto;
+    padding: 18px;
+    background: var(--bg);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
   }
 
   .loading {
@@ -169,7 +226,7 @@
   }
 
   @media (max-width: 640px) {
-    .widgets.shifted {
+    .bottom.shifted {
       left: var(--gap);
     }
 

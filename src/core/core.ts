@@ -129,9 +129,14 @@ export function createCore(container: HTMLElement) {
       location.reload();
     },
     async create(name?: string): Promise<void> {
-      const entities = newTripEntities(name);
-      if (db) await putEntities(db, entities);
-      await trips.open(entities[0]!.id);
+      await trips.add(newTripEntities(name));
+    },
+    /** Saves a complete trip (e.g. a restored backup) and opens it. */
+    async add(entities: Entity[]): Promise<void> {
+      const trip = entities.find((e) => e.type === 'trip');
+      if (!trip || !db) throw new Error(t('app.storageUnavailable'));
+      await putEntities(db, entities);
+      await trips.open(trip.id);
     },
   };
 

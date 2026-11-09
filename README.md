@@ -11,6 +11,8 @@ It's a static site on GitHub Pages. Everything is stored in the browser (Indexed
 - Change the travel mode, routing profile and colour in the card on the right. Line styles live in `src/config/modes.ts`.
 - **Cmd/Ctrl+Z** undoes, **Cmd/Ctrl+Shift+Z** redoes.
 - **Sharing** (side panel): sign in, share the trip, invite friends, switch between trips. Comments are at the bottom of each stage or segment card.
+- **Import**: drop GPX, KML, TCX or GeoJSON files on the page (many at once), check the preview, pick the stage. **Export** the trip, a stage or a segment as GPX, or the whole trip as a JSON backup (drop it back in to restore it as a new trip).
+- **E** opens the elevation profile for the selected segment, its stage, or the whole trip. The **Stats** section shows km and climb by travel mode.
 
 ## Local development
 
@@ -90,6 +92,7 @@ Free Supabase projects pause after a week with little activity. The **Keep Supab
 - [Architecture and milestone 1](docs/01-skeleton.md): core concepts, how to add a module, map sources and their terms.
 - [Milestone 2: routes](docs/02-routes.md): drawing and editing segments, routing, travel modes and line styles.
 - [Milestone 3: collaboration](docs/03-collaboration.md): database, sync, conflicts, comments.
+- [Milestone 4: import, export, elevation and stats](docs/04-import-export-elevation.md).
 - [Spec](docs/SPEC.md)
 
 ## Credits
