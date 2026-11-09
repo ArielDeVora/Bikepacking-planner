@@ -39,10 +39,34 @@ The State Department identifies countries with FIPS codes, which clash with ISO 
   - drop onto a stage to move it to the end of that stage.
   Dragging a selected segment drags the whole selection.
 - **Stages** can be dragged too: above or below another stage to reorder (selected stages move together).
+- **Groups** within a stage (see below).
 - **Eye** on each segment and stage: hides it from the map (or shows it again); hiding a stage hides all its segments. **Show all** at the top brings everything back. This is a viewing preference, kept per trip in each browser and not shared (`ctx.visibility`, `src/core/visibility.ts`).
 - **Collapse**: the arrow next to a stage hides its segments in the list; the button at the top collapses or expands every stage. Remembered per trip in each browser.
 - **Panel width**: drag the panel's right edge (260 to 640 px); double-click it for the default. Remembered in each browser.
 - **Import** has its own toolbar button (`I`), always visible.
+
+## Groups
+
+A stage can hold groups of segments (a day, a detour, a variant…), next to segments that aren't in a group.
+
+- **Create**: select segments (Cmd/Ctrl+click, Shift+click), then **Group** in the multiple-selection card, or press **G**. The group takes the place of the first segment. A group stays within one stage: when the selection spans stages, only the first stage's segments are grouped, and a toast says so. A single selected segment can be grouped too.
+- **Tree**: a group row has a folder icon in the group's colour, its total distance, an arrow to collapse it, an eye, up/down, **Ungroup** and delete. Shift+click ranges include groups and the segments inside them.
+- **Drag and drop**:
+  - a segment dropped onto a group goes in at the end; dropped between two segments of a group, it goes there; dragged out between items of the stage, it leaves the group;
+  - a group is dragged between the items of its stage, or onto another stage (its segments go with it). Groups can't go inside groups;
+  - up/down on the first or last segment of a group takes it out of the group.
+- **Group card**: name, planned date, colour, notes, stats, **Ungroup** (keeps the segments where the group was), **Delete group and segments**, GPX export, OSM places along it, and comments.
+- **Colour**: bike and walk segments use the group's colour instead of the stage's (a segment's own colour still wins). The × next to it goes back to the stage colour.
+- **Map and profile**: the eye on a group hides its segments; selecting a group outlines its segments on the map and highlights them in the stage's elevation profile.
+- **Drawing** with a group (or one of its segments) selected adds the new segment at the end of the group.
+- Merging with the next segment (**M**) only joins segments of the same group; fusing several (from the card or by drag and drop) works across groups.
+- **Delete** (key or card) on a group deletes its segments too; undo brings everything back.
+
+### How groups are stored
+
+`group` is a new entity type (`Group`: `stageId`, `order`, `name`, `notes`, `color?`, `plannedDate?`), synced like everything else (no database change). A segment in a group has a `groupId`. Order keys work in two spaces: a stage's groups and ungrouped segments share one order (the stage's children), and a group's segments are ordered among themselves. A segment whose group was deleted elsewhere counts as ungrouped.
+
+Everything that lists segments in trip order uses `src/lib/tree.ts` (`stageChildren`, `groupSegments`, `stageSegments`, `tripSegments`, `segmentsOf`): GPX export, border crossings, travel advice, the elevation profile, stats, the importer and drawing. Group commands (`groupCommand`, `ungroupCommand`, `moveIntoCommand`, `deleteGroupCommand`, `removeChanges`) are in `src/lib/segment-edits.ts`.
 
 ## Elevation profile
 
@@ -60,7 +84,10 @@ scripts/fetch-advisories.mjs        US advisories at build time
 src/lib/countries.ts                Natural Earth outlines (shared by borders and risk)
 src/modules/risk/                   advisories (US, UK), overlay, Travel advice section, country card
 src/modules/editing/MultiCard.svelte multiple-selection card
-src/lib/segment-edits.ts            + inTripOrder, mergeManyCommand, moveSegmentsCommand
+src/lib/segment-edits.ts            + inTripOrder, mergeManyCommand, moveSegmentsCommand, group commands
+src/lib/tree.ts                     trip order: stages, groups and segments
+src/lib/group-actions.ts            group the selected segments (card button and G)
+src/modules/trip-tree/GroupCard.svelte group card
 ```
 
 Core: `ui.addMultiCard` (the info card for several selected entities) and `ui.addPointLayer` (markers that take clicks before route lines).

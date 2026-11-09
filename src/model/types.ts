@@ -1,6 +1,6 @@
 export type LngLat = [lng: number, lat: number];
 
-export type EntityType = 'trip' | 'stage' | 'segment' | 'poi' | 'zone' | 'borderCrossing' | 'comment';
+export type EntityType = 'trip' | 'stage' | 'group' | 'segment' | 'poi' | 'zone' | 'borderCrossing' | 'comment';
 
 export interface BaseEntity {
   id: string;
@@ -23,6 +23,21 @@ export interface Stage extends BaseEntity {
   order: string;
   name: string;
   notes: string;
+  color?: string;
+  plannedDate?: string;
+}
+
+/**
+ * Segments grouped within a stage. A stage's children are its groups and its ungrouped segments,
+ * sharing one order; a group's segments are ordered among themselves.
+ */
+export interface Group extends BaseEntity {
+  type: 'group';
+  stageId: string;
+  order: string;
+  name: string;
+  notes: string;
+  /** Colour for its bike and walk segments, instead of the stage's. */
   color?: string;
   plannedDate?: string;
 }
@@ -59,6 +74,9 @@ export interface SegmentStats {
 export interface Segment extends BaseEntity {
   type: 'segment';
   stageId: string;
+  /** The group it belongs to, within its stage (none: directly in the stage). */
+  groupId?: string;
+  /** Order among its group's segments, or among the stage's children when not in a group. */
   order: string;
   name: string;
   notes: string;
@@ -145,7 +163,7 @@ export interface Comment extends BaseEntity {
   createdAt: number;
 }
 
-export type Entity = Trip | Stage | Segment | Poi | Zone | BorderCrossing | Comment;
+export type Entity = Trip | Stage | Group | Segment | Poi | Zone | BorderCrossing | Comment;
 export type EntityOf<T extends EntityType> = Extract<Entity, { type: T }>;
 
 /** An entity before it has been stamped by the command system. */

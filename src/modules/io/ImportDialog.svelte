@@ -25,7 +25,7 @@
   const defaultStageId = $derived.by(() => {
     const id = selection.current[0];
     const e = id ? store.get(id) : undefined;
-    return e?.type === 'stage' ? e.id : e?.type === 'segment' ? e.stageId : undefined;
+    return e?.type === 'stage' ? e.id : e?.type === 'segment' || e?.type === 'group' ? e.stageId : undefined;
   });
 
   let target = $state<ImportTarget>('auto');

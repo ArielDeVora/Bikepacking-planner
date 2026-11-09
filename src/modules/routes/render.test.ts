@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { encodeLine } from '../../lib/geo/polyline';
-import type { Segment, Stage } from '../../model/types';
+import type { Group, Segment, Stage } from '../../model/types';
 import { legFeatures, segmentColor } from './render';
 
 const seg = (over: Partial<Segment> = {}): Segment =>
@@ -13,6 +13,13 @@ describe('route styles', () => {
     expect(segmentColor(seg({ color: '#123456' }), stage)).toBe('#123456');
     expect(segmentColor(seg({ mode: 'train' }), stage)).toBe('#343a40');
     expect(segmentColor(seg({ mode: 'train', color: '#123456' }), stage)).toBe('#123456');
+  });
+
+  it('prefers the group colour to the stage colour', () => {
+    const group = { color: '#aa00aa' } as Group;
+    expect(segmentColor(seg(), stage, group)).toBe('#aa00aa');
+    expect(segmentColor(seg(), stage, {} as Group)).toBe('#2f9e44');
+    expect(segmentColor(seg({ mode: 'train' }), stage, group)).toBe('#343a40');
   });
 
   it('carries the width and pattern, falling back to the travel mode', () => {

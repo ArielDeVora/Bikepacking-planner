@@ -20,7 +20,8 @@ export interface Stats {
 
 const DAY_MS = 86_400_000;
 
-export function computeStats(stages: Stage[], segments: Segment[]): Stats {
+/** `extraDates`: planned dates of anything else in scope (a group's). */
+export function computeStats(stages: Stage[], segments: Segment[], extraDates: (string | undefined)[] = []): Stats {
   const totals = new Map<TravelMode, ModeTotal>();
   for (const s of segments) {
     const t = totals.get(s.mode) ?? { mode: s.mode, lengthM: 0, ascentM: 0, segments: 0 };
@@ -30,7 +31,7 @@ export function computeStats(stages: Stage[], segments: Segment[]): Stats {
     totals.set(s.mode, t);
   }
   const byMode = MODE_ORDER.map((m) => totals.get(m)).filter((t): t is ModeTotal => !!t);
-  const dates = [...stages.map((s) => s.plannedDate), ...segments.map((s) => s.plannedDate)]
+  const dates = [...stages.map((s) => s.plannedDate), ...segments.map((s) => s.plannedDate), ...extraDates]
     .filter((d): d is string => !!d && /^\d{4}-\d{2}-\d{2}$/.test(d))
     .sort();
   const from = dates[0];

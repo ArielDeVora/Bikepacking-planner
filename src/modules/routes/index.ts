@@ -1,4 +1,6 @@
 import { get, writable } from 'svelte/store';
+import { removeChanges } from '../../lib/segment-edits';
+import { groupSegments } from '../../lib/tree';
 import { edits } from '../../core/commands';
 import { defineModule } from '../../core/module';
 import { icons } from '../../lib/icons';
@@ -61,7 +63,8 @@ export default defineModule({
       const ids = selection.current;
       const seg = ids.length === 1 ? store.get(ids[0]!, 'segment') : undefined;
       renderer.setActive(seg?.id ?? null);
-      renderer.setSelected(ids.length > 1 ? ids : []);
+      const outlined = ids.flatMap((id) => (store.get(id, 'group') ? groupSegments(store, id).map((s) => s.id) : [id]));
+      renderer.setSelected(ids.length > 1 || store.get(ids[0] ?? '', 'group') ? outlined : []);
       editor.onSelectionChanged();
     };
 
@@ -111,9 +114,9 @@ export default defineModule({
       if (editor.deleteSelectedAnchor()) return;
       const ids = selection.current.filter((id) => {
         const type = store.get(id)?.type;
-        return type === 'segment' || type === 'poi' || type === 'zone' || type === 'borderCrossing';
+        return type === 'segment' || type === 'group' || type === 'poi' || type === 'zone' || type === 'borderCrossing';
       });
-      if (ids.length) ctx.commands.run({ label: t('tree.delete'), changes: ids.map((id) => edits.remove(store, id)) });
+      if (ids.length) ctx.commands.run({ label: t('tree.delete'), changes: removeChanges(store, ids) });
     };
     const offShortcuts = [
       shortcuts.add({ keys: 'd', label: t('routes.draw'), run: () => editor.toggleDrawing() }),

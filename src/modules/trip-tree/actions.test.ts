@@ -3,7 +3,8 @@ import { CommandStack } from '../../core/commands';
 import { TripStore } from '../../core/store';
 import type { Segment } from '../../model/types';
 import { stage, trip, TRIP_ID } from '../../test/fixtures';
-import { addStage, deleteStage, moveSegment, moveStage, moveStagesCommand, sortedSegments, sortedStages } from './actions';
+import { addStage, deleteStage, moveSegment, moveStage, moveStagesCommand, sortedStages } from './actions';
+import { stageSegments as sortedSegments } from '../../lib/tree';
 
 let store: TripStore;
 let commands: CommandStack;

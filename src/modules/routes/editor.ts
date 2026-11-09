@@ -6,7 +6,7 @@ import { closestOnPolyline } from '../../lib/geo/geo';
 import { insertAnchor, legCoords, moveAnchor, removeAnchor } from '../../model/segment';
 import type { LngLat, Segment, TravelMode } from '../../model/types';
 import { createSegment } from './actions';
-import { segmentColor, SRC, type RouteRenderer } from './render';
+import { routeColor, SRC, type RouteRenderer } from './render';
 
 export const DRAW_TOOL = 'routes.draw';
 
@@ -62,7 +62,7 @@ export class RouteEditor {
     const seg = id ? this.ctx.store.get(id, 'segment') : undefined;
     if (!seg || seg.geomType === 'imported') return undefined;
     // Hidden from the map: nothing to edit there.
-    return this.ctx.visibility.isHidden(seg.id) || this.ctx.visibility.isHidden(seg.stageId) ? undefined : seg;
+    return this.ctx.visibility.segmentHidden(seg) ? undefined : seg;
   }
 
   attach(): () => void {
@@ -124,10 +124,12 @@ export class RouteEditor {
     const selected = this.ctx.selection.current[0];
     const selectedEntity = selected ? store.get(selected) : undefined;
     const stageId =
-      selectedEntity?.type === 'stage' ? selectedEntity.id : selectedEntity?.type === 'segment' ? selectedEntity.stageId : undefined;
+      selectedEntity?.type === 'stage' ? selectedEntity.id : selectedEntity?.type === 'segment' || selectedEntity?.type === 'group' ? selectedEntity.stageId : undefined;
+    const groupId = selectedEntity?.type === 'group' ? selectedEntity.id : selectedEntity?.type === 'segment' ? selectedEntity.groupId : undefined;
     const { command, segmentId } = createSegment(store, {
       tripId: this.ctx.tripId,
       stageId,
+      groupId,
       mode: this.defaultMode(),
       points: [this.#start, lngLat],
       label: t('cmd.drawSegment'),
@@ -359,7 +361,7 @@ export class RouteEditor {
   #render(): void {
     this.#frame = 0;
     const seg = this.#active;
-    const color = seg ? segmentColor(seg, this.ctx.store.get(seg.stageId, 'stage')) : '#495057';
+    const color = seg ? routeColor(this.ctx.store, seg) : '#495057';
     const point = (lngLat: LngLat, props: Record<string, unknown>): GeoJSON.Feature => ({
       type: 'Feature',
       properties: { color, ...props },

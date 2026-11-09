@@ -3,7 +3,7 @@ import { get, writable } from 'svelte/store';
 import { defineModule } from '../../core/module';
 import { loadCountries, type CountryIndex } from '../../lib/countries';
 import { distance } from '../../lib/geo/geo';
-import { compareOrder } from '../../model/order';
+import { tripSegments } from '../../lib/tree';
 import { segmentCoords } from '../../model/segment';
 import { usAdvisories, type TripCountries } from './advisories';
 import CountryAdvice from './CountryAdvice.svelte';
@@ -95,11 +95,7 @@ export default defineModule({
       countries.set({ status: 'loading', countries: [] });
       try {
         const index = await loadCountries();
-        const lines = store
-          .list('stage')
-          .sort(compareOrder)
-          .flatMap((st) => store.list('segment', (s) => s.stageId === st.id).sort(compareOrder))
-          .map((s) => segmentCoords(s));
+        const lines = tripSegments(store).map((s) => segmentCoords(s));
         countries.set({ status: 'ready', countries: countriesAlong(index, lines) });
       } catch {
         countries.set({ status: 'error', countries: [] });

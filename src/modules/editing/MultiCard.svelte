@@ -1,18 +1,19 @@
 <script lang="ts">
   import { edits } from '../../core/commands';
   import type { ModuleContext } from '../../core/module';
-  import { inTripOrder, mergeManyCommand, moveSegmentsCommand } from '../../lib/segment-edits';
+  import { inTripOrder, mergeManyCommand, moveSegmentsCommand, removeChanges } from '../../lib/segment-edits';
   import LineStyleFields from '../../lib/ui/LineStyleFields.svelte';
   import { lineStyleOf } from '../../lib/ui/line-style';
   import { MODES } from '../../config/modes';
-  import { compareOrder } from '../../model/order';
+  import { groupSegmentsAction } from '../../lib/group-actions';
+  import { sortedStages } from '../../lib/tree';
   import type { Segment } from '../../model/types';
 
   let { ids, ctx }: { ids: string[]; ctx: ModuleContext } = $props();
   const { t, commands, selection } = $derived(ctx);
   const store = $derived(ctx.store);
 
-  const DELETABLE = new Set(['segment', 'poi', 'zone', 'borderCrossing']);
+  const DELETABLE = new Set(['segment', 'group', 'poi', 'zone', 'borderCrossing']);
 
   const items = $derived.by(() => {
     void $store;
@@ -22,7 +23,7 @@
   const deletable = $derived(items.filter((e) => DELETABLE.has(e.type)));
   const stages = $derived.by(() => {
     void $store;
-    return store.list('stage').sort(compareOrder);
+    return sortedStages(store);
   });
   const km = $derived(segments.reduce((sum, s) => sum + s.stats.lengthM, 0) / 1000);
   const climb = $derived(segments.reduce((sum, s) => sum + s.stats.ascentM, 0));
@@ -55,8 +56,11 @@
   {#if segments.length >= 2}
     <button type="button" class="btn primary" onclick={fuse} title={t('multi.fuseHint')}>{t('multi.fuse', { n: segments.length })}</button>
   {/if}
+  {#if segments.length}
+    <button type="button" class="btn" onclick={() => groupSegmentsAction(ctx, segments)} title={t('multi.groupHint')}>{t('multi.group')}</button>
+  {/if}
   {#if deletable.length}
-    <button type="button" class="btn danger" onclick={() => commands.run({ label: t('tree.delete'), changes: deletable.map((e) => edits.remove(store, e.id)) })}>
+    <button type="button" class="btn danger" onclick={() => commands.run({ label: t('tree.delete'), changes: removeChanges(store, deletable.map((e) => e.id)) })}>
       {t('multi.delete', { n: deletable.length })}
     </button>
   {/if}

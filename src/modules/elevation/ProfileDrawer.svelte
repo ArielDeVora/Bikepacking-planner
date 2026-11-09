@@ -5,7 +5,7 @@
   import IconButton from '../../lib/ui/IconButton.svelte';
   import { eraseCommand } from '../../lib/segment-edits';
   import { sliceLine } from '../../model/edit-ops';
-  import { compareOrder } from '../../model/order';
+  import { groupSegments, stageSegments as allStageSegments, tripSegments } from '../../lib/tree';
   import type { Segment } from '../../model/types';
   import { buildProfile, eleAt, GRADE_LEGEND, gradeAt, gradeColor, positionAt, type Profile } from './profile';
 
@@ -41,10 +41,13 @@
     void $store;
     return $ids.length === 1 ? store.get($ids[0]!) : undefined;
   });
-  /** Selected segments, highlighted in the stage or trip profile. */
+  /** Selected segments (and those of selected groups), highlighted in the stage or trip profile. */
   const picked = $derived.by(() => {
     void $store;
-    return $ids.map((id) => store.get(id, 'segment')).filter((s): s is Segment => !!s);
+    return $ids.flatMap((id) => {
+      const e = store.get(id);
+      return e?.type === 'segment' ? [e] : e?.type === 'group' ? groupSegments(store, id) : [];
+    });
   });
   const pickedStage = $derived(picked.length && picked.every((s) => s.stageId === picked[0]!.stageId) ? picked[0]!.stageId : null);
   // With a segment selected, the profile shows its stage with the segment highlighted.
@@ -64,15 +67,14 @@
   });
 
   const ground = (s: Segment) => s.mode !== 'plane';
-  const stageSegments = (stageId: string) => store.list('segment', (s) => s.stageId === stageId && ground(s)).sort(compareOrder);
+  const stageSegments = (stageId: string) => allStageSegments(store, stageId).filter(ground);
 
   const target = $derived.by((): { title: string; segments: Segment[] } => {
     void $store;
     if (scope === 'segment' && picked.length === 1) return { title: picked[0]!.name, segments: [picked[0]!] };
     const stageId = selected?.type === 'stage' ? selected.id : pickedStage;
     if (scope === 'stage' && stageId) return { title: store.get(stageId, 'stage')?.name ?? '', segments: stageSegments(stageId) };
-    const stages = store.list('stage').sort(compareOrder);
-    return { title: store.get(ctx.tripId, 'trip')?.name ?? '', segments: stages.flatMap((st) => stageSegments(st.id)) };
+    return { title: store.get(ctx.tripId, 'trip')?.name ?? '', segments: tripSegments(store).filter(ground) };
   });
 
   const profile = $derived<Profile>(buildProfile(target.segments));

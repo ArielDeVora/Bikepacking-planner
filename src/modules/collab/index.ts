@@ -24,7 +24,7 @@ export default defineModule({
       id: 'collab.comments',
       component: Comments,
       props: { ctx },
-      types: ['stage', 'segment', 'poi', 'zone', 'borderCrossing'],
+      types: ['stage', 'group', 'segment', 'poi', 'zone', 'borderCrossing'],
       order: 20,
     });
 

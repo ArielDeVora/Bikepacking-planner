@@ -6,10 +6,11 @@
   import Icon from '../../lib/ui/Icon.svelte';
   import { timeAgo } from '../../lib/time';
   import IconButton from '../../lib/ui/IconButton.svelte';
-  import { inTripOrder, mergeManyCommand, moveSegmentsCommand } from '../../lib/segment-edits';
-  import type { Entity, Segment, Trip } from '../../model/types';
+  import { deleteGroupCommand, inTripOrder, mergeManyCommand, moveIntoCommand, ungroupCommand, type Container } from '../../lib/segment-edits';
+  import { groupSegments, inGroup, siblingsOf, stageChildren, type StageChild } from '../../lib/tree';
+  import type { Entity, Group, Segment, Trip } from '../../model/types';
   import { untrack } from 'svelte';
-  import { addStage, deleteStage, moveSegment, moveStage, moveStagesCommand, sortedSegments, sortedStages } from './actions';
+  import { addStage, deleteStage, moveGroup, moveSegment, moveStage, moveStagesCommand, sortedStages } from './actions';
 
   let { ctx }: { ctx: ModuleContext } = $props();
   const { t, commands, selection } = $derived(ctx);
@@ -17,7 +18,7 @@
   const selected = $derived(ctx.selection.ids);
   const hidden = $derived(ctx.visibility.hidden);
 
-  // Collapsed stages (segments not listed), remembered per trip in this browser.
+  // Collapsed stages and groups (contents not listed), remembered per trip in this browser.
   const collapseKey = untrack(() => `collapsed:${ctx.tripId}`);
   let collapsed = $state(new Set<string>(untrack(() => ctx.settings.get<string[]>(collapseKey, []))));
   function setCollapsed(ids: string[], on: boolean) {
@@ -54,10 +55,18 @@
     return sortedStages(store);
   });
 
-  const segmentsByStage = $derived.by(() => {
+  /** Each stage's groups and ungrouped segments, in order. */
+  const childrenByStage = $derived.by(() => {
     void $store;
-    return new Map(stages.map((st) => [st.id, sortedSegments(store, st.id)]));
+    return new Map(stages.map((st) => [st.id, stageChildren(store, st.id)]));
   });
+  const segmentsByGroup = $derived.by(() => {
+    const map = new Map<string, Segment[]>();
+    for (const list of childrenByStage.values()) for (const c of list) if (c.type === 'group') map.set(c.id, groupSegments(store, c.id));
+    return map;
+  });
+  const childSegments = (c: StageChild): Segment[] => (c.type === 'group' ? (segmentsByGroup.get(c.id) ?? []) : [c]);
+  const segmentsByStage = $derived(new Map(stages.map((st) => [st.id, (childrenByStage.get(st.id) ?? []).flatMap(childSegments)])));
 
   const km = (segs: Segment[]) => {
     const m = segs.reduce((sum, s) => sum + s.stats.lengthM, 0);
@@ -81,7 +90,9 @@
 
   // Selection: click selects one, Cmd/Ctrl+click adds or removes, Shift+click selects a range.
   let anchorId: string | null = null;
-  const flat = $derived(stages.flatMap((st) => [st.id, ...(segmentsByStage.get(st.id) ?? []).map((s) => s.id)]));
+  const flat = $derived(
+    stages.flatMap((st) => [st.id, ...(childrenByStage.get(st.id) ?? []).flatMap((c) => (c.type === 'group' ? [c.id, ...childSegments(c).map((s) => s.id)] : [c.id]))]),
+  );
 
   function click(e: MouseEvent, id: string, segs: Segment[]) {
     const type = store.get(id)?.type;
@@ -98,69 +109,99 @@
     }
   }
 
-  // Drag and drop: drop between segments to move them, onto a segment to fuse them into it, onto
-  // a stage to move them to its end. Dragging a selected segment drags the whole selection.
-  // Stages can be dragged too (between other stages), with the selected stages if it is one.
-  type Where = 'before' | 'after' | 'onto' | 'stage';
+  // Drag and drop. Segments: between two items to move them there, onto a segment to fuse them
+  // into it, onto a group or a stage to move them to its end. Groups: between the items of a
+  // stage, or onto a stage. Stages: between other stages. Dragging a selected item drags every
+  // selected item of its kind.
+  type Kind = 'segment' | 'group' | 'stage';
+  type Where = 'before' | 'after' | 'onto' | 'into';
   let dragging = $state<string[] | null>(null);
-  let dragKind: 'segment' | 'stage' = 'segment';
+  let dragKind: Kind = 'segment';
   let target = $state<{ id: string; where: Where } | null>(null);
 
-  function dragStart(e: DragEvent, seg: Segment) {
+  function startDrag(e: DragEvent, kind: Kind, ids: string[]) {
     e.stopPropagation();
-    const chosen = $selected.includes(seg.id) ? store.list('segment', (s) => $selected.includes(s.id)) : [seg];
-    dragKind = 'segment';
-    dragging = inTripOrder(store, chosen).map((s) => s.id);
-    e.dataTransfer?.setData('text/plain', dragging.join(','));
+    dragKind = kind;
+    dragging = ids;
+    e.dataTransfer?.setData('text/plain', ids.join(','));
     if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+  }
+
+  function dragStart(e: DragEvent, seg: Segment) {
+    const chosen = $selected.includes(seg.id) ? store.list('segment', (s) => $selected.includes(s.id)) : [seg];
+    startDrag(e, 'segment', inTripOrder(store, chosen).map((s) => s.id));
+  }
+
+  function dragGroupStart(e: DragEvent, id: string) {
+    startDrag(e, 'group', $selected.includes(id) ? flat.filter((x) => $selected.includes(x) && store.get(x, 'group')) : [id]);
   }
 
   function dragStageStart(e: DragEvent, id: string) {
-    dragKind = 'stage';
-    dragging = $selected.includes(id) ? stages.filter((s) => $selected.includes(s.id)).map((s) => s.id) : [id];
-    e.dataTransfer?.setData('text/plain', dragging.join(','));
-    if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+    startDrag(e, 'stage', $selected.includes(id) ? stages.filter((s) => $selected.includes(s.id)).map((s) => s.id) : [id]);
   }
 
-  function dragOver(e: DragEvent, id: string, isStage: boolean) {
+  function dragOver(e: DragEvent, id: string, row: Kind) {
     if (!dragging || dragging.includes(id)) return;
-    if (dragKind === 'stage' && !isStage) return;
-    e.preventDefault();
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const y = (e.clientY - r.top) / r.height;
-    let where: Where = 'stage';
-    if (dragKind === 'stage') where = y < 0.5 ? 'before' : 'after';
-    else if (!isStage) where = y < 0.3 ? 'before' : y > 0.7 ? 'after' : 'onto';
+    const edge: Where = y < 0.5 ? 'before' : 'after';
+    let where: Where | null = null;
+    if (dragKind === 'stage') where = row === 'stage' ? edge : null;
+    else if (row === 'stage') where = 'into';
+    else if (dragKind === 'group') {
+      const seg = row === 'segment' ? store.get(id, 'segment') : undefined;
+      where = seg && inGroup(store, seg) ? null : edge;
+    } else where = y < 0.3 ? 'before' : y > 0.7 ? 'after' : row === 'group' ? 'into' : 'onto';
+    if (!where) return;
+    e.preventDefault();
+    e.stopPropagation();
     target = { id, where };
+  }
+
+  /** Moves `ids` next to `nextTo` in `list` (the items of `container`). */
+  function place(ids: string[], container: Container, list: StageChild[], nextTo: string, where: Where, label: string) {
+    const rest = list.filter((c) => !ids.includes(c.id));
+    const before = where === 'before' ? nextTo : (rest[rest.findIndex((c) => c.id === nextTo) + 1]?.id ?? null);
+    return moveIntoCommand(store, ids, container, before, label);
   }
 
   function drop(e: DragEvent) {
     e.preventDefault();
+    e.stopPropagation();
     const ids = dragging;
     const to = target;
     dragging = null;
     target = null;
     if (!ids || !to) return;
+    const label = t(dragKind === 'group' ? 'cmd.moveGroup' : 'cmd.moveSegment');
+    const onto = store.get(to.id);
     let cmd = null;
     if (dragKind === 'stage') {
       const rest = stages.filter((s) => !ids.includes(s.id));
       const before = to.where === 'before' ? to.id : (rest[rest.findIndex((s) => s.id === to.id) + 1]?.id ?? null);
       cmd = moveStagesCommand(store, ids, before, t('cmd.moveStage'));
-    } else if (to.where === 'stage') cmd = moveSegmentsCommand(store, ids, to.id, null, t('cmd.moveSegment'));
-    else {
-      const seg = store.get(to.id, 'segment');
-      if (!seg) return;
+    } else if (onto?.type === 'stage') cmd = moveIntoCommand(store, ids, { stageId: onto.id }, null, label);
+    else if (onto?.type === 'group') {
+      cmd =
+        to.where === 'into'
+          ? moveIntoCommand(store, ids, { stageId: onto.stageId, groupId: onto.id }, null, label)
+          : place(ids, { stageId: onto.stageId }, stageChildren(store, onto.stageId), onto.id, to.where, label);
+    } else if (onto?.type === 'segment') {
       if (to.where === 'onto') {
         const moved = ids.map((id) => store.get(id, 'segment')).filter((s): s is Segment => !!s);
-        cmd = mergeManyCommand(store, [seg, ...moved], t('cmd.merge'));
+        cmd = mergeManyCommand(store, [onto, ...moved], t('cmd.merge'));
       } else {
-        const list = (segmentsByStage.get(seg.stageId) ?? []).filter((s) => !ids.includes(s.id));
-        const before = to.where === 'before' ? seg.id : (list[list.findIndex((s) => s.id === seg.id) + 1]?.id ?? null);
-        cmd = moveSegmentsCommand(store, ids, seg.stageId, before, t('cmd.moveSegment'));
+        const container = inGroup(store, onto) ? { stageId: onto.stageId, groupId: onto.groupId } : { stageId: onto.stageId };
+        cmd = place(ids, container, siblingsOf(store, onto), onto.id, to.where, label);
       }
     }
     if (cmd) commands.run(cmd);
   }
+
+  const endDrag = () => {
+    dragging = null;
+    target = null;
+  };
 
   const dropClass = (id: string) => (target?.id === id ? `drop-${target.where}` : '');
 
@@ -177,6 +218,16 @@
 
   function moveSeg(id: string, dir: -1 | 1) {
     const cmd = moveSegment(store, id, dir, t('cmd.moveSegment'));
+    if (cmd) commands.run(cmd);
+  }
+
+  function moveGrp(id: string, dir: -1 | 1) {
+    const cmd = moveGroup(store, id, dir, t('cmd.moveGroup'));
+    if (cmd) commands.run(cmd);
+  }
+
+  function ungroup(group: Group) {
+    const cmd = ungroupCommand(store, group.id, t('cmd.ungroup'));
     if (cmd) commands.run(cmd);
   }
 
@@ -239,12 +290,47 @@
   {/if}
 {/snippet}
 
+{#snippet segmentRow(seg: Segment, parentHidden: boolean, firstOfTrip: boolean, lastOfTrip: boolean)}
+  <li
+    class="row {dropClass(seg.id)}"
+    class:selected={$selected.includes(seg.id)}
+    class:dragged={dragging?.includes(seg.id)}
+    class:hidden={parentHidden || $hidden.has(seg.id)}
+    draggable="true"
+    title={t('tree.dragHint')}
+    ondragstart={(e) => dragStart(e, seg)}
+    ondragover={(e) => dragOver(e, seg.id, 'segment')}
+    ondragleave={() => target?.id === seg.id && (target = null)}
+    ondrop={drop}
+    ondragend={endDrag}
+  >
+    <button type="button" class="name" onclick={(e) => click(e, seg.id, [seg])}>
+      <Icon d={icons[seg.mode]} size={14} />
+      <span class="label">{seg.name}</span>
+      {@render editor(seg)}
+      <span class="km muted">{km([seg])}</span>
+    </button>
+    {@render eye(seg.id, parentHidden)}
+    <span class="actions">
+      <IconButton icon={icons.up} label={t('tree.moveUp')} size={14} disabled={firstOfTrip} onclick={() => moveSeg(seg.id, -1)} />
+      <IconButton icon={icons.down} label={t('tree.moveDown')} size={14} disabled={lastOfTrip} onclick={() => moveSeg(seg.id, 1)} />
+      <IconButton
+        icon={icons.trash}
+        label={t('tree.delete')}
+        size={14}
+        onclick={() => commands.run({ label: t('cmd.deleteSegment'), changes: [edits.remove(store, seg.id)] })}
+      />
+    </span>
+  </li>
+{/snippet}
+
 {#if stages.length === 0}
   <p class="muted">{t('tree.empty')}</p>
 {:else}
   <ol>
     {#each stages as stage, i (stage.id)}
       {@const segs = segmentsByStage.get(stage.id) ?? []}
+      {@const children = childrenByStage.get(stage.id) ?? []}
       {@const stageHidden = $hidden.has(stage.id)}
       <li>
         <div
@@ -258,16 +344,16 @@
           tabindex="-1"
           draggable="true"
           ondragstart={(e) => dragStageStart(e, stage.id)}
-          ondragover={(e) => dragOver(e, stage.id, true)}
+          ondragover={(e) => dragOver(e, stage.id, 'stage')}
           ondragleave={() => target?.id === stage.id && (target = null)}
           ondrop={drop}
-          ondragend={() => ((dragging = null), (target = null))}
+          ondragend={endDrag}
         >
           <button
             type="button"
             class="chevron"
             class:closed={collapsed.has(stage.id)}
-            disabled={!segs.length}
+            disabled={!children.length}
             aria-label={collapsed.has(stage.id) ? t('tree.expand') : t('tree.collapse')}
             title={collapsed.has(stage.id) ? t('tree.expand') : t('tree.collapse')}
             onclick={() => setCollapsed([stage.id], !collapsed.has(stage.id))}
@@ -298,46 +384,77 @@
             />
           </span>
         </div>
-        {#if segs.length && !collapsed.has(stage.id)}
+        {#if children.length && !collapsed.has(stage.id)}
           <ol class="segments">
-            {#each segs as seg, j (seg.id)}
-              <li
-                class="row {dropClass(seg.id)}"
-                class:selected={$selected.includes(seg.id)}
-                class:dragged={dragging?.includes(seg.id)}
-                class:hidden={stageHidden || $hidden.has(seg.id)}
-                draggable="true"
-                title={t('tree.dragHint')}
-                ondragstart={(e) => dragStart(e, seg)}
-                ondragover={(e) => dragOver(e, seg.id, false)}
-                ondragleave={() => target?.id === seg.id && (target = null)}
-                ondrop={drop}
-                ondragend={() => ((dragging = null), (target = null))}
-              >
-                <button type="button" class="name" onclick={(e) => click(e, seg.id, [seg])}>
-                  <Icon d={icons[seg.mode]} size={14} />
-                  <span class="label">{seg.name}</span>
-                  {@render editor(seg)}
-                  <span class="km muted">{km([seg])}</span>
-                </button>
-                {@render eye(seg.id, stageHidden)}
-                <span class="actions">
-                  <IconButton icon={icons.up} label={t('tree.moveUp')} size={14} disabled={j === 0 && i === 0} onclick={() => moveSeg(seg.id, -1)} />
-                  <IconButton
-                    icon={icons.down}
-                    label={t('tree.moveDown')}
-                    size={14}
-                    disabled={j === segs.length - 1 && i === stages.length - 1}
-                    onclick={() => moveSeg(seg.id, 1)}
-                  />
-                  <IconButton
-                    icon={icons.trash}
-                    label={t('tree.delete')}
-                    size={14}
-                    onclick={() => commands.run({ label: t('cmd.deleteSegment'), changes: [edits.remove(store, seg.id)] })}
-                  />
-                </span>
-              </li>
+            {#each children as child, k (child.id)}
+              {#if child.type === 'group'}
+                {@const gsegs = segmentsByGroup.get(child.id) ?? []}
+                {@const groupHidden = $hidden.has(child.id)}
+                <li>
+                  <div
+                    class="row group {dropClass(child.id)}"
+                    class:selected={$selected.includes(child.id)}
+                    class:hidden={stageHidden || groupHidden}
+                    class:dragged={dragging?.includes(child.id)}
+                    role="treeitem"
+                    aria-selected={$selected.includes(child.id)}
+                    aria-expanded={!collapsed.has(child.id)}
+                    tabindex="-1"
+                    draggable="true"
+                    title={t('tree.groupHint')}
+                    ondragstart={(e) => dragGroupStart(e, child.id)}
+                    ondragover={(e) => dragOver(e, child.id, 'group')}
+                    ondragleave={() => target?.id === child.id && (target = null)}
+                    ondrop={drop}
+                    ondragend={endDrag}
+                  >
+                    <button
+                      type="button"
+                      class="chevron"
+                      class:closed={collapsed.has(child.id)}
+                      disabled={!gsegs.length}
+                      aria-label={collapsed.has(child.id) ? t('tree.expand') : t('tree.collapse')}
+                      title={collapsed.has(child.id) ? t('tree.expand') : t('tree.collapse')}
+                      onclick={() => setCollapsed([child.id], !collapsed.has(child.id))}
+                    >
+                      <Icon d={icons.down} size={12} />
+                    </button>
+                    <button type="button" class="name" onclick={(e) => click(e, child.id, gsegs)}>
+                      <span class="folder" style:color={child.color ?? stage.color ?? 'var(--accent)'}><Icon d={icons.folder} size={14} /></span>
+                      <span class="label">{child.name}</span>
+                      {@render editor(child)}
+                      <span class="km muted">{km(gsegs)}</span>
+                    </button>
+                    {@render eye(child.id, stageHidden)}
+                    <span class="actions">
+                      <IconButton icon={icons.up} label={t('tree.moveUp')} size={14} disabled={k === 0} onclick={() => moveGrp(child.id, -1)} />
+                      <IconButton
+                        icon={icons.down}
+                        label={t('tree.moveDown')}
+                        size={14}
+                        disabled={k === children.length - 1}
+                        onclick={() => moveGrp(child.id, 1)}
+                      />
+                      <IconButton icon={icons.ungroup} label={t('tree.ungroup')} size={14} onclick={() => ungroup(child)} />
+                      <IconButton
+                        icon={icons.trash}
+                        label={t('tree.delete')}
+                        size={14}
+                        onclick={() => commands.run(deleteGroupCommand(store, child.id, t('cmd.deleteGroup')))}
+                      />
+                    </span>
+                  </div>
+                  {#if gsegs.length && !collapsed.has(child.id)}
+                    <ol class="segments">
+                      {#each gsegs as seg (seg.id)}
+                        {@render segmentRow(seg, stageHidden || groupHidden, false, false)}
+                      {/each}
+                    </ol>
+                  {/if}
+                </li>
+              {:else}
+                {@render segmentRow(child, stageHidden, i === 0 && k === 0, i === stages.length - 1 && k === children.length - 1)}
+              {/if}
             {/each}
           </ol>
         {/if}
@@ -401,7 +518,7 @@
   }
 
   .row.drop-onto,
-  .row.drop-stage {
+  .row.drop-into {
     background: var(--accent-soft);
     outline: 2px dashed var(--accent);
     outline-offset: -2px;
@@ -538,6 +655,11 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  .folder {
+    display: grid;
+    flex: none;
   }
 
   .swatch {

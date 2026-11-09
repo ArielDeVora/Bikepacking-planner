@@ -1,6 +1,6 @@
 import type { TripStore } from '../../core/store';
 import { distanceToLine } from '../../lib/geo/geo';
-import { compareOrder } from '../../model/order';
+import { groupSegments, stageSegments, tripSegments } from '../../lib/tree';
 import { segmentCoords } from '../../model/segment';
 import type { Segment, Stage } from '../../model/types';
 import { toGpx, type GpxTrack, type GpxWaypoint } from './gpx';
@@ -24,24 +24,26 @@ function waypoints(store: TripStore, tracks: GpxTrack[] | null): GpxWaypoint[] {
     .map((p) => ({ name: p.name, desc: p.notes, lngLat: p.lngLat, links: p.links }));
 }
 
-const sortedSegments = (store: TripStore, stageId: string) =>
-  store.list('segment', (s) => s.stageId === stageId).sort(compareOrder);
-
 export function tripGpx(store: TripStore, tripId: string, activeOnly: boolean): { name: string; xml: string } {
   const name = store.get(tripId, 'trip')?.name ?? 'Trip';
-  const tracks = store
-    .list('stage')
-    .sort(compareOrder)
-    .flatMap((st) => sortedSegments(store, st.id).map((seg) => ({ seg, st })))
-    .filter(({ seg }) => !activeOnly || ACTIVE_MODES.has(seg.mode))
-    .map(({ seg, st }) => track(seg, st));
+  const tracks = tripSegments(store)
+    .filter((seg) => !activeOnly || ACTIVE_MODES.has(seg.mode))
+    .map((seg) => track(seg, store.get(seg.stageId, 'stage')));
   return { name, xml: toGpx(name, tracks, waypoints(store, null)) };
 }
 
 export function stageGpx(store: TripStore, stageId: string): { name: string; xml: string } {
   const stage = store.get(stageId, 'stage');
   const name = stage?.name ?? 'Stage';
-  const tracks = sortedSegments(store, stageId).map((seg) => track(seg, stage));
+  const tracks = stageSegments(store, stageId).map((seg) => track(seg, stage));
+  return { name, xml: toGpx(name, tracks, waypoints(store, tracks)) };
+}
+
+export function groupGpx(store: TripStore, groupId: string): { name: string; xml: string } {
+  const group = store.get(groupId, 'group');
+  const name = group?.name ?? 'Group';
+  const stage = group ? store.get(group.stageId, 'stage') : undefined;
+  const tracks = groupSegments(store, groupId).map((seg) => track(seg, stage));
   return { name, xml: toGpx(name, tracks, waypoints(store, tracks)) };
 }
 

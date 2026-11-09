@@ -2,17 +2,17 @@ import { MODES, STAGE_COLORS } from '../../config/modes';
 import { edits, type Change, type Command } from '../../core/commands';
 import type { TripStore } from '../../core/store';
 import { newId } from '../../model/ids';
-import { compareOrder, keyBetween } from '../../model/order';
+import { groupSegments, sortedStages, stageChildren, stageSegments } from '../../lib/tree';
+import { keyBetween } from '../../model/order';
 import { insertAnchor, rebuildLegs, retryFailedLegs } from '../../model/segment';
 import type { LngLat, Segment, Stage, TravelMode } from '../../model/types';
-
-export const sortedSegments = (store: TripStore, stageId: string): Segment[] =>
-  store.list('segment', (s) => s.stageId === stageId).sort(compareOrder);
 
 export interface NewSegment {
   tripId: string;
   /** Stage to add to; the last stage (or a new one, if there are none) when unset. */
   stageId?: string;
+  /** Group of that stage to add to, at its end. */
+  groupId?: string;
   mode: TravelMode;
   points: LngLat[];
   label: string;
@@ -23,7 +23,7 @@ export interface NewSegment {
 export function createSegment(store: TripStore, opts: NewSegment): { command: Command; segmentId: string } {
   const changes: Change[] = [];
   let stage = opts.stageId ? store.get(opts.stageId, 'stage') : undefined;
-  if (!stage) stage = store.list('stage').sort(compareOrder).at(-1);
+  if (!stage) stage = sortedStages(store).at(-1);
   let stageId = stage?.id;
   if (!stageId) {
     stageId = newId();
@@ -40,7 +40,9 @@ export function createSegment(store: TripStore, opts: NewSegment): { command: Co
     );
   }
 
-  const siblings = sortedSegments(store, stageId);
+  const group = opts.groupId ? store.get(opts.groupId, 'group') : undefined;
+  const groupId = group?.stageId === stageId ? group.id : undefined;
+  const siblings = groupId ? groupSegments(store, groupId) : stageChildren(store, stageId);
   const geomType = MODES[opts.mode].geomType;
   let geometry = { anchors: [] as Segment['anchors'], legs: [] as Segment['legs'] };
   for (const p of opts.points) geometry = insertAnchor({ ...geometry, geomType }, geometry.anchors.length, p);
@@ -52,8 +54,9 @@ export function createSegment(store: TripStore, opts: NewSegment): { command: Co
       type: 'segment',
       tripId: opts.tripId,
       stageId,
+      ...(groupId ? { groupId } : {}),
       order: keyBetween(siblings.at(-1)?.order ?? null, null),
-      name: opts.segmentName(siblings.length + 1),
+      name: opts.segmentName(stageSegments(store, stageId).length + 1),
       notes: '',
       mode: opts.mode,
       geomType,

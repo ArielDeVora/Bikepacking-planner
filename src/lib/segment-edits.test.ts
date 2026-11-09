@@ -111,23 +111,23 @@ describe('segment edit commands', () => {
 
 describe('several segments at once', () => {
   it('fuses segments in order into the first', () => {
-    const a = add('a', 'V', [[7, 45], [7.01, 45]]);
-    const b = add('b', 'X', [[7.01, 45], [7.02, 45]]);
-    const c = add('c', 'Y', [[7.05, 45], [7.06, 45]], 'manual', 'b');
-    commands.run(mergeManyCommand(store, inTripOrder(store, [c, a, b]), 'fuse')!);
-    expect(store.list('segment').map((s) => s.id)).toEqual(['a']);
-    expect(store.get('a', 'segment')!.anchors).toHaveLength(5);
-    expect(mergeManyCommand(store, [store.get('a', 'segment')!], 'fuse')).toBeNull();
+    const p = add('p', 'V', [[7, 45], [7.01, 45]]);
+    const q = add('q', 'X', [[7.01, 45], [7.02, 45]]);
+    const r = add('r', 'Y', [[7.05, 45], [7.06, 45]], 'manual', 'b');
+    commands.run(mergeManyCommand(store, inTripOrder(store, [r, p, q]), 'fuse')!);
+    expect(store.list('segment').map((s) => s.id)).toEqual(['p']);
+    expect(store.get('p', 'segment')!.anchors).toHaveLength(5);
+    expect(mergeManyCommand(store, [store.get('p', 'segment')!], 'fuse')).toBeNull();
   });
 
   it('moves segments into a stage at a given place', () => {
-    add('a', 'V', [[7, 45], [7.01, 45]]);
-    add('b', 'X', [[7, 45], [7.01, 45]]);
+    add('p', 'V', [[7, 45], [7.01, 45]]);
+    add('q', 'X', [[7, 45], [7.01, 45]]);
     add('x', 'V', [[7, 45], [7.01, 45]], 'manual', 'b');
     add('y', 'X', [[7, 45], [7.01, 45]], 'manual', 'b');
-    commands.run(moveSegmentsCommand(store, ['b', 'a'], 'b', 'y', 'move')!);
-    expect(order('b')).toEqual(['x', 'b', 'a', 'y']);
+    commands.run(moveSegmentsCommand(store, ['q', 'p'], 'b', 'y', 'move')!);
+    expect(order('b')).toEqual(['x', 'q', 'p', 'y']);
     commands.run(moveSegmentsCommand(store, ['x'], 'b', null, 'move')!);
-    expect(order('b')).toEqual(['b', 'a', 'y', 'x']);
+    expect(order('b')).toEqual(['q', 'p', 'y', 'x']);
   });
 });

@@ -2,7 +2,7 @@ import { get, writable, type Readable } from 'svelte/store';
 import type { Settings } from './settings';
 
 /**
- * Stages and segments hidden from the map. A viewing preference, kept per trip in this browser
+ * Stages, groups and segments hidden from the map. A viewing preference, kept per trip in this browser
  * (not synced): each person can hide what they don't need to see.
  */
 export class Visibility {
@@ -21,6 +21,12 @@ export class Visibility {
 
   isHidden(id: string): boolean {
     return get(this.#hidden).has(id);
+  }
+
+  /** Whether a segment is hidden, by itself or through its stage or group. */
+  segmentHidden(seg: { id: string; stageId: string; groupId?: string }): boolean {
+    const hidden = get(this.#hidden);
+    return hidden.has(seg.id) || hidden.has(seg.stageId) || (!!seg.groupId && hidden.has(seg.groupId));
   }
 
   toggle(id: string): void {

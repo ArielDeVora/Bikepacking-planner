@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { ModuleContext } from '../../core/module';
+  import { segmentsOf } from '../../lib/tree';
   import { computeStats } from './stats';
   import StatsTable from './StatsTable.svelte';
 
@@ -8,7 +9,7 @@
   const stats = $derived.by(() => {
     void $store;
     const stage = store.get(id, 'stage');
-    return computeStats(stage ? [stage] : [], store.list('segment', (s) => s.stageId === id));
+    return computeStats(stage ? [stage] : [], segmentsOf(store, id), [store.get(id, 'group')?.plannedDate]);
   });
 </script>
 

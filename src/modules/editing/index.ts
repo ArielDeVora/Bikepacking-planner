@@ -9,6 +9,7 @@ import {
   nextSegment,
   reverseCommand,
 } from '../../lib/segment-edits';
+import { groupSegmentsAction } from '../../lib/group-actions';
 import EditCard from './EditCard.svelte';
 import MultiCard from './MultiCard.svelte';
 import { EditTools, ERASE_TOOL, PREVIEW, SPLIT_TOOL } from './tools';
@@ -130,6 +131,11 @@ export default defineModule({
       shortcuts.add({ keys: 'r', label: t('edit.reverse'), run: () => actions.reverse() }),
       shortcuts.add({ keys: 'shift+d', label: t('edit.duplicate'), run: () => actions.duplicate() }),
       shortcuts.add({ keys: 'm', label: t('edit.merge'), run: () => actions.merge() }),
+      shortcuts.add({
+        keys: 'g',
+        label: t('group.shortcut'),
+        run: () => void groupSegmentsAction(ctx, selection.current.map((id) => store.get(id, 'segment')).filter((s) => !!s)),
+      }),
     ];
 
     return () => {

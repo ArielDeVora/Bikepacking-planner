@@ -6,12 +6,12 @@ import { defineModule } from '../../core/module';
 import { distance } from '../../lib/geo/geo';
 import { addRoundIcon } from '../../lib/map-icons';
 import { newId } from '../../model/ids';
-import { compareOrder } from '../../model/order';
 import { segmentCoords } from '../../model/segment';
 import type { BorderCrossing, CrossingStatus } from '../../model/types';
 import BorderCard from './BorderCard.svelte';
 import BordersSection from './BordersSection.svelte';
 import { loadCountries, type CountryIndex } from '../../lib/countries';
+import { tripSegments } from '../../lib/tree';
 import { findCrossings, type Crossing, type CrossingState, type TripLine } from './countries';
 import CrossingCard from './CrossingCard.svelte';
 import { postsNear, type BorderPost } from './posts';
@@ -187,11 +187,7 @@ export default defineModule({
     }
 
     const tripLines = (): TripLine[] =>
-      store
-        .list('stage')
-        .sort(compareOrder)
-        .flatMap((st) => store.list('segment', (s) => s.stageId === st.id).sort(compareOrder))
-        .map((s) => ({ segmentId: s.id, endsOnly: s.mode === 'plane' || s.mode === 'boat', coords: segmentCoords(s) }));
+      tripSegments(store).map((s) => ({ segmentId: s.id, endsOnly: s.mode === 'plane' || s.mode === 'boat', coords: segmentCoords(s) }));
 
     async function compute(): Promise<void> {
       try {
@@ -217,7 +213,7 @@ export default defineModule({
         renderAnnotations();
         renderDetected(get(crossings).crossings);
       }
-      if (index && (types.has('segment') || types.has('stage'))) {
+      if (index && (types.has('segment') || types.has('stage') || types.has('group'))) {
         clearTimeout(timer);
         timer = setTimeout(() => void compute(), RECOMPUTE_MS);
       }

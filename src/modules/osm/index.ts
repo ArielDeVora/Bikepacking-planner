@@ -5,6 +5,7 @@ import { defineModule } from '../../core/module';
 import { addRoundIcon } from '../../lib/map-icons';
 import { osmFromTileId } from '../../lib/places/details';
 import PlaceCard from '../../lib/places/PlaceCard.svelte';
+import { segmentsOf } from '../../lib/tree';
 import { segmentCoords } from '../../model/segment';
 import { OverpassLoader } from './loader';
 import OsmStatus from './OsmStatus.svelte';
@@ -101,8 +102,8 @@ export default defineModule({
     const loadAlong = async (stageId: string): Promise<number> => {
       const cats = get(visible);
       if (!cats.length) return -1;
-      const coords = store
-        .list('segment', (s) => s.stageId === stageId && s.mode !== 'plane' && s.mode !== 'boat')
+      const coords = segmentsOf(store, stageId)
+        .filter((s) => s.mode !== 'plane' && s.mode !== 'boat')
         .flatMap((s) => segmentCoords(s));
       const tiles = tilesAlongLine(coords);
       for (const tile of tiles) along.add(tile);
@@ -170,7 +171,7 @@ export default defineModule({
     map.on('mousemove', onBaseHover);
 
     const removeWidget = ui.addWidget({ id: 'osm.status', component: OsmStatus, props: { t, status }, order: 20 });
-    const removeStage = ui.addCardSection({ id: 'osm.stage', component: StageOsm, props: { ctx, loadAlong }, types: ['stage'], order: 6 });
+    const removeStage = ui.addCardSection({ id: 'osm.stage', component: StageOsm, props: { ctx, loadAlong }, types: ['stage', 'group'], order: 6 });
 
     return () => {
       clearTimeout(timer);

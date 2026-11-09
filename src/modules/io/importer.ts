@@ -4,6 +4,7 @@ import type { TripStore } from '../../core/store';
 import { newId } from '../../model/ids';
 import { compareOrder, keyBetween } from '../../model/order';
 import { distance } from '../../lib/geo/geo';
+import { stageChildren } from '../../lib/tree';
 import { importedGeometry } from '../../model/segment';
 import type { Poi, Segment, Stage, TravelMode, Zone } from '../../model/types';
 import type { ParsedFile, ParsedWaypoint } from './parse';
@@ -94,7 +95,7 @@ export function buildImport(store: TripStore, files: ParsedFile[], opts: ImportO
 
   const nextOrder = (stageId: string): string => {
     if (!lastSegmentOrder.has(stageId)) {
-      lastSegmentOrder.set(stageId, store.list('segment', (s) => s.stageId === stageId).sort(compareOrder).at(-1)?.order ?? null);
+      lastSegmentOrder.set(stageId, stageChildren(store, stageId).at(-1)?.order ?? null);
     }
     const order = keyBetween(lastSegmentOrder.get(stageId) ?? null, null);
     lastSegmentOrder.set(stageId, order);
