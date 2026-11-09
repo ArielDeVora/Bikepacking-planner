@@ -1,0 +1,165 @@
+:root {
+  --bg: #ffffff;
+  --bg-sunken: #f4f4f5;
+  --bg-hover: #ececee;
+  --fg: #18181b;
+  --fg-muted: #6b6b75;
+  --border: #e2e2e6;
+  --accent: #d9480f;
+  --accent-soft: #fff0e8;
+  --accent-fg: #ffffff;
+  --danger: #c92a2a;
+  --warn: #b45309;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.08), 0 6px 20px rgb(0 0 0 / 0.1);
+  --radius: 10px;
+  --radius-sm: 6px;
+  --gap: 12px;
+  --panel-w: 320px;
+  --font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-size: 14px;
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  --bg: #1c1c1f;
+  --bg-sunken: #141416;
+  --bg-hover: #2a2a2e;
+  --fg: #ececef;
+  --fg-muted: #9d9da8;
+  --border: #323238;
+  --accent: #ff7a3d;
+  --accent-soft: #3a2117;
+  --accent-fg: #1c1c1f;
+  --danger: #ff6b6b;
+  --warn: #f59f00;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 6px 20px rgb(0 0 0 / 0.35);
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  font-family: var(--font);
+  font-size: var(--font-size);
+  color: var(--fg);
+  background: var(--bg-sunken);
+}
+
+#map {
+  position: fixed;
+  inset: 0;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+#app > * {
+  pointer-events: auto;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+input[type='text'],
+input[type='date'],
+textarea,
+select {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}
+
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+textarea {
+  resize: vertical;
+  min-height: 72px;
+}
+
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  cursor: pointer;
+  color: var(--fg);
+}
+
+.icon-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.icon-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.icon-btn.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.muted {
+  color: var(--fg-muted);
+}
+
+.field {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.field > span {
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+
+/* MapLibre controls follow the theme */
+.maplibregl-ctrl-group,
+.maplibregl-ctrl-attrib,
+.maplibregl-ctrl-scale {
+  background: var(--bg) !important;
+  color: var(--fg);
+}
+
+.maplibregl-ctrl-attrib-inner,
+.maplibregl-ctrl-attrib a {
+  color: var(--fg-muted);
+}
+
+.maplibregl-ctrl-group button + button {
+  border-top-color: var(--border);
+}
+
+:root[data-theme='dark'] .maplibregl-ctrl-icon,
+:root[data-theme='dark'] .maplibregl-ctrl-attrib-button {
+  filter: invert(1);
+}
