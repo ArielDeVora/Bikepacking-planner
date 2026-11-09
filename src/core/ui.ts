@@ -30,6 +30,8 @@ export interface WidgetSpec {
   component: AnyComponent;
   props?: Record<string, unknown>;
   order?: number;
+  /** Bottom-left stack (default), or centred along the top of the map. */
+  position?: 'bottom' | 'top';
 }
 
 /** Renders the info card for a selected entity. The component receives `id` plus `props`. */
@@ -88,6 +90,18 @@ export class UiRegistry {
 
   toggleTool(id: string): void {
     this.#tool.update((current) => (current === id ? null : id));
+  }
+
+  #place = writable<{ component: AnyComponent; props: Record<string, unknown> } | null>(null);
+  /** A card about something that isn't a trip entity (a search result, an OSM feature). */
+  readonly place: Readable<{ component: AnyComponent; props: Record<string, unknown> } | null> = { subscribe: this.#place.subscribe };
+
+  showPlace(component: AnyComponent, props: Record<string, unknown> = {}): void {
+    this.#place.set({ component, props });
+  }
+
+  closePlace(): void {
+    this.#place.set(null);
   }
 
   #dialog = writable<{ component: AnyComponent; props: Record<string, unknown> } | null>(null);

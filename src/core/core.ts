@@ -94,6 +94,10 @@ export function createCore(container: HTMLElement) {
   shortcuts.add({ keys: 'mod+y', label: t('toolbar.redo'), run: () => commands.redo() });
   shortcuts.add({ keys: 'escape', label: 'Clear selection', run: () => selection.clear() });
 
+  bus.on('selection:changed', ({ ids }) => {
+    if (ids.length) ui.closePlace();
+  });
+
   store.onChange(({ ids }) => {
     const sel = selection.current;
     if (ids.some((id) => sel.includes(id))) selection.set(sel.filter((id) => store.get(id)));
@@ -169,7 +173,7 @@ export function createCore(container: HTMLElement) {
       const target = db;
       const saver = attachDebouncedSave(store, { write: (list) => putEntities(target, list) }, (err) => {
         console.error(err);
-        ui.notify(t('app.storageUnavailable'), 'error');
+        ui.notify(t('app.saveFailed'), 'error');
       });
       if (fresh) await putEntities(db, entities);
       flushLocal = saver.flush;

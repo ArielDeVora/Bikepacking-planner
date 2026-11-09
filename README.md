@@ -13,6 +13,8 @@ It's a static site on GitHub Pages. Everything is stored in the browser (Indexed
 - **Sharing** (side panel): sign in, share the trip, invite friends, switch between trips. Comments are at the bottom of each stage or segment card.
 - **Import**: drop GPX, KML, TCX or GeoJSON files on the page (many at once), check the preview, pick the stage. **Export** the trip, a stage or a segment as GPX, or the whole trip as a JSON backup (drop it back in to restore it as a new trip).
 - **E** opens the elevation profile for the selected segment, its stage, or the whole trip. The **Stats** section shows km and climb by travel mode.
+- **P** adds a place (POI) on the map; the **Places** section lists them. **/** focuses the search box (places or coordinates). OSM overlays (water, bike shops, campsites…) are in the **Map** section.
+- Google Maps lists: export them with Google Takeout (CSV) or Google My Maps (KML) and drop the file in; re-import a newer export to add what's new. See [docs/06](docs/06-pois-search-osm.md#google-maps-lists).
 - With a segment selected: **S** split, **X** erase a part (or drag across the profile and click Erase), **R** reverse, **Shift+D** duplicate, **M** merge with the next segment. The card also moves it to another stage, and makes imported tracks editable. **Esc** leaves any tool.
 
 ## Local development
@@ -95,8 +97,9 @@ Free Supabase projects pause after a week with little activity. The **Keep Supab
 - [Milestone 3: collaboration](docs/03-collaboration.md): database, sync, conflicts, comments.
 - [Milestone 4: import, export, elevation and stats](docs/04-import-export-elevation.md).
 - [Milestone 5: advanced editing](docs/05-advanced-editing.md): split, erase, merge, reverse, duplicate, move, editable tracks.
+- [Milestone 6: places, search and OSM overlays](docs/06-pois-search-osm.md), including Google Maps lists.
 - [Spec](docs/SPEC.md)
 
 ## Credits
 
-Map data © OpenStreetMap contributors. Base maps: OpenFreeMap, OpenStreetMap, CyclOSM, OpenTopoMap, EOxCloudless (Sentinel-2, CC BY-NC-SA 4.0). Elevation: Mapzen Terrain Tiles on AWS. Routing: [BRouter](https://brouter.de/) (public server, run on donations).
+Map data © OpenStreetMap contributors. Base maps: OpenFreeMap, OpenStreetMap, CyclOSM, OpenTopoMap, EOxCloudless (Sentinel-2, CC BY-NC-SA 4.0). Elevation: Mapzen Terrain Tiles on AWS. Routing: [BRouter](https://brouter.de/) (public server, run on donations). Search: [Photon](https://photon.komoot.io/) by komoot. OSM places: [Overpass API](https://overpass-api.de/).

@@ -44,7 +44,14 @@ export function putEntities(db: IDBDatabase, entities: Entity[]): Promise<void> 
   return new Promise((resolve, reject) => {
     const tx = db.transaction(ENTITIES, 'readwrite');
     const store = tx.objectStore(ENTITIES);
-    for (const e of entities) store.put(e);
+    for (const e of entities) {
+      try {
+        store.put(e);
+      } catch {
+        // Not structured-cloneable (e.g. a reactive proxy slipped in): store a plain copy.
+        store.put(JSON.parse(JSON.stringify(e)) as Entity);
+      }
+    }
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
     tx.onabort = () => reject(tx.error);

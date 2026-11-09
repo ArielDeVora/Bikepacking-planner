@@ -164,3 +164,29 @@ describe('backup', () => {
     expect((byType.comment as Comment).targetId).toBe(byType.segment!.id);
   });
 });
+
+describe('re-importing waypoints', () => {
+  it('updates matching POIs instead of adding duplicates', () => {
+    const store = new TripStore();
+    store.apply([trip(), stage('a', 'V')], 'load');
+    const commands = new CommandStack(store, () => 'u1');
+    const gmaps = 'https://www.google.com/maps/place/X/data=!1s0x1:0x2';
+    const file = (desc: string): ParsedFile => ({
+      name: 'list.csv',
+      tracks: [],
+      waypoints: [
+        { name: 'Narikala', desc, lngLat: [44.808, 41.688], links: [gmaps] },
+        { name: 'Bakery', desc: '', lngLat: [44.8, 41.69], links: [] },
+      ],
+    });
+    const opts = { tripId: TRIP_ID, userId: 'u1', target: 'auto', mode: 'bike', waypoints: true, label: 'import', stageName: (n: number) => `S${n}` } as const;
+    commands.run(buildImport(store, [file('')], opts).command);
+    expect(store.list('poi')).toHaveLength(2);
+
+    const again = buildImport(store, [{ ...file('Fortress'), waypoints: [...file('Fortress').waypoints, { name: 'bakery ', desc: '', lngLat: [44.8001, 41.6901], links: [] }] }], opts);
+    expect([again.poiCount, again.poiMatched]).toEqual([0, 3]);
+    commands.run(again.command);
+    expect(store.list('poi')).toHaveLength(2);
+    expect(store.list('poi').find((p) => p.name === 'Narikala')!.notes).toBe('Fortress');
+  });
+});

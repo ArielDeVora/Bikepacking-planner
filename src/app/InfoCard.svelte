@@ -9,6 +9,7 @@
   const ids = $derived(core.selection.ids);
   const cards = $derived(core.ui.cards);
   const sections = $derived(core.ui.cardSections);
+  const place = $derived(core.ui.place);
 
   const target = $derived.by(() => {
     void $store;
@@ -19,17 +20,32 @@
   });
 </script>
 
-{#if target}
+{#if target || $place}
   <div class="card" role="dialog" aria-label="Details">
     <div class="close">
-      <IconButton icon={icons.close} label={t('card.close')} size={16} onclick={() => selection.clear()} />
+      <IconButton
+        icon={icons.close}
+        label={t('card.close')}
+        size={16}
+        onclick={() => {
+          selection.clear();
+          core.ui.closePlace();
+        }}
+      />
     </div>
-    {#key target.id}
-      <target.renderer.component id={target.id} {...target.renderer.props} />
-      {#each $sections.filter((s) => !s.types || s.types.includes(target.type)) as section (section.id)}
-        <section.component id={target.id} {...section.props} />
-      {/each}
-    {/key}
+    {#if target}
+      {#key target.id}
+        <target.renderer.component id={target.id} {...target.renderer.props} />
+        {#each $sections.filter((s) => !s.types || s.types.includes(target.type)) as section (section.id)}
+          <section.component id={target.id} {...section.props} />
+        {/each}
+      {/key}
+    {:else if $place}
+      {@const Place = $place.component}
+      {#key $place}
+        <Place {...$place.props} />
+      {/key}
+    {/if}
   </div>
 {/if}
 

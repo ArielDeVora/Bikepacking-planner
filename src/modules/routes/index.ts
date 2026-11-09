@@ -101,10 +101,14 @@ export default defineModule({
       run: () => editor.toggleDrawing(),
     });
 
+    // Deletes the selected point, else the selected segments and POIs (stages only from the tree).
     const deleteSelection = () => {
       if (editor.deleteSelectedAnchor()) return;
-      const id = renderer.activeId;
-      if (id) ctx.commands.run({ label: t('cmd.deleteSegment'), changes: [edits.remove(store, id)] });
+      const ids = selection.current.filter((id) => {
+        const type = store.get(id)?.type;
+        return type === 'segment' || type === 'poi';
+      });
+      if (ids.length) ctx.commands.run({ label: t('tree.delete'), changes: ids.map((id) => edits.remove(store, id)) });
     };
     const offShortcuts = [
       shortcuts.add({ keys: 'd', label: t('routes.draw'), run: () => editor.toggleDrawing() }),
@@ -113,7 +117,10 @@ export default defineModule({
         label: t('card.close'),
         run: () => {
           if (get(ui.tool)) ui.setTool(null);
-          else if (!editor.clearAnchor()) selection.clear();
+          else if (!editor.clearAnchor()) {
+            selection.clear();
+            ui.closePlace();
+          }
         },
       }),
       shortcuts.add({ keys: 'delete', label: t('tree.delete'), run: deleteSelection }),

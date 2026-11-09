@@ -2,6 +2,7 @@ import { gpx, kml, tcx } from '@tmcw/togeojson';
 import type { Coord } from '../../lib/geo/polyline';
 import type { LngLat } from '../../model/types';
 import { isBackup, type Backup } from './backup';
+import { parseGoogleList, type UnlocatedPlace } from './google';
 
 export interface ParsedTrack {
   name: string;
@@ -21,10 +22,12 @@ export interface ParsedFile {
   tracks: ParsedTrack[];
   waypoints: ParsedWaypoint[];
   backup?: Backup;
+  /** Places from a Google Maps list whose link has no position. */
+  unlocated?: UnlocatedPlace[];
   error?: string;
 }
 
-export const ACCEPTED = '.gpx,.kml,.tcx,.geojson,.json';
+export const ACCEPTED = '.gpx,.kml,.tcx,.geojson,.json,.csv';
 
 const baseName = (file: string) => file.replace(/\.[^.]+$/, '');
 
@@ -104,6 +107,11 @@ export function fromGeoJSON(data: GeoJSON.GeoJSON<GeoJSON.Geometry | null>, file
 export function parseFile(fileName: string, content: string): ParsedFile {
   const ext = fileName.toLowerCase().split('.').pop() ?? '';
   try {
+    if (ext === 'csv') {
+      const list = parseGoogleList(content);
+      if (!list) throw new Error('Not a Google Maps list (expected Title, Note and URL columns).');
+      return { name: fileName, tracks: [], waypoints: list.waypoints, unlocated: list.unlocated };
+    }
     if (ext === 'json' || ext === 'geojson') {
       const data = JSON.parse(content) as unknown;
       if (isBackup(data)) return { name: fileName, tracks: [], waypoints: [], backup: data };

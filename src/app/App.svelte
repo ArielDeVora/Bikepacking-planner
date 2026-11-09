@@ -62,10 +62,15 @@
 {/if}
 
 <Toolbar {core} shifted={panelOpen} />
+<div class="top" class:shifted={panelOpen}>
+  {#each $widgets.filter((w) => w.position === 'top') as widget (widget.id)}
+    <widget.component {...widget.props} />
+  {/each}
+</div>
 <div class="bottom" class:shifted={panelOpen} bind:clientHeight={bottomHeight}>
-  {#if $widgets.length}
+  {#if $widgets.some((w) => w.position !== 'top')}
     <div class="widgets">
-      {#each $widgets as widget (widget.id)}
+      {#each $widgets.filter((w) => w.position !== 'top') as widget (widget.id)}
         <widget.component {...widget.props} />
       {/each}
     </div>
@@ -162,6 +167,25 @@
     padding: 4px;
   }
 
+  .top {
+    position: absolute;
+    top: var(--gap);
+    left: calc(var(--gap) + 104px);
+    right: calc(var(--gap) + 316px);
+    display: flex;
+    justify-content: center;
+    pointer-events: none;
+    transition: left 0.18s ease;
+  }
+
+  .top.shifted {
+    left: calc(var(--panel-w) + 2 * var(--gap) + 56px);
+  }
+
+  .top > :global(*) {
+    pointer-events: auto;
+  }
+
   .bottom {
     position: absolute;
     bottom: calc(var(--gap) + 28px);
@@ -228,6 +252,12 @@
   @media (max-width: 640px) {
     .bottom.shifted {
       left: var(--gap);
+    }
+
+    .top,
+    .top.shifted {
+      left: calc(var(--gap) + 52px);
+      right: var(--gap);
     }
 
     .panel {

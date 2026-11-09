@@ -3,9 +3,10 @@ import { edits, type Change, type Command } from '../../core/commands';
 import type { TripStore } from '../../core/store';
 import { newId } from '../../model/ids';
 import { compareOrder, keyBetween } from '../../model/order';
+import { distance } from '../../lib/geo/geo';
 import { importedGeometry } from '../../model/segment';
 import type { Poi, Segment, Stage, TravelMode } from '../../model/types';
-import type { ParsedFile } from './parse';
+import type { ParsedFile, ParsedWaypoint } from './parse';
 
 /**
  * `auto`: files with one track go to `defaultStageId` (or the last stage); files with several
@@ -29,7 +30,22 @@ export interface ImportResult {
   command: Command;
   segmentIds: string[];
   stageIds: string[];
+  /** New POIs. */
   poiCount: number;
+  /** Existing POIs the import matched (and updated where something was new). */
+  poiMatched: number;
+}
+
+/** Waypoints matching an existing POI: same link, or the same name within this distance. */
+const MATCH_M = 300;
+const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
+
+export function findExistingPoi(pois: Poi[], w: ParsedWaypoint): Poi | undefined {
+  return pois.find(
+    (p) =>
+      w.links.some((l) => p.links.includes(l)) ||
+      (!!w.name && norm(p.name) === norm(w.name) && distance(p.lngLat, w.lngLat) <= MATCH_M),
+  );
 }
 
 const baseName = (file: string) => file.replace(/\.[^.]+$/, '');
@@ -42,6 +58,8 @@ export function buildImport(store: TripStore, files: ParsedFile[], opts: ImportO
   const segmentIds: string[] = [];
   const newStages: string[] = [];
   let poiCount = 0;
+  let poiMatched = 0;
+  const existingPois = store.list('poi');
 
   const newStage = (name: string): string => {
     const id = newId();
@@ -106,6 +124,16 @@ export function buildImport(store: TripStore, files: ParsedFile[], opts: ImportO
 
     if (!opts.waypoints) continue;
     for (const w of file.waypoints) {
+      const existing = findExistingPoi(existingPois, w);
+      if (existing) {
+        poiMatched++;
+        const links = [...new Set([...existing.links, ...w.links])];
+        const notes = existing.notes || w.desc;
+        if (links.length !== existing.links.length || notes !== existing.notes) {
+          changes.push(edits.update<Poi>(store, existing.id, { links, notes }));
+        }
+        continue;
+      }
       poiCount++;
       changes.push(
         edits.create<Poi>({
@@ -123,5 +151,5 @@ export function buildImport(store: TripStore, files: ParsedFile[], opts: ImportO
       );
     }
   }
-  return { command: { label: opts.label, changes }, segmentIds, stageIds: newStages, poiCount };
+  return { command: { label: opts.label, changes }, segmentIds, stageIds: newStages, poiCount, poiMatched };
 }

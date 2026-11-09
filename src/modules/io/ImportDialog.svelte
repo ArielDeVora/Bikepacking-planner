@@ -4,10 +4,11 @@
   import { MODE_ORDER } from '../../config/modes';
   import type { ModuleContext } from '../../core/module';
   import { lineLength } from '../../lib/geo/geo';
+  import { Photon } from '../../lib/photon';
   import { compareOrder } from '../../model/order';
   import type { TravelMode } from '../../model/types';
   import { buildImport, type ImportTarget } from './importer';
-  import type { ParsedFile } from './parse';
+  import type { ParsedFile, ParsedWaypoint } from './parse';
 
   let {
     ctx,
@@ -31,6 +32,42 @@
   let mode = $state<TravelMode>(untrack(() => ctx.settings.get('importMode', 'bike')));
   let withWaypoints = $state(true);
 
+  // Places from a Google list without a position, looked up by name on request.
+  const LOOKUP_GAP_MS = 1100;
+  const unlocated = $derived(files.flatMap((f) => f.unlocated ?? []));
+  let found = $state<({ lngLat: [number, number]; label: string } | null | undefined)[]>([]);
+  let keep = $state<boolean[]>([]);
+  let looking = $state(false);
+  let closed = false;
+
+  async function lookUp() {
+    looking = true;
+    const photon = new Photon();
+    const located = files.flatMap((f) => f.waypoints);
+    const near = located.length
+      ? ([located.reduce((s, w) => s + w.lngLat[0], 0) / located.length, located.reduce((s, w) => s + w.lngLat[1], 0) / located.length] as [number, number])
+      : undefined;
+    for (let i = 0; i < unlocated.length && !closed; i++) {
+      if (found[i] !== undefined) continue;
+      try {
+        const [r] = await photon.search(unlocated[i]!.name, near, new AbortController().signal);
+        found[i] = r ? { lngLat: r.lngLat, label: [r.name, r.detail].filter(Boolean).join(', ') } : null;
+        keep[i] = !!r;
+      } catch {
+        found[i] = null;
+      }
+      await new Promise((res) => setTimeout(res, LOOKUP_GAP_MS));
+    }
+    looking = false;
+  }
+
+  const foundWaypoints = (): ParsedWaypoint[] =>
+    unlocated.flatMap((u, i) => {
+      const f = found[i];
+      // Plain values: what's stored must not be Svelte state.
+      return f && keep[i] ? [{ name: u.name, desc: u.desc, lngLat: [f.lngLat[0], f.lngLat[1]] as [number, number], links: u.url ? [u.url] : [] }] : [];
+    });
+
   const summary = $derived(
     files.map((f) => ({
       file: f,
@@ -43,7 +80,7 @@
     })),
   );
   const trackCount = $derived(files.reduce((n, f) => n + f.tracks.length, 0));
-  const waypointCount = $derived(files.reduce((n, f) => n + f.waypoints.length, 0));
+  const waypointCount = $derived(files.reduce((n, f) => n + f.waypoints.length, 0) + found.filter((f, i) => f && keep[i]).length);
   const autoStageName = $derived(
     (defaultStageId && stages.find((s) => s.id === defaultStageId)?.name) || stages.at(-1)?.name || t('tree.stageName', { n: 1 }),
   );
@@ -54,11 +91,16 @@
     for (const f of files) for (const tr of f.tracks) for (const p of tr.parts) for (const c of p) bounds.extend([c[0], c[1]]);
     for (const f of files) for (const w of f.waypoints) bounds.extend(w.lngLat);
     if (!bounds.isEmpty()) map.fitBounds(bounds, { padding: 80, maxZoom: 14, duration: 0 });
-    return () => preview(null);
+    return () => {
+      closed = true;
+      preview(null);
+    };
   });
 
   function run() {
-    const res = buildImport(store, files, {
+    const extra = foundWaypoints();
+    const all = extra.length ? [...files, { name: 'lookup', tracks: [], waypoints: extra }] : files;
+    const res = buildImport(store, all, {
       tripId: ctx.tripId,
       userId: ctx.user.id,
       target,
@@ -74,7 +116,13 @@
       const first = res.segmentIds[0];
       if (res.segmentIds.length === 1 && first) selection.set([first]);
       else if (res.stageIds.length === 1) selection.set([res.stageIds[0]!]);
-      ui.notify(t('io.imported', { segments: res.segmentIds.length, pois: res.poiCount }));
+      ui.notify(
+        res.poiMatched
+          ? t('io.importedMatched', { segments: res.segmentIds.length, pois: res.poiCount, matched: res.poiMatched })
+          : t('io.imported', { segments: res.segmentIds.length, pois: res.poiCount }),
+      );
+    } else if (res.poiMatched) {
+      ui.notify(t('io.nothingNew', { matched: res.poiMatched }));
     }
     // Last: closing unmounts this component.
     ui.closeDialog();
@@ -104,6 +152,30 @@
     </li>
   {/each}
 </ul>
+
+{#if unlocated.length}
+  <div class="unlocated">
+    <p>{t('io.unlocated', { n: unlocated.length })}</p>
+    {#if found.length === 0 && !looking}
+      <button type="button" class="btn" onclick={lookUp}>{t('io.lookUp')}</button>
+    {/if}
+    {#if found.length || looking}
+      <ul>
+        {#each unlocated as u, i (i)}
+          <li>
+            {#if found[i]}
+              <label><input type="checkbox" bind:checked={keep[i]} /> {u.name} <span class="muted">→ {found[i]!.label}</span></label>
+            {:else}
+              <span class:muted={found[i] === undefined}>{u.name}</span>
+              <span class="muted">{found[i] === null ? t('io.notFound') : ''}</span>
+            {/if}
+          </li>
+        {/each}
+      </ul>
+      {#if looking}<p class="muted">{t('io.lookingUp')}</p>{/if}
+    {/if}
+  </div>
+{/if}
 
 {#if trackCount}
   <label class="field">
@@ -179,6 +251,30 @@
 
   .error {
     color: var(--danger);
+  }
+
+  .unlocated {
+    margin-bottom: 12px;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+  }
+
+  .unlocated p {
+    margin: 0 0 6px;
+  }
+
+  .unlocated ul {
+    max-height: 30vh;
+    overflow-y: auto;
+    margin: 6px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .unlocated li {
+    padding: 2px 0;
   }
 
   .check {

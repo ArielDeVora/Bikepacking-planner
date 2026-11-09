@@ -1,3 +1,5 @@
+import { TERRAIN_DEM } from '../config/terrain';
+
 const TILE = 256;
 
 /** Tile and pixel position of a point in the Web Mercator tile grid. */
@@ -91,3 +93,6 @@ export class Dem {
     });
   }
 }
+
+/** Shared elevation lookups, so every module uses one tile cache. */
+export const terrain = new Dem(TERRAIN_DEM.tiles[0]!);

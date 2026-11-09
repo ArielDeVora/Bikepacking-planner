@@ -1,11 +1,10 @@
 import type { GeoJSONSource } from 'maplibre-gl';
 import { writable } from 'svelte/store';
-import { TERRAIN_DEM } from '../../config/terrain';
 import { edits } from '../../core/commands';
 import { defineModule } from '../../core/module';
+import { terrain } from '../../lib/dem';
 import { icons } from '../../lib/icons';
 import type { Segment } from '../../model/types';
-import { Dem } from './dem';
 import ProfileDrawer from './ProfileDrawer.svelte';
 import { applyTerrain, terrainJobs } from './terrain';
 
@@ -20,7 +19,7 @@ export default defineModule({
     const { store, ui, map, layers, settings, shortcuts, t, commands } = ctx;
 
     // Terrain elevation for legs that have none.
-    const dem = new Dem(TERRAIN_DEM.tiles[0]!);
+    const dem = terrain;
     const running = new Set<string>();
     const failed = new Set<string>();
     const recheck = new Map<string, ReturnType<typeof setTimeout>>();

@@ -218,7 +218,10 @@ export class RouteEditor {
     }
     const hit = this.ctx.map.queryRenderedFeatures(box(e.point, HIT_PX), { layers: this.renderer.hitLayerIds })[0];
     if (hit) this.ctx.selection.set([hit.properties.sid as string]);
-    else this.ctx.selection.clear();
+    else {
+      this.ctx.selection.clear();
+      this.ctx.ui.closePlace();
+    }
   }
 
   #onMouseDown(e: MapMouseEvent): void {
