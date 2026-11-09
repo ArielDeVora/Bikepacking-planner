@@ -19,7 +19,7 @@ Press **?** (or the **?** button at the bottom of the toolbar) for a cheatsheet 
 - Google Maps lists: export them with Google Takeout (CSV) or Google My Maps (KML) and drop the file in; re-import a newer export to add what's new. See [docs/06](docs/06-pois-search-osm.md#google-maps-lists).
 - Click shops, restaurants and sights on the base map (from zoom 15) for details (opening hours, phone, website, Wikipedia) and **Add to trip**.
 - **A** draws an avoid zone (no-go zones are routed around). **Border crossings** in the side panel lists where the trip changes country; add notes (status, link, last verified) to each.
-- **Side panel**: Cmd/Ctrl+click or Shift+click to select several segments, then fuse, move or delete them. Drag segments to reorder them, move them to another stage, or drop one onto another to fuse them.
+- **Side panel**: Cmd/Ctrl+click or Shift+click to select several segments, then fuse, move or delete them. Drag segments to reorder them, move them to another stage, or drop one onto another to fuse them; drag stages to reorder them. The eye hides a segment or stage from the map; the arrow collapses a stage. Drag the panel's right edge to make it wider.
 - **Travel advice** (side panel) and the **Travel advisory levels** overlay: official UK and US advice for the countries on the trip. Avoid zones can be switched to information-only **risk zones**.
 - With a segment selected: **S** split, **X** erase a part (or drag across the profile and click Erase), **R** reverse, **Shift+D** duplicate, **M** merge with the next segment. The card also moves it to another stage, and makes imported tracks editable. **Esc** leaves any tool.
 

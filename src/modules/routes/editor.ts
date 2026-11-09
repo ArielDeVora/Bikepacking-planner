@@ -60,7 +60,9 @@ export class RouteEditor {
   get #active(): Segment | undefined {
     const id = this.renderer.activeId;
     const seg = id ? this.ctx.store.get(id, 'segment') : undefined;
-    return seg?.geomType === 'imported' ? undefined : seg;
+    if (!seg || seg.geomType === 'imported') return undefined;
+    // Hidden from the map: nothing to edit there.
+    return this.ctx.visibility.isHidden(seg.id) || this.ctx.visibility.isHidden(seg.stageId) ? undefined : seg;
   }
 
   attach(): () => void {

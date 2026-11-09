@@ -10,6 +10,7 @@ import type { Settings } from './settings';
 import type { ShortcutManager } from './shortcuts';
 import type { TripStore } from './store';
 import type { UiRegistry } from './ui';
+import type { Visibility } from './visibility';
 
 export interface ModuleContext {
   readonly map: MapLibreMap;
@@ -26,6 +27,8 @@ export interface ModuleContext {
   /** Sign-in, sharing and sync. */
   readonly cloud: Cloud;
   readonly trips: TripManager;
+  /** Stages and segments hidden from the map (per browser). */
+  readonly visibility: Visibility;
   readonly tripId: string;
   readonly t: typeof t;
 }

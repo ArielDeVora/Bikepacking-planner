@@ -2,6 +2,7 @@ import type { ExpressionSpecification, GeoJSONSource, LineLayerSpecification, Ma
 import { LEG_STATUS_STYLES, MODE_ORDER, MODES, type LineStyle } from '../../config/modes';
 import type { LayerManager } from '../../core/layers';
 import type { TripStore } from '../../core/store';
+import type { Visibility } from '../../core/visibility';
 import { legCoords } from '../../model/segment';
 import type { Segment, Stage } from '../../model/types';
 
@@ -91,7 +92,10 @@ export class RouteRenderer {
     private map: MapLibreMap,
     private layers: LayerManager,
     private store: TripStore,
+    private visibility: Visibility,
   ) {}
+
+  #shown = (s: Segment) => !this.visibility.isHidden(s.id) && !this.visibility.isHidden(s.stageId);
 
   install(): void {
     if (!this.map.hasImage(PLANE_ICON)) this.map.addImage(PLANE_ICON, planeImage(), { pixelRatio: 2 });
@@ -285,13 +289,13 @@ export class RouteRenderer {
   #flush(): void {
     this.#frame = 0;
     if (this.#dirtyBg) {
-      const features = this.store.list('segment', (s) => s.id !== this.#activeId).flatMap((s) => this.#featuresOf(s));
+      const features = this.store.list('segment', (s) => s.id !== this.#activeId && this.#shown(s)).flatMap((s) => this.#featuresOf(s));
       this.setData(SRC.bg, features);
       this.#dirtyBg = false;
     }
     if (this.#dirtyActive) {
       const seg = this.#activeId ? this.store.get(this.#activeId, 'segment') : undefined;
-      this.setData(SRC.active, seg ? this.#featuresOf(seg) : []);
+      this.setData(SRC.active, seg && this.#shown(seg) ? this.#featuresOf(seg) : []);
       this.#dirtyActive = false;
     }
   }

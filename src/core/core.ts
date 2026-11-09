@@ -19,6 +19,7 @@ import { ShortcutManager } from './shortcuts';
 import { TripStore } from './store';
 import { createTheme } from './theme';
 import { UiRegistry } from './ui';
+import { Visibility } from './visibility';
 
 export const BASE_STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
 
@@ -87,6 +88,7 @@ export function createCore(container: HTMLElement) {
   const ui = new UiRegistry();
   const shortcuts = new ShortcutManager();
   const theme = createTheme(settings);
+  const visibility = new Visibility(settings, () => tripId);
 
   window.addEventListener('keydown', shortcuts.handle);
   shortcuts.add({ keys: 'mod+z', label: t('toolbar.undo'), run: () => commands.undo() });
@@ -179,6 +181,7 @@ export function createCore(container: HTMLElement) {
       flushLocal = saver.flush;
       window.addEventListener('pagehide', () => void saver.flush());
     }
+    visibility.load();
     bus.emit('trip:loaded', { tripId });
   }
 
@@ -204,6 +207,7 @@ export function createCore(container: HTMLElement) {
           user,
           cloud,
           trips,
+          visibility,
           t,
           settings: createSettings(mod.id),
           get tripId() {
@@ -239,6 +243,7 @@ export function createCore(container: HTMLElement) {
     user,
     cloud,
     trips,
+    visibility,
     t,
     status: { subscribe: status.subscribe } as Readable<CoreStatus>,
     get tripId() {

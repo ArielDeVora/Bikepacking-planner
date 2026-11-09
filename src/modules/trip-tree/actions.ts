@@ -58,6 +58,23 @@ export function moveSegment(store: TripStore, id: string, dir: -1 | 1, label: st
   return { label, changes: [edits.update<Segment>(store, id, { stageId: target.id, order })] };
 }
 
+/** Moves stages, in this order, before `beforeId` (or to the end when null). */
+export function moveStagesCommand(store: TripStore, ids: string[], beforeId: string | null, label: string): Command | null {
+  const moving = new Set(ids);
+  const others = sortedStages(store).filter((s) => !moving.has(s.id));
+  const at = beforeId ? others.findIndex((s) => s.id === beforeId) : others.length;
+  const index = at < 0 ? others.length : at;
+  let prev = others[index - 1]?.order ?? null;
+  const next = others[index]?.order ?? null;
+  const changes = ids.flatMap((id) => {
+    if (!store.get(id, 'stage')) return [];
+    const order = keyBetween(prev, next);
+    prev = order;
+    return [edits.update<Stage>(store, id, { order })];
+  });
+  return changes.length ? { label, changes } : null;
+}
+
 /** Soft-deletes a stage and everything in it. */
 export function deleteStage(store: TripStore, id: string, label: string): Command {
   const segments = store.list('segment', (s) => s.stageId === id);

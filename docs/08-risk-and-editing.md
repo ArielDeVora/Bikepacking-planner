@@ -38,6 +38,10 @@ The State Department identifies countries with FIPS codes, which clash with ISO 
   - drop onto a segment to fuse it into that one;
   - drop onto a stage to move it to the end of that stage.
   Dragging a selected segment drags the whole selection.
+- **Stages** can be dragged too: above or below another stage to reorder (selected stages move together).
+- **Eye** on each segment and stage: hides it from the map (or shows it again); hiding a stage hides all its segments. **Show all** at the top brings everything back. This is a viewing preference, kept per trip in each browser and not shared (`ctx.visibility`, `src/core/visibility.ts`).
+- **Collapse**: the arrow next to a stage hides its segments in the list; the button at the top collapses or expands every stage. Remembered per trip in each browser.
+- **Panel width**: drag the panel's right edge (260 to 640 px); double-click it for the default. Remembered in each browser.
 - **Import** has its own toolbar button (`I`), always visible.
 
 ## Elevation profile

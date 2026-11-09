@@ -47,7 +47,7 @@ export default defineModule({
     };
     const reconciler = createReconciler(store, ctx.commands, queue, onError, shouldRoute);
 
-    const renderer = new RouteRenderer(map, ctx.layers, store);
+    const renderer = new RouteRenderer(map, ctx.layers, store, ctx.visibility);
     renderer.install();
 
     const lastMode = {
@@ -75,6 +75,10 @@ export default defineModule({
       if (changed.length) reconciler.scan(changed);
     });
     const offSelection = bus.on('selection:changed', syncSelection);
+    const offVisibility = ctx.visibility.hidden.subscribe(() => {
+      renderer.invalidateAll();
+      editor.refresh();
+    });
     renderer.invalidateAll();
     reconciler.scan(store.list('segment'));
 
@@ -138,6 +142,7 @@ export default defineModule({
       detach();
       offStore();
       offSelection();
+      offVisibility();
       offShortcuts.forEach((off) => off());
       map.off('idle', onIdle);
       removeTool();

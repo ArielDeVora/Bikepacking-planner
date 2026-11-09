@@ -34,9 +34,50 @@
     panelOpen = !panelOpen;
     prefs.set('panelOpen', panelOpen);
   }
+
+  // Panel width: drag the panel's edge; double-click it to go back to the default.
+  const DEFAULT_W = 320;
+  const MIN_W = 260;
+  const MAX_W = 640;
+  let panelW = $state(prefs.get('panelWidth', DEFAULT_W));
+  let resizing = $state(false);
+  $effect(() => {
+    document.documentElement.style.setProperty('--panel-w', `${panelW}px`);
+  });
+
+  function startResize(e: PointerEvent) {
+    const handle = e.currentTarget as HTMLElement;
+    handle.setPointerCapture(e.pointerId);
+    resizing = true;
+    const left = handle.parentElement!.getBoundingClientRect().left;
+    const move = (ev: PointerEvent) => {
+      panelW = Math.round(Math.min(MAX_W, Math.max(MIN_W, ev.clientX - left)));
+    };
+    const up = () => {
+      resizing = false;
+      prefs.set('panelWidth', panelW);
+      handle.removeEventListener('pointermove', move);
+    };
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('pointerup', up, { once: true });
+  }
+
+  function resetWidth() {
+    panelW = DEFAULT_W;
+    prefs.set('panelWidth', panelW);
+  }
 </script>
 
-<aside class="panel" class:open={panelOpen} aria-label={t('app.title')}>
+<aside class="panel" class:open={panelOpen} class:resizing aria-label={t('app.title')}>
+  <div
+    class="resize"
+    role="separator"
+    aria-orientation="vertical"
+    aria-label={t('app.resizePanel')}
+    title={t('app.resizePanel')}
+    onpointerdown={startResize}
+    ondblclick={resetWidth}
+  ></div>
   <header>
     <h1>{t('app.title')}</h1>
     <IconButton
@@ -115,6 +156,28 @@
     overflow: hidden;
     transform: translateX(calc(-100% - 2 * var(--gap)));
     transition: transform 0.18s ease;
+  }
+
+  .resize {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 7px;
+    z-index: 1;
+    cursor: ew-resize;
+  }
+
+  .resize:hover,
+  .panel.resizing .resize {
+    background: linear-gradient(to right, transparent 4px, var(--accent) 4px);
+  }
+
+  /* While resizing, everything that follows the panel's width moves with the pointer. */
+  :global(html:has(.panel.resizing)) :global(.toolbar),
+  :global(html:has(.panel.resizing)) :global(.bottom),
+  :global(html:has(.panel.resizing)) :global(.top) {
+    transition: none !important;
   }
 
   .panel.open {
@@ -253,6 +316,9 @@
   }
 
   @media (max-width: 640px) {
+    .resize {
+      display: none;
+    }
     .bottom.shifted {
       left: var(--gap);
     }

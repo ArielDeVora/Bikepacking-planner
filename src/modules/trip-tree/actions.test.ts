@@ -3,7 +3,7 @@ import { CommandStack } from '../../core/commands';
 import { TripStore } from '../../core/store';
 import type { Segment } from '../../model/types';
 import { stage, trip, TRIP_ID } from '../../test/fixtures';
-import { addStage, deleteStage, moveSegment, moveStage, sortedSegments, sortedStages } from './actions';
+import { addStage, deleteStage, moveSegment, moveStage, moveStagesCommand, sortedSegments, sortedStages } from './actions';
 
 let store: TripStore;
 let commands: CommandStack;
@@ -30,6 +30,13 @@ describe('trip-tree actions', () => {
     expect(names()).toEqual(['c', 'a', 'b']);
     commands.undo();
     commands.undo();
+    expect(names()).toEqual(['a', 'b', 'c']);
+  });
+
+  it('moves several stages at once', () => {
+    commands.run(moveStagesCommand(store, ['c', 'a'], 'b', 'move')!);
+    expect(names()).toEqual(['c', 'a', 'b']);
+    commands.run(moveStagesCommand(store, ['c'], null, 'move')!);
     expect(names()).toEqual(['a', 'b', 'c']);
   });
 

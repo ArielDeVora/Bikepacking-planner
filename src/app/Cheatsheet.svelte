@@ -11,7 +11,10 @@
 
   const MOUSE: { title: StringKey; rows: StringKey[] }[] = [
     { title: 'help.mouse.routes', rows: ['help.mouse.draw', 'help.mouse.dragPoint', 'help.mouse.insertPoint', 'help.mouse.deletePoint', 'help.mouse.selectSegment'] },
-    { title: 'help.mouse.panel', rows: ['help.mouse.multi', 'help.mouse.range', 'help.mouse.dragMove', 'help.mouse.dragFuse', 'help.mouse.dragStage'] },
+    {
+      title: 'help.mouse.panel',
+      rows: ['help.mouse.multi', 'help.mouse.range', 'help.mouse.dragMove', 'help.mouse.dragFuse', 'help.mouse.dragStage', 'help.mouse.dragStages', 'help.mouse.eye', 'help.mouse.collapse', 'help.mouse.resize'],
+    },
     { title: 'help.mouse.places', rows: ['help.mouse.basePlaces', 'help.mouse.dragPoi', 'help.mouse.zoneCorners', 'help.mouse.crossings'] },
     { title: 'help.mouse.other', rows: ['help.mouse.profileHover', 'help.mouse.profileErase', 'help.mouse.dropFiles'] },
   ];
