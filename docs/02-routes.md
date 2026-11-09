@@ -59,7 +59,9 @@ Avoid zones (milestone 7) are already passed to BRouter as no-go polygons: every
 | Boat | straight | none | blue dashes |
 | Plane | great-circle arc | none | thin grey dashes, plane icon |
 
-Bike and walk lines use the segment's colour, else the stage's colour. New stages get colours from `STAGE_COLORS` in turn.
+Bike and walk lines use the stage's colour. New stages get colours from `STAGE_COLORS` in turn.
+
+Each segment can override its line: **colour** (any mode), **width** (1 to 10 px) and **pattern** (solid, dashed, dotted, long dashes), from the segment card, or for every selected segment from the multiple-selection card. "Mode" or the × next to a field goes back to the travel mode's style. Overrides are stored on the segment (`color`, `lineWidth`, `dash`), so everyone sees them. Segments with their own pattern are drawn by two extra layers per source (round ends for solid and dotted, flat ends for dashes); the patterns are in `LINE_DASHES` in `src/config/modes.ts`.
 
 Changing a segment's mode gives it the new mode's geometry type and default profile, and redraws its legs if that changes how they're drawn. BRouter profiles per mode are listed in `routing/brouter.ts`; the first one is the default.
 

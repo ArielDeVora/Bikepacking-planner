@@ -1,0 +1,22 @@
+import { describe, expect, it } from 'vitest';
+import { encodeLine } from '../../lib/geo/polyline';
+import type { Segment, Stage } from '../../model/types';
+import { legFeatures, segmentColor } from './render';
+
+const seg = (over: Partial<Segment> = {}): Segment =>
+  ({ id: 's', mode: 'bike', legs: [{ line: encodeLine([[7, 45], [7.1, 45]]) }], ...over }) as Segment;
+const stage = { color: '#2f9e44' } as Stage;
+
+describe('route styles', () => {
+  it('uses the segment colour, else the stage colour for bike and walk, else the mode colour', () => {
+    expect(segmentColor(seg(), stage)).toBe('#2f9e44');
+    expect(segmentColor(seg({ color: '#123456' }), stage)).toBe('#123456');
+    expect(segmentColor(seg({ mode: 'train' }), stage)).toBe('#343a40');
+    expect(segmentColor(seg({ mode: 'train', color: '#123456' }), stage)).toBe('#123456');
+  });
+
+  it('carries the width and pattern, falling back to the travel mode', () => {
+    expect(legFeatures(seg(), '#fff')[0]!.properties).toMatchObject({ width: 4, dash: 'mode' });
+    expect(legFeatures(seg({ lineWidth: 7, dash: 'dotted' }), '#fff')[0]!.properties).toMatchObject({ width: 7, dash: 'dotted' });
+  });
+});

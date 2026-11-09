@@ -2,7 +2,11 @@
   import { edits } from '../../core/commands';
   import type { ModuleContext } from '../../core/module';
   import { inTripOrder, mergeManyCommand, moveSegmentsCommand } from '../../lib/segment-edits';
+  import LineStyleFields from '../../lib/ui/LineStyleFields.svelte';
+  import { lineStyleOf } from '../../lib/ui/line-style';
+  import { MODES } from '../../config/modes';
   import { compareOrder } from '../../model/order';
+  import type { Segment } from '../../model/types';
 
   let { ids, ctx }: { ids: string[]; ctx: ModuleContext } = $props();
   const { t, commands, selection } = $derived(ctx);
@@ -28,6 +32,10 @@
     if (!cmd) return;
     commands.run(cmd);
     selection.set([segments[0]!.id]);
+  }
+
+  function restyle(patch: Partial<Segment>, field: string) {
+    commands.run({ label: t('cmd.lineStyle'), changes: segments.map((s) => edits.update<Segment>(store, s.id, patch)), mergeKey: `segments:${field}` });
   }
 
   function moveTo(stageId: string) {
@@ -65,6 +73,19 @@
     </select>
   </label>
 {/if}
+{#if segments.length}
+  <div class="style">
+    <span class="muted small">{t('multi.lineStyle')}</span>
+    <LineStyleFields
+      {t}
+      value={lineStyleOf(segments)}
+      shownColor={lineStyleOf(segments).color ?? '#e8590c'}
+      shownWidth={lineStyleOf(segments).width ?? MODES[segments[0]!.mode].style.width}
+      onChange={restyle}
+      onDone={() => commands.seal()}
+    />
+  </div>
+{/if}
 <p class="muted small">{t('multi.hint')}</p>
 
 <style>
@@ -82,6 +103,12 @@
     flex-wrap: wrap;
     gap: 6px;
     margin: 10px 0;
+  }
+
+  .style {
+    margin: 8px 0;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
   }
 
   .btn {

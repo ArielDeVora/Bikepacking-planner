@@ -28,6 +28,9 @@ export interface Stage extends BaseEntity {
 }
 
 export type TravelMode = 'bike' | 'walk' | 'train' | 'bus' | 'boat' | 'plane' | 'car';
+
+/** Line pattern of a segment that overrides its travel mode's. */
+export type LineDash = 'solid' | 'dashed' | 'dotted' | 'long';
 export type GeometryType = 'routed' | 'manual' | 'imported' | 'greatCircle';
 
 export interface Anchor {
@@ -67,7 +70,12 @@ export interface Segment extends BaseEntity {
   stats: SegmentStats;
   /** Routing profile; the provider's default for the mode when unset. */
   profile?: string;
+  /** Overrides the stage's or travel mode's colour. */
   color?: string;
+  /** Line width in pixels, overriding the travel mode's. */
+  lineWidth?: number;
+  /** Line pattern, overriding the travel mode's. */
+  dash?: LineDash;
   plannedDate?: string;
 }
 

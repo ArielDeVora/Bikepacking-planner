@@ -1,5 +1,5 @@
 import type { ExpressionSpecification, GeoJSONSource, LineLayerSpecification, Map as MapLibreMap } from 'maplibre-gl';
-import { LEG_STATUS_STYLES, MODE_ORDER, MODES, type LineStyle } from '../../config/modes';
+import { LEG_STATUS_STYLES, LINE_DASHES, MODE_ORDER, MODES, type LineStyle } from '../../config/modes';
 import type { LayerManager } from '../../core/layers';
 import type { TripStore } from '../../core/store';
 import type { Visibility } from '../../core/visibility';
@@ -13,6 +13,10 @@ export interface LegProps {
   leg: number;
   mode: Segment['mode'];
   color: string;
+  /** Line width in pixels (the segment's own, or its mode's). */
+  width: number;
+  /** The segment's own line pattern, or "mode" to use the travel mode's. */
+  dash: NonNullable<Segment['dash']> | 'mode';
   status?: 'pending' | 'failed';
 }
 
@@ -27,24 +31,36 @@ export const SRC = {
 const PLANE_ICON = 'route-plane';
 const EMPTY: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
 
+/** The segment's own colour, else its stage's (bike and walk only), else its mode's. */
 export function segmentColor(seg: Segment, stage: Stage | undefined): string {
   const mode = MODES[seg.mode];
-  if (!mode.stageColor) return mode.style.color;
-  return seg.color ?? stage?.color ?? mode.style.color;
+  return seg.color ?? (mode.stageColor ? stage?.color : undefined) ?? mode.style.color;
 }
 
 export function legFeatures(seg: Segment, color: string): LineFeature[] {
   return seg.legs.map((leg, i) => ({
     type: 'Feature',
-    properties: { sid: seg.id, leg: i, mode: seg.mode, color, ...(leg.status ? { status: leg.status } : {}) },
+    properties: {
+      sid: seg.id,
+      leg: i,
+      mode: seg.mode,
+      color,
+      width: seg.lineWidth ?? MODES[seg.mode].style.width,
+      dash: seg.dash ?? 'mode',
+      ...(leg.status ? { status: leg.status } : {}),
+    },
     geometry: { type: 'LineString', coordinates: legCoords(leg).map((c) => [c[0], c[1]]) },
   }));
 }
 
-function linePaint(style: LineStyle, color: string | ExpressionSpecification, extraWidth = 0): LineLayerSpecification['paint'] {
+function linePaint(
+  style: LineStyle,
+  color: string | ExpressionSpecification,
+  width: number | ExpressionSpecification = style.width,
+): LineLayerSpecification['paint'] {
   return {
     'line-color': color,
-    'line-width': style.width + extraWidth,
+    'line-width': width,
     'line-opacity': style.opacity ?? 1,
     ...(style.dash ? { 'line-dasharray': style.dash } : {}),
   };
@@ -111,7 +127,7 @@ export class RouteRenderer {
         source: SRC.bg,
         filter: ['in', ['get', 'sid'], ['literal', []]],
         layout: { 'line-join': 'round', 'line-cap': 'round' },
-        paint: { 'line-color': '#ffffff', 'line-width': 10, 'line-opacity': 0.9, 'line-blur': 1 },
+        paint: { 'line-color': '#ffffff', 'line-width': ['+', ['get', 'width'], 6], 'line-opacity': 0.9, 'line-blur': 1 },
       },
       'route',
     );
@@ -169,20 +185,21 @@ export class RouteRenderer {
         id: `${source}-casing`,
         type: 'line',
         layout: { 'line-join': 'round', 'line-cap': 'round' },
-        paint: { 'line-color': '#ffffff', 'line-width': 10, 'line-opacity': 0.85, 'line-blur': 1 },
+        paint: { 'line-color': '#ffffff', 'line-width': ['+', ['get', 'width'], 6], 'line-opacity': 0.85, 'line-blur': 1 },
       });
     }
 
+    const width: ExpressionSpecification = active ? ['+', ['get', 'width'], 1] : ['get', 'width'];
     for (const mode of MODE_ORDER) {
       const { style } = MODES[mode];
-      const filter: ExpressionSpecification = ['all', ['==', ['get', 'mode'], mode], notStatus];
+      const filter: ExpressionSpecification = ['all', ['==', ['get', 'mode'], mode], ['==', ['get', 'dash'], 'mode'], notStatus];
       const id = `${source}-${mode}`;
       add({
         id,
         type: 'line',
         filter,
         layout: { 'line-join': 'round', 'line-cap': roundCaps(style) ? 'round' : 'butt' },
-        paint: linePaint(style, ['get', 'color'], active ? 1 : 0),
+        paint: linePaint(style, ['get', 'color'], width),
       });
       this.modeLayerIds.push(id);
       if (style.overlay) {
@@ -194,6 +211,28 @@ export class RouteRenderer {
           paint: linePaint({ ...style.overlay }, style.overlay.color),
         });
       }
+    }
+
+    // Segments with their own line pattern: round ends for solid and dotted, flat ends for dashes.
+    const dashes: ExpressionSpecification = [
+      'match',
+      ['get', 'dash'],
+      ...Object.entries(LINE_DASHES).flatMap(([key, pattern]) => [key, ['literal', pattern ?? [1, 0]]]),
+      ['literal', [1, 0]],
+    ] as unknown as ExpressionSpecification;
+    for (const [suffix, cap, kinds] of [
+      ['custom-round', 'round', ['solid', 'dotted']],
+      ['custom-flat', 'butt', ['dashed', 'long']],
+    ] as const) {
+      const id = `${source}-${suffix}`;
+      add({
+        id,
+        type: 'line',
+        filter: ['all', ['in', ['get', 'dash'], ['literal', [...kinds]]], notStatus],
+        layout: { 'line-join': 'round', 'line-cap': cap },
+        paint: { 'line-color': ['get', 'color'], 'line-width': width, 'line-dasharray': dashes },
+      });
+      this.modeLayerIds.push(id);
     }
 
     for (const status of ['pending', 'failed'] as const) {
@@ -230,7 +269,7 @@ export class RouteRenderer {
       id: `${source}-hit`,
       type: 'line',
       layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': '#000000', 'line-width': 16, 'line-opacity': 0 },
+      paint: { 'line-color': '#000000', 'line-width': ['max', 16, ['+', ['get', 'width'], 8]], 'line-opacity': 0 },
     });
   }
 

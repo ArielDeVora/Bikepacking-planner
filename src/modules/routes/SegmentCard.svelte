@@ -5,6 +5,8 @@
   import { icons } from '../../lib/icons';
   import IconButton from '../../lib/ui/IconButton.svelte';
   import type { Segment, TravelMode } from '../../model/types';
+  import LineStyleFields from '../../lib/ui/LineStyleFields.svelte';
+  import { lineStyleOf } from '../../lib/ui/line-style';
   import { changeMode, retryChange, setProfile, setSnap } from './actions';
   import { segmentColor } from './render';
   import type { RoutingProvider } from './routing/provider';
@@ -127,18 +129,17 @@
       <span>{t('segment.plannedDate')}</span>
       <input type="date" value={seg.plannedDate ?? ''} onchange={(e) => edit('plannedDate', e.currentTarget.value)} />
     </label>
-    {#if MODES[seg.mode].stageColor}
-      <div class="field color">
-        <span>{t('segment.color')}</span>
-        <div class="color-row">
-          <input type="color" value={color} aria-label={t('segment.color')} onchange={(e) => edit('color', e.currentTarget.value)} />
-          {#if seg.color}
-            <IconButton icon={icons.close} label={t('segment.colorReset')} size={14} onclick={() => edit('color', undefined)} />
-          {/if}
-        </div>
-      </div>
-    {/if}
   </div>
+
+  <LineStyleFields
+    {t}
+    value={lineStyleOf([seg])}
+    shownColor={color}
+    shownWidth={seg.lineWidth ?? MODES[seg.mode].style.width}
+    onChange={(patch, field) =>
+      commands.run({ label: t('cmd.lineStyle'), changes: [edits.update<Segment>(store, id, patch)], mergeKey: `segment:${id}:${field}` })}
+    onDone={() => commands.seal()}
+  />
 
   <label class="field">
     <span>{t('segment.notes')}</span>
@@ -222,20 +223,7 @@
     gap: 10px;
   }
 
-  .color-row {
-    display: flex;
-    align-items: center;
-    gap: 2px;
-  }
 
-  .color input {
-    width: 44px;
-    height: 32px;
-    padding: 2px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: var(--bg);
-  }
 
   .hint {
     font-size: 12px;

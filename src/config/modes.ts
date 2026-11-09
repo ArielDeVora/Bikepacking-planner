@@ -1,4 +1,4 @@
-import type { GeometryType, TravelMode } from '../model/types';
+import type { GeometryType, LineDash, TravelMode } from '../model/types';
 
 /**
  * Travel modes and how their lines are drawn. Widths are in pixels; dash arrays are in
@@ -89,6 +89,17 @@ export const MODES: Record<TravelMode, ModeConfig> = {
 };
 
 export const MODE_ORDER: TravelMode[] = ['bike', 'walk', 'train', 'bus', 'car', 'boat', 'plane'];
+
+/** Patterns a segment can use instead of its travel mode's (in multiples of the line width). */
+export const LINE_DASHES: Record<LineDash, number[] | null> = {
+  solid: null,
+  dashed: [3, 2],
+  dotted: [0, 2],
+  long: [6, 3],
+};
+export const LINE_DASH_ORDER: LineDash[] = ['solid', 'dashed', 'dotted', 'long'];
+
+export const LINE_WIDTH_RANGE = { min: 1, max: 10 };
 
 /** Colours given to new stages, in turn. */
 export const STAGE_COLORS = ['#e8590c', '#2f9e44', '#c2255c', '#1098ad', '#f59f00', '#6741d9', '#a61e4d', '#5c940d'];

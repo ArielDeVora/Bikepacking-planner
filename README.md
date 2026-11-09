@@ -10,7 +10,7 @@ Press **?** (or the **?** button at the bottom of the toolbar) for a cheatsheet 
 
 - Press **D** (or the route button in the toolbar) and click the map to draw a segment; it snaps to roads. **Esc** finishes.
 - Click a segment to select it. Drag its points to move them, drag the line to add a point, right-click a point to delete it.
-- Change the travel mode, routing profile and colour in the card on the right. Line styles live in `src/config/modes.ts`.
+- Change the travel mode, routing profile and line style (colour, width, dashed or dotted) in the card on the right, or for several selected segments at once. Default styles per travel mode live in `src/config/modes.ts`.
 - **Cmd/Ctrl+Z** undoes, **Cmd/Ctrl+Shift+Z** redoes.
 - **Sharing** (side panel): sign in, share the trip, invite friends, switch between trips. Comments are at the bottom of each stage or segment card.
 - **Import**: drop GPX, KML, TCX or GeoJSON files on the page (many at once), check the preview, pick the stage. **Export** the trip, a stage or a segment as GPX, or the whole trip as a JSON backup (drop it back in to restore it as a new trip).
