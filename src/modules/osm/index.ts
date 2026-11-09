@@ -1,8 +1,9 @@
-import type { GeoJSONSource, MapLayerMouseEvent } from 'maplibre-gl';
+import type { GeoJSONSource, MapLayerMouseEvent, MapMouseEvent } from 'maplibre-gl';
 import { derived, get, writable } from 'svelte/store';
-import { OSM_CATEGORIES } from '../../config/pois';
+import { OSM_CATEGORIES, poiCategoryFromOmt } from '../../config/pois';
 import { defineModule } from '../../core/module';
 import { addRoundIcon } from '../../lib/map-icons';
+import { osmFromTileId } from '../../lib/places/details';
 import PlaceCard from '../../lib/places/PlaceCard.svelte';
 import { segmentCoords } from '../../model/segment';
 import { OverpassLoader } from './loader';
@@ -14,6 +15,9 @@ const SOURCE = 'osm-places';
 /** Below this zoom the viewport isn't loaded (too many tiles); places already loaded still show. */
 const MIN_ZOOM = 12;
 const MOVE_DEBOUNCE_MS = 600;
+/** Places drawn by the OpenFreeMap style itself (shops, restaurants, sights… from zoom 15). */
+const BASE_POI_LAYERS = ['poi_r1', 'poi_r7', 'poi_r20', 'poi_transit'];
+const human = (s: string) => s.replace(/_/g, ' ');
 
 const kind = (tags: Record<string, string>) =>
   (tags.shop ?? tags.amenity ?? tags.tourism ?? tags.man_made ?? '').replace(/_/g, ' ');
@@ -110,6 +114,7 @@ export default defineModule({
       if (get(ui.tool)) return;
       const place = byKey.get(e.features?.[0]?.properties.key as string);
       if (!place) return;
+      ui.claim(e.originalEvent);
       const cat = OSM_CATEGORIES.find((c) => c.id === place.category)!;
       ctx.selection.clear();
       ui.showPlace(PlaceCard, {
@@ -119,11 +124,50 @@ export default defineModule({
     };
     const pointer = () => (map.getCanvas().style.cursor = get(ui.tool) ? map.getCanvas().style.cursor : 'pointer');
     const unpointer = () => (map.getCanvas().style.cursor = get(ui.tool) ? map.getCanvas().style.cursor : '');
+    const removePointLayers = layerIds.map((id) => ui.addPointLayer(id));
     for (const id of layerIds) {
       map.on('click', id, onClick);
       map.on('mouseenter', id, pointer);
       map.on('mouseleave', id, unpointer);
     }
+
+    // Clicking a place of the base map shows its card, like an OSM overlay feature.
+    const baseLayers = () => BASE_POI_LAYERS.filter((id) => map.getLayer(id) && map.getLayoutProperty(id, 'visibility') !== 'none');
+    const onBaseClick = (e: MapMouseEvent) => {
+      // Something else (a segment, one of our places) already took this click.
+      if (get(ui.tool) || ui.claimed(e.originalEvent)) return;
+      const box: [[number, number], [number, number]] = [
+        [e.point.x - 8, e.point.y - 8],
+        [e.point.x + 8, e.point.y + 8],
+      ];
+      if (map.queryRenderedFeatures(box, { layers: layerIds }).length) return;
+      const f = map.queryRenderedFeatures(box, { layers: baseLayers() })[0];
+      if (!f || f.geometry.type !== 'Point') return;
+      ui.claim(e.originalEvent);
+      const p = f.properties as Record<string, string>;
+      const ref = osmFromTileId(f.id);
+      const name = p.name_en || p['name:latin'] || p.name || '';
+      ui.showPlace(PlaceCard, {
+        ctx,
+        place: {
+          name,
+          kind: human(p.subclass || p.class || ''),
+          lngLat: f.geometry.coordinates as [number, number],
+          category: poiCategoryFromOmt(p.class ?? '', p.subclass ?? ''),
+          osm: ref ? { ...ref, tags: p.name ? { name: p.name } : {} } : undefined,
+        },
+      });
+    };
+    let pointing = false;
+    const onBaseHover = (e: MapMouseEvent) => {
+      if (get(ui.tool)) return;
+      const hit = map.queryRenderedFeatures(e.point, { layers: baseLayers() }).length > 0;
+      if (hit === pointing) return;
+      pointing = hit;
+      map.getCanvas().style.cursor = hit ? 'pointer' : '';
+    };
+    map.on('click', onBaseClick);
+    map.on('mousemove', onBaseHover);
 
     const removeWidget = ui.addWidget({ id: 'osm.status', component: OsmStatus, props: { t, status }, order: 20 });
     const removeStage = ui.addCardSection({ id: 'osm.stage', component: StageOsm, props: { ctx, loadAlong }, types: ['stage'], order: 6 });
@@ -132,8 +176,11 @@ export default defineModule({
       clearTimeout(timer);
       map.off('moveend', loadView);
       map.off('zoomend', onZoom);
+      map.off('click', onBaseClick);
+      map.off('mousemove', onBaseHover);
       offVisible();
       removeOverlays.forEach((off) => off());
+      removePointLayers.forEach((off) => off());
       removeWidget();
       removeStage();
       for (const id of layerIds) {

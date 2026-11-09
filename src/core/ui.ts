@@ -74,11 +74,42 @@ export class UiRegistry {
   readonly panelSections = registry<PanelSectionSpec>();
   readonly widgets = registry<WidgetSpec>();
   readonly cardSections = registry<CardSectionSpec>();
+  /** Shown in the info card when several entities are selected; the component receives `ids`. */
+  readonly multiCards = registry<WidgetSpec>();
   /** Full-width panels along the bottom of the map (e.g. the elevation profile). */
   readonly drawers = registry<WidgetSpec>();
 
   #cards = writable(new Map<string, CardRenderer>());
   readonly cards: Readable<Map<string, CardRenderer>> = { subscribe: this.#cards.subscribe };
+
+  #pointLayers = new Set<string>();
+
+  /**
+   * Registers a layer of clickable markers (places, crossings…). Lines and areas underneath, such
+   * as routes, leave clicks on these markers to their module.
+   */
+  addPointLayer(id: string): () => void {
+    this.#pointLayers.add(id);
+    return () => this.#pointLayers.delete(id);
+  }
+
+  get pointLayers(): string[] {
+    return [...this.#pointLayers];
+  }
+
+  #claimed = new WeakSet<Event>();
+
+  /**
+   * Marks a map click as handled, so handlers for things underneath (e.g. a zone around the
+   * clicked segment) leave it alone. Pass the DOM event (`e.originalEvent`).
+   */
+  claim(e: Event): void {
+    this.#claimed.add(e);
+  }
+
+  claimed(e: Event): boolean {
+    return this.#claimed.has(e);
+  }
 
   #tool = writable<string | null>(null);
   /** The active map tool (drawing, splitting…). One at a time; null when none is. */
@@ -126,6 +157,10 @@ export class UiRegistry {
 
   addDrawer(spec: WidgetSpec) {
     return this.drawers.add(spec);
+  }
+
+  addMultiCard(spec: WidgetSpec) {
+    return this.multiCards.add(spec);
   }
 
   addCardSection(spec: CardSectionSpec) {

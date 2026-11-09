@@ -99,6 +99,18 @@ export class RouteRenderer {
       const attribution = id === SRC.bg ? 'Routing: <a href="https://brouter.de/">BRouter</a>' : undefined;
       this.layers.addSource(id, { type: 'geojson', data: EMPTY, ...(attribution ? { attribution } : {}) });
     }
+    // Outline under the segments of a multiple selection (one selected segment has its own source).
+    this.layers.addLayer(
+      {
+        id: 'routes-selected',
+        type: 'line',
+        source: SRC.bg,
+        filter: ['in', ['get', 'sid'], ['literal', []]],
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: { 'line-color': '#ffffff', 'line-width': 10, 'line-opacity': 0.9, 'line-blur': 1 },
+      },
+      'route',
+    );
     this.#addRouteLayers(SRC.bg, false);
     this.#addRouteLayers(SRC.active, true);
 
@@ -216,6 +228,11 @@ export class RouteRenderer {
       layout: { 'line-cap': 'round', 'line-join': 'round' },
       paint: { 'line-color': '#000000', 'line-width': 16, 'line-opacity': 0 },
     });
+  }
+
+  /** Outlines these segments (used for multiple selections). */
+  setSelected(ids: string[]): void {
+    if (this.map.getLayer('routes-selected')) this.map.setFilter('routes-selected', ['in', ['get', 'sid'], ['literal', ids]]);
   }
 
   get activeId(): string | null {

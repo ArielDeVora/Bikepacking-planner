@@ -10,6 +10,8 @@
   const cards = $derived(core.ui.cards);
   const sections = $derived(core.ui.cardSections);
   const place = $derived(core.ui.place);
+  const multiCards = $derived(core.ui.multiCards);
+  const multi = $derived($ids.length > 1 && $multiCards.length > 0);
 
   const target = $derived.by(() => {
     void $store;
@@ -20,7 +22,7 @@
   });
 </script>
 
-{#if target || $place}
+{#if target || multi || $place}
   <div class="card" role="dialog" aria-label="Details">
     <div class="close">
       <IconButton
@@ -33,7 +35,11 @@
         }}
       />
     </div>
-    {#if target}
+    {#if multi}
+      {#each $multiCards as card (card.id)}
+        <card.component ids={$ids} {...card.props} />
+      {/each}
+    {:else if target}
       {#key target.id}
         <target.renderer.component id={target.id} {...target.renderer.props} />
         {#each $sections.filter((s) => !s.types || s.types.includes(target.type)) as section (section.id)}

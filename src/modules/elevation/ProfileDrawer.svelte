@@ -41,25 +41,50 @@
     void $store;
     return $ids.length === 1 ? store.get($ids[0]!) : undefined;
   });
+  /** Selected segments, highlighted in the stage or trip profile. */
+  const picked = $derived.by(() => {
+    void $store;
+    return $ids.map((id) => store.get(id, 'segment')).filter((s): s is Segment => !!s);
+  });
+  const pickedStage = $derived(picked.length && picked.every((s) => s.stageId === picked[0]!.stageId) ? picked[0]!.stageId : null);
+  // With a segment selected, the profile shows its stage with the segment highlighted.
   const scopes = $derived<Scope[]>(
-    selected?.type === 'segment' ? ['segment', 'stage', 'trip'] : selected?.type === 'stage' ? ['stage', 'trip'] : ['trip'],
+    picked.length === 1 ? ['stage', 'segment', 'trip'] : pickedStage ? ['stage', 'trip'] : picked.length ? ['trip'] : selected?.type === 'stage' ? ['stage', 'trip'] : ['trip'],
   );
   const scope = $derived(chosen && scopes.includes(chosen) ? chosen : scopes[0]!);
+
+  // Back to the default view whenever the selection changes.
+  let lastIds = '';
+  $effect(() => {
+    const key = $ids.join(',');
+    if (key !== lastIds) {
+      lastIds = key;
+      chosen = null;
+    }
+  });
 
   const ground = (s: Segment) => s.mode !== 'plane';
   const stageSegments = (stageId: string) => store.list('segment', (s) => s.stageId === stageId && ground(s)).sort(compareOrder);
 
   const target = $derived.by((): { title: string; segments: Segment[] } => {
     void $store;
-    if (scope === 'segment' && selected?.type === 'segment') return { title: selected.name, segments: [selected] };
-    const stageId = selected?.type === 'stage' ? selected.id : selected?.type === 'segment' ? selected.stageId : null;
+    if (scope === 'segment' && picked.length === 1) return { title: picked[0]!.name, segments: [picked[0]!] };
+    const stageId = selected?.type === 'stage' ? selected.id : pickedStage;
     if (scope === 'stage' && stageId) return { title: store.get(stageId, 'stage')?.name ?? '', segments: stageSegments(stageId) };
     const stages = store.list('stage').sort(compareOrder);
     return { title: store.get(ctx.tripId, 'trip')?.name ?? '', segments: stages.flatMap((st) => stageSegments(st.id)) };
   });
 
   const profile = $derived<Profile>(buildProfile(target.segments));
-  const rangeSegment = $derived(scope === 'segment' && selected?.type === 'segment' ? selected : null);
+  const rangeSegment = $derived(scope === 'segment' && picked.length === 1 ? picked[0]! : null);
+  const highlighted = $derived(
+    scope === 'segment' ? [] : profile.ranges.filter((r) => picked.some((s) => s.id === r.id)),
+  );
+  const highlightStats = $derived.by(() => {
+    if (!highlighted.length) return null;
+    const segs = picked.filter((s) => highlighted.some((r) => r.id === s.id));
+    return { km: segs.reduce((n, s) => n + s.stats.lengthM, 0), up: segs.reduce((n, s) => n + s.stats.ascentM, 0) };
+  });
 
   // A range belongs to one segment; drop it when the segment changes.
   let rangeOwner: string | null = null;
@@ -110,6 +135,8 @@
     const fg = style.getPropertyValue('--fg').trim() || '#222';
     const muted = style.getPropertyValue('--fg-muted').trim() || '#888';
     const border = style.getPropertyValue('--border').trim() || '#ddd';
+    const accent = style.getPropertyValue('--accent').trim() || '#d9480f';
+    const accentSoft = style.getPropertyValue('--accent-soft').trim() || 'rgba(217,72,15,0.12)';
     g.font = '11px system-ui, sans-serif';
 
     // Grid and labels
@@ -135,6 +162,14 @@
       g.fillText(`${km(d)} km`, x, PAD.top + plotH + 5);
     }
 
+    const xOf = (d: number) => PAD.left + (d / profile.lengthM) * plotW;
+
+    // Background band behind the selected segments
+    for (const r of highlighted) {
+      g.fillStyle = accentSoft;
+      g.fillRect(xOf(r.from), PAD.top, Math.max(1, xOf(r.to) - xOf(r.from)), plotH);
+    }
+
     // Area coloured by gradient, then the outline
     const base = PAD.top + plotH;
     let prev: number | null = null;
@@ -157,6 +192,28 @@
     }
     g.strokeStyle = fg;
     g.stroke(outline);
+
+    // The selected segments' outline, thicker and in the accent colour
+    if (highlighted.length) {
+      const strong = new Path2D();
+      for (const r of highlighted) {
+        let started = false;
+        for (let x = Math.floor(xOf(r.from) - PAD.left); x <= Math.ceil(xOf(r.to) - PAD.left) && x < plotW; x++) {
+          const e = eleAt(profile, ((x + 0.5) / plotW) * profile.lengthM);
+          if (Number.isNaN(e)) {
+            started = false;
+            continue;
+          }
+          if (!started) strong.moveTo(PAD.left + x, yOf(e));
+          else strong.lineTo(PAD.left + x, yOf(e));
+          started = true;
+        }
+      }
+      g.lineWidth = 3;
+      g.strokeStyle = accent;
+      g.stroke(strong);
+      g.lineWidth = 1.5;
+    }
 
     if (range) {
       const x0 = PAD.left + (Math.min(range.from, range.to) / profile.lengthM) * plotW;
@@ -245,6 +302,9 @@
           <span title={t('segment.descent')}>↘ {profile.descentM} m</span>
           <span title={t('elevation.max')}>⤒ {Math.round(profile.maxEle)} m</span>
         </span>
+        {#if highlightStats}
+          <span class="picked" title={t('elevation.selection')}>■ {km(highlightStats.km)} km · ↗ {highlightStats.up} m</span>
+        {/if}
       {/if}
       <span class="spacer"></span>
       {#if range}
@@ -335,6 +395,11 @@
   .stats {
     display: flex;
     gap: 10px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .picked {
+    color: var(--accent);
     font-variant-numeric: tabular-nums;
   }
 

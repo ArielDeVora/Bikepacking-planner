@@ -3,6 +3,9 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
+  # Daily rebuild, to refresh the travel advisory data.
+  schedule:
+    - cron: '41 4 * * *'
   workflow_dispatch:
 
 permissions:
@@ -26,6 +29,7 @@ jobs:
       - run: npm ci
       - run: npm run check
       - run: npm test
+      - run: npm run advisories
       - run: npm run build
       - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5

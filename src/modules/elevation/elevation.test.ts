@@ -40,6 +40,10 @@ describe('profile', () => {
     expect(p.d[3]).toBe(p.d[2]);
     expect(Number.isNaN(p.e[4]!)).toBe(true);
     expect([p.ascentM, p.descentM, p.minEle, p.maxEle]).toEqual([50, 30, 100, 150]);
+    expect(p.ranges.map((r) => [r.from, Math.round(r.to)])).toEqual([
+      [0, Math.round(p.d[2]!)],
+      [p.d[2], Math.round(p.lengthM)],
+    ]);
   });
 
   it('does not count the step between separate segments as climb', () => {

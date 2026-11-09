@@ -67,6 +67,14 @@ export const OSM_CATEGORIES: OsmCategory[] = [
     poi: 'food',
   },
   {
+    id: 'food',
+    color: '#f76707',
+    icon: POI_ICONS.food,
+    filters: ['nwr["amenity"~"^(restaurant|cafe|fast_food)$"]'],
+    match: (t) => /^(restaurant|cafe|fast_food)$/.test(t.amenity ?? ''),
+    poi: 'food',
+  },
+  {
     id: 'water',
     color: '#1c7ed6',
     icon: POI_ICONS.drop,
@@ -107,6 +115,21 @@ export const OSM_CATEGORIES: OsmCategory[] = [
     poi: 'other',
   },
 ];
+
+const OMT_FOOD = ['restaurant', 'fast_food', 'cafe', 'bar', 'beer', 'ice_cream', 'grocery', 'bakery', 'food_court', 'alcohol_shop'];
+const OMT_SIGHTS = ['attraction', 'museum', 'monument', 'castle', 'art_gallery', 'viewpoint', 'place_of_worship', 'theatre', 'zoo', 'historic'];
+
+/** POI category for a place of the base map (OpenMapTiles `poi` layer: class and subclass). */
+export function poiCategoryFromOmt(cls: string, subclass: string): PoiCategory {
+  if (cls === 'bicycle' || subclass === 'bicycle' || subclass === 'bicycle_repair_station') return 'bikeShop';
+  if (cls === 'campsite' || subclass === 'camp_site') return 'camp';
+  if (cls === 'lodging') return 'accommodation';
+  if (cls === 'drinking_water' || subclass === 'drinking_water') return 'water';
+  if (OMT_FOOD.includes(cls) || subclass === 'supermarket' || subclass === 'convenience') return 'food';
+  if (OMT_SIGHTS.includes(cls)) return 'sight';
+  if (cls === 'town_hall' || subclass === 'embassy') return 'admin';
+  return 'other';
+}
 
 /** Best-guess POI category for an OSM feature's tags. */
 export function poiCategoryFromTags(tags: Record<string, string>): PoiCategory {

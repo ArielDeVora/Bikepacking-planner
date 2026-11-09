@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { ModuleContext } from '../../core/module';
   import type { LngLat, PoiCategory } from '../../model/types';
+  import { osmDetails } from './details';
   import PlaceInfo from './PlaceInfo.svelte';
   import { createPoiCommand } from './poi';
 
@@ -16,13 +17,22 @@
   let { ctx, place }: { ctx: ModuleContext; place: Place } = $props();
   const { t } = $derived(ctx);
 
+  // Nominatim gives the English name when OSM has one (the map shows the local name).
+  let englishName = $state<string | null>(null);
+  $effect(() => {
+    const ref = place.osm;
+    englishName = null;
+    if (ref) void osmDetails(ref.type, ref.id).then((d) => (englishName = d?.tags.name ?? null));
+  });
+  const title = $derived(englishName || place.name);
+
   function add() {
     const { command, id } = createPoiCommand(
       {
         tripId: ctx.tripId,
         userId: ctx.user.id,
         lngLat: place.lngLat,
-        name: place.name || place.kind,
+        name: title || place.kind,
         category: place.category,
         osm: place.osm ? { ...place.osm, fetchedAt: Date.now() } : undefined,
       },
@@ -33,9 +43,9 @@
   }
 </script>
 
-<h3>{place.name || place.kind}</h3>
-{#if place.name && place.kind}<p class="kind muted">{place.kind}</p>{/if}
-<PlaceInfo {ctx} lngLat={place.lngLat} name={place.name || place.kind} osm={place.osm} />
+<h3>{title || place.kind}</h3>
+{#if title && place.kind}<p class="kind muted">{place.kind}{englishName && place.name && englishName !== place.name ? ` · ${place.name}` : ''}</p>{/if}
+<PlaceInfo {ctx} lngLat={place.lngLat} name={title || place.kind} osm={place.osm} />
 <button type="button" class="add" onclick={add}>{t('place.addToTrip')}</button>
 
 <style>

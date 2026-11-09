@@ -190,3 +190,42 @@ describe('re-importing waypoints', () => {
     expect(store.list('poi').find((p) => p.name === 'Narikala')!.notes).toBe('Fortress');
   });
 });
+
+describe('polygons', () => {
+  it('reads polygons and imports them as zones', () => {
+    const parsed = fromGeoJSON(
+      {
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            properties: { name: 'Border area', description: 'FCDO: avoid', url: 'https://www.gov.uk/x' },
+            geometry: { type: 'Polygon', coordinates: [[[44, 41], [45, 41], [45, 42], [44, 41]]] },
+          },
+          { type: 'Feature', properties: {}, geometry: { type: 'MultiPolygon', coordinates: [[[[1, 1], [2, 1], [2, 2], [1, 1]]], [[[5, 5], [6, 5], [6, 6], [5, 5]]]] } },
+        ],
+      },
+      'risks.geojson',
+    );
+    expect(parsed.areas!.map((a) => [a.name, a.polygon[0]!.length, a.link])).toEqual([
+      ['Border area', 3, 'https://www.gov.uk/x'],
+      ['risks', 3, undefined],
+      ['risks', 3, undefined],
+    ]);
+    const store = new TripStore();
+    store.apply([trip(), stage('a', 'V')], 'load');
+    const res = buildImport(store, [{ name: 'risks.geojson', tracks: [], waypoints: [], areas: parsed.areas }], {
+      tripId: TRIP_ID,
+      userId: 'u1',
+      target: 'auto',
+      mode: 'bike',
+      waypoints: true,
+      areas: 'risk',
+      label: 'import',
+      stageName: (n) => `S${n}`,
+    });
+    expect(res.zoneCount).toBe(3);
+    const zone = res.command.changes[0]!.after as import('../../model/types').Zone;
+    expect([zone.kind, zone.severity, zone.source, zone.sourceUrl, zone.reason]).toEqual(['risk', 'caution', 'risks.geojson', 'https://www.gov.uk/x', 'FCDO: avoid']);
+  });
+});

@@ -91,9 +91,10 @@ export default defineModule({
         features: line && line.length > 1 ? [{ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: line } }] : [],
       });
 
-    const open = writable(settings.get('open', false));
+    // Shown by default; closing it is remembered.
+    const open = writable(settings.get('shown', true));
     const offOpen = open.subscribe((v) => {
-      settings.set('open', v);
+      settings.set('shown', v);
       if (!v) setHover(null);
     });
     const toggle = () => open.update((v) => !v);

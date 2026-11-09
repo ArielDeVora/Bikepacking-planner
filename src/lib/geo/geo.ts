@@ -172,3 +172,64 @@ export function distanceToLine(p: Pos, coords: readonly Pos[]): number {
   if (coords.length === 1) return Math.hypot(...xy(coords[0]!));
   return closestOnPolyline(coords.map(xy), [0, 0])?.dist ?? Infinity;
 }
+
+export type BBox = [west: number, south: number, east: number, north: number];
+
+export function bbox(coords: readonly Pos[]): BBox {
+  let w = Infinity, s = Infinity, e = -Infinity, n = -Infinity;
+  for (const c of coords) {
+    if (c[0] < w) w = c[0];
+    if (c[0] > e) e = c[0];
+    if (c[1] < s) s = c[1];
+    if (c[1] > n) n = c[1];
+  }
+  return [w, s, e, n];
+}
+
+export const bboxOverlap = (a: BBox, b: BBox) => a[0] <= b[2] && b[0] <= a[2] && a[1] <= b[3] && b[1] <= a[3];
+
+/** Ray casting; the ring may be open or closed. */
+export function pointInRing(p: Pos, ring: readonly Pos[]): boolean {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i]!;
+    const [xj, yj] = ring[j]!;
+    if (yi > p[1] !== yj > p[1] && p[0] < ((xj - xi) * (p[1] - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+/** Inside the outer ring and outside every hole. */
+export function pointInPolygon(p: Pos, polygon: readonly (readonly Pos[])[]): boolean {
+  if (!polygon[0] || !pointInRing(p, polygon[0])) return false;
+  return !polygon.slice(1).some((hole) => pointInRing(p, hole));
+}
+
+function cross(o: Pos, a: Pos, b: Pos): number {
+  return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+}
+
+export function segmentsIntersect(a: Pos, b: Pos, c: Pos, d: Pos): boolean {
+  const d1 = cross(c, d, a);
+  const d2 = cross(c, d, b);
+  const d3 = cross(a, b, c);
+  const d4 = cross(a, b, d);
+  return ((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0));
+}
+
+/** Whether a line enters a polygon (a vertex inside, or an edge crossing its outline). */
+export function lineIntersectsPolygon(line: readonly Pos[], polygon: readonly (readonly Pos[])[]): boolean {
+  const outer = polygon[0];
+  if (!outer || outer.length < 3 || line.length === 0) return false;
+  const pb = bbox(outer);
+  if (!bboxOverlap(bbox(line), pb)) return false;
+  for (const p of line) if (p[0] >= pb[0] && p[0] <= pb[2] && p[1] >= pb[1] && p[1] <= pb[3] && pointInPolygon(p, polygon)) return true;
+  for (const ring of polygon) {
+    for (let i = 0; i < line.length - 1; i++) {
+      for (let j = 0, k = ring.length - 1; j < ring.length; k = j++) {
+        if (segmentsIntersect(line[i]!, line[i + 1]!, ring[k]!, ring[j]!)) return true;
+      }
+    }
+  }
+  return false;
+}

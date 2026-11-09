@@ -61,6 +61,7 @@ export default defineModule({
       const ids = selection.current;
       const seg = ids.length === 1 ? store.get(ids[0]!, 'segment') : undefined;
       renderer.setActive(seg?.id ?? null);
+      renderer.setSelected(ids.length > 1 ? ids : []);
       editor.onSelectionChanged();
     };
 
@@ -101,12 +102,12 @@ export default defineModule({
       run: () => editor.toggleDrawing(),
     });
 
-    // Deletes the selected point, else the selected segments and POIs (stages only from the tree).
+    // Deletes the selected point, else the selected segments, places, zones and crossings (stages only from the tree).
     const deleteSelection = () => {
       if (editor.deleteSelectedAnchor()) return;
       const ids = selection.current.filter((id) => {
         const type = store.get(id)?.type;
-        return type === 'segment' || type === 'poi';
+        return type === 'segment' || type === 'poi' || type === 'zone' || type === 'borderCrossing';
       });
       if (ids.length) ctx.commands.run({ label: t('tree.delete'), changes: ids.map((id) => edits.remove(store, id)) });
     };

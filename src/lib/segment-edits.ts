@@ -99,3 +99,47 @@ export function makeEditableCommand(store: TripStore, seg: Segment, label: strin
   if (geometry.anchors.length < 2) return null;
   return { label, changes: [edits.update<Segment>(store, seg.id, { ...geometry, geomType: MODES[seg.mode].geomType })] };
 }
+
+/** Segments sorted in trip order: by stage, then by their order in the stage. */
+export function inTripOrder(store: TripStore, segments: Segment[]): Segment[] {
+  const stageRank = new Map(store.list('stage').sort(compareOrder).map((s, i) => [s.id, i]));
+  return [...segments].sort((a, b) => (stageRank.get(a.stageId) ?? 0) - (stageRank.get(b.stageId) ?? 0) || compareOrder(a, b));
+}
+
+/**
+ * Fuses segments into the first one, in the given order: each is appended (joined by a new leg
+ * where they don't touch) and then deleted; their comments move to the first.
+ */
+export function mergeManyCommand(store: TripStore, segments: Segment[], label: string): Command | null {
+  const [first, ...rest] = segments;
+  if (!first || !rest.length) return null;
+  let geometry: SegmentGeometry = { anchors: first.anchors, legs: first.legs, stats: first.stats };
+  for (const s of rest) geometry = mergeGeometry({ ...geometry, geomType: first.geomType }, s);
+  const ids = new Set(rest.map((s) => s.id));
+  const comments = store.list('comment', (c) => ids.has(c.targetId));
+  return {
+    label,
+    changes: [
+      edits.update<Segment>(store, first.id, geometry),
+      ...rest.map((s) => edits.remove(store, s.id)),
+      ...comments.map((c) => edits.update<Comment>(store, c.id, { targetId: first.id })),
+    ],
+  };
+}
+
+/** Moves segments, in this order, into a stage: before `beforeId`, or at the end when null. */
+export function moveSegmentsCommand(store: TripStore, ids: string[], stageId: string, beforeId: string | null, label: string): Command | null {
+  const moving = new Set(ids);
+  const others = siblings(store, stageId).filter((s) => !moving.has(s.id));
+  const at = beforeId ? others.findIndex((s) => s.id === beforeId) : others.length;
+  const index = at < 0 ? others.length : at;
+  let prev = others[index - 1]?.order ?? null;
+  const next = others[index]?.order ?? null;
+  const changes = ids.flatMap((id) => {
+    if (!store.get(id, 'segment')) return [];
+    const order = keyBetween(prev, next);
+    prev = order;
+    return [edits.update<Segment>(store, id, { stageId, order })];
+  });
+  return changes.length ? { label, changes } : null;
+}

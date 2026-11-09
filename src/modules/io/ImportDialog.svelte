@@ -31,6 +31,8 @@
   let target = $state<ImportTarget>('auto');
   let mode = $state<TravelMode>(untrack(() => ctx.settings.get('importMode', 'bike')));
   let withWaypoints = $state(true);
+  let areasAs = $state<'risk' | 'avoid' | ''>('risk');
+  const areaCount = $derived(files.reduce((n, f) => n + (f.areas?.length ?? 0), 0));
 
   // Places from a Google list without a position, looked up by name on request.
   const LOOKUP_GAP_MS = 1100;
@@ -107,6 +109,7 @@
       defaultStageId,
       mode,
       waypoints: withWaypoints,
+      areas: areasAs || null,
       label: t('cmd.import'),
       stageName: (n) => t('tree.stageName', { n }),
     });
@@ -116,6 +119,7 @@
       const first = res.segmentIds[0];
       if (res.segmentIds.length === 1 && first) selection.set([first]);
       else if (res.stageIds.length === 1) selection.set([res.stageIds[0]!]);
+      if (res.zoneCount) ui.notify(t('io.importedZones', { n: res.zoneCount }));
       ui.notify(
         res.poiMatched
           ? t('io.importedMatched', { segments: res.segmentIds.length, pois: res.poiCount, matched: res.poiMatched })
@@ -177,6 +181,17 @@
   </div>
 {/if}
 
+{#if areaCount}
+  <label class="field">
+    <span>{t('io.areas', { n: areaCount })}</span>
+    <select bind:value={areasAs}>
+      <option value="risk">{t('io.areasRisk')}</option>
+      <option value="avoid">{t('io.areasAvoid')}</option>
+      <option value="">{t('io.areasSkip')}</option>
+    </select>
+  </label>
+{/if}
+
 {#if trackCount}
   <label class="field">
     <span>{t('io.target')}</span>
@@ -207,7 +222,7 @@
 
 <div class="buttons">
   <button type="button" class="btn" onclick={() => ui.closeDialog()}>{t('io.cancel')}</button>
-  <button type="button" class="btn primary" disabled={!trackCount && !(waypointCount && withWaypoints)} onclick={run}>
+  <button type="button" class="btn primary" disabled={!trackCount && !(waypointCount && withWaypoints) && !(areaCount && areasAs)} onclick={run}>
     {t('io.import')}
   </button>
 </div>

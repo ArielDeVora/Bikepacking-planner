@@ -45,6 +45,7 @@ export function describeTags(tags: Record<string, string>): { key: string; value
     .join(', ');
   add('address', address);
   add('opening_hours', tags.opening_hours);
+  add('cuisine', tags.cuisine?.replace(/[_;]/g, (c) => (c === ';' ? ', ' : ' ')));
   const phone = tags.phone ?? tags['contact:phone'];
   add('phone', phone, phone && `tel:${phone.replace(/[^\d+]/g, '')}`);
   const website = tags.website ?? tags['contact:website'] ?? tags.url;

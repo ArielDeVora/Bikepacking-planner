@@ -10,6 +10,7 @@ import {
   reverseCommand,
 } from '../../lib/segment-edits';
 import EditCard from './EditCard.svelte';
+import MultiCard from './MultiCard.svelte';
 import { EditTools, ERASE_TOOL, PREVIEW, SPLIT_TOOL } from './tools';
 
 export interface EditActions {
@@ -101,6 +102,7 @@ export default defineModule({
       },
     };
 
+    const removeMulti = ui.addMultiCard({ id: 'editing.multi', component: MultiCard, props: { ctx } });
     const removeCard = ui.addCardSection({ id: 'editing', component: EditCard, props: { ctx, actions }, types: ['segment'], order: 1 });
     const removeTools = [
       ui.addTool({
@@ -133,6 +135,7 @@ export default defineModule({
     return () => {
       detach();
       removeCard();
+      removeMulti();
       removeTools.forEach((off) => off());
       offShortcuts.forEach((off) => off());
     };

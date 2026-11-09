@@ -3,6 +3,7 @@
   import type { ModuleContext } from '../../core/module';
   import type { LngLat } from '../../model/types';
   import { terrain } from '../dem';
+  import { osmDetails, wikiSummary, type OsmDetails, type WikiSummary } from './details';
   import { describeTags, formatLngLat, placeLinks } from './links';
   import { nearestSegment } from './route';
 
@@ -22,6 +23,26 @@
 
   let elevation = $state<number | null>(null);
   let copied = $state(false);
+  let fetched = $state<OsmDetails | null>(null);
+  let summary = $state<WikiSummary | null>(null);
+
+  // Full tags and a Wikipedia summary, fetched when the card opens.
+  $effect(() => {
+    const ref = osm;
+    fetched = null;
+    summary = null;
+    if (!ref) return;
+    let live = true;
+    void osmDetails(ref.type, ref.id).then(async (d) => {
+      if (!live) return;
+      fetched = d;
+      const s = await wikiSummary({ ...ref.tags, ...(d?.tags ?? {}) });
+      if (live) summary = s;
+    });
+    return () => {
+      live = false;
+    };
+  });
 
   $effect(() => {
     const point = lngLat;
@@ -35,8 +56,13 @@
     void $store;
     return nearestSegment(store, lngLat);
   });
-  const tags = $derived(osm ? describeTags(osm.tags) : []);
-  const links = $derived(placeLinks(lngLat, name, osm));
+  const allTags = $derived({ ...(osm?.tags ?? {}), ...(fetched?.tags ?? {}) });
+  const tags = $derived.by(() => {
+    const rows = describeTags(allTags);
+    if (fetched?.address && !rows.some((r) => r.key === 'address')) rows.unshift({ key: 'address', value: fetched.address });
+    return rows;
+  });
+  const links = $derived(placeLinks(lngLat, name, osm ? { ...osm, tags: allTags } : undefined));
   const distance = (m: number) => (m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(m < 10_000 ? 1 : 0)} km`);
 
   async function copy() {
@@ -45,6 +71,14 @@
     setTimeout(() => (copied = false), 1500);
   }
 </script>
+
+{#if summary}
+  <div class="summary">
+    {#if summary.image}<img src={summary.image} alt={summary.title} loading="lazy" />{/if}
+    <p>{summary.extract}</p>
+    <a href={summary.url} target="_blank" rel="noopener noreferrer">{t('place.readMore')}</a>
+  </div>
+{/if}
 
 <dl class="info">
   {#each tags as row (row.key)}
@@ -74,6 +108,29 @@
 </p>
 
 <style>
+  .summary {
+    margin: 0 0 10px;
+    font-size: 13px;
+  }
+
+  .summary img {
+    display: block;
+    width: 100%;
+    max-height: 160px;
+    object-fit: cover;
+    border-radius: var(--radius-sm);
+    margin-bottom: 6px;
+  }
+
+  .summary p {
+    margin: 0 0 4px;
+    display: -webkit-box;
+    -webkit-line-clamp: 5;
+    line-clamp: 5;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
   .info {
     display: grid;
     gap: 4px;

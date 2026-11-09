@@ -8,6 +8,9 @@ import type { Comment, LngLat, Segment } from '../model/types';
 import { stage, trip, TRIP_ID } from '../test/fixtures';
 import {
   duplicateCommand,
+  inTripOrder,
+  mergeManyCommand,
+  moveSegmentsCommand,
   eraseCommand,
   makeEditableCommand,
   mergeCommand,
@@ -103,5 +106,28 @@ describe('segment edit commands', () => {
     expect(after.anchors.length).toBe(3);
     expect(after.legs.every((l) => !l.status)).toBe(true);
     expect(makeEditableCommand(store, after, 'edit')).toBeNull();
+  });
+});
+
+describe('several segments at once', () => {
+  it('fuses segments in order into the first', () => {
+    const a = add('a', 'V', [[7, 45], [7.01, 45]]);
+    const b = add('b', 'X', [[7.01, 45], [7.02, 45]]);
+    const c = add('c', 'Y', [[7.05, 45], [7.06, 45]], 'manual', 'b');
+    commands.run(mergeManyCommand(store, inTripOrder(store, [c, a, b]), 'fuse')!);
+    expect(store.list('segment').map((s) => s.id)).toEqual(['a']);
+    expect(store.get('a', 'segment')!.anchors).toHaveLength(5);
+    expect(mergeManyCommand(store, [store.get('a', 'segment')!], 'fuse')).toBeNull();
+  });
+
+  it('moves segments into a stage at a given place', () => {
+    add('a', 'V', [[7, 45], [7.01, 45]]);
+    add('b', 'X', [[7, 45], [7.01, 45]]);
+    add('x', 'V', [[7, 45], [7.01, 45]], 'manual', 'b');
+    add('y', 'X', [[7, 45], [7.01, 45]], 'manual', 'b');
+    commands.run(moveSegmentsCommand(store, ['b', 'a'], 'b', 'y', 'move')!);
+    expect(order('b')).toEqual(['x', 'b', 'a', 'y']);
+    commands.run(moveSegmentsCommand(store, ['x'], 'b', null, 'move')!);
+    expect(order('b')).toEqual(['b', 'a', 'y', 'x']);
   });
 });

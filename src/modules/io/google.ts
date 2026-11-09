@@ -28,6 +28,11 @@ export function coordsFromGoogleUrl(url: string): LngLat | null {
   return null;
 }
 
+// Takeout names its columns in the account's language.
+const TITLE = ['title', 'titre', 'titel', 'titulo', 'titolo', 'titulo', 'nome', 'naam', 'tytul', 'nazvanie', 'название'];
+const NOTE = ['note', 'notiz', 'nota', 'notitie', 'notatka', 'заметка'];
+const COMMENT = ['comment', 'commentaire', 'kommentar', 'comentario', 'commento', 'opmerking', 'komentarz', 'комментарий'];
+
 export interface UnlocatedPlace {
   name: string;
   desc: string;
@@ -40,12 +45,13 @@ export interface UnlocatedPlace {
  */
 export function parseGoogleList(text: string): { waypoints: ParsedWaypoint[]; unlocated: UnlocatedPlace[] } | null {
   const rows = parseCsv(text);
-  const header = rows[0]?.map((h) => h.trim().toLowerCase()) ?? [];
-  const title = header.indexOf('title');
-  const url = header.indexOf('url');
+  const header = rows[0]?.map((h) => h.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')) ?? [];
+  const col = (names: string[]) => header.findIndex((h) => names.includes(h));
+  const title = col(TITLE);
+  const url = col(['url']);
   if (title < 0 || url < 0) return null;
-  const note = header.indexOf('note');
-  const comment = header.indexOf('comment');
+  const note = col(NOTE);
+  const comment = col(COMMENT);
   const waypoints: ParsedWaypoint[] = [];
   const unlocated: UnlocatedPlace[] = [];
   for (const row of rows.slice(1)) {

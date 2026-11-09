@@ -14,6 +14,8 @@ export interface Profile {
   descentM: number;
   minEle: number;
   maxEle: number;
+  /** Where each segment starts and ends along the profile, in metres. */
+  ranges: { id: string; from: number; to: number }[];
 }
 
 /**
@@ -30,9 +32,11 @@ export function buildProfile(segments: Segment[]): Profile {
   let i = 0;
   let total = 0;
   const starts = new Set<number>();
+  const ranges: Profile['ranges'] = [];
   for (const s of segments) {
     let first = true;
     starts.add(i);
+    const from = total;
     for (const leg of s.legs) {
       for (const c of legCoords(leg)) {
         if (i > 0 && !first) total += distance([lng[i - 1]!, lat[i - 1]!], c);
@@ -44,6 +48,7 @@ export function buildProfile(segments: Segment[]): Profile {
         i++;
       }
     }
+    ranges.push({ id: s.id, from, to: total });
   }
 
   let ascentM = 0;
@@ -70,7 +75,7 @@ export function buildProfile(segments: Segment[]): Profile {
     if (v > maxEle) maxEle = v;
   }
   flush();
-  return { d, e, lng, lat, lengthM: total, ascentM: Math.round(ascentM), descentM: Math.round(descentM), minEle, maxEle };
+  return { d, e, lng, lat, lengthM: total, ascentM: Math.round(ascentM), descentM: Math.round(descentM), minEle, maxEle, ranges };
 }
 
 /** Index of the last point at or before `dist`. */

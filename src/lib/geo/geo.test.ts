@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { closestOnPolyline, densify, distance, distanceToLine, elevationGain, greatCircle, lineLength, simplify } from './geo';
+import { bbox, closestOnPolyline, densify, distance, distanceToLine, elevationGain, greatCircle, lineIntersectsPolygon, lineLength, pointInPolygon, segmentsIntersect, simplify } from './geo';
 
 describe('geo helpers', () => {
   it('measures distances', () => {
@@ -73,5 +73,37 @@ describe('simplify, densify, distanceToLine', () => {
   it('measures the distance to a line', () => {
     expect(distanceToLine([7.005, 45.001], [[7, 45], [7.01, 45]])).toBeCloseTo(110.6, 0);
     expect(distanceToLine([7, 45], [[7, 45]])).toBe(0);
+  });
+});
+
+describe('polygons', () => {
+  const square: [number, number][][] = [
+    [
+      [0, 0],
+      [10, 0],
+      [10, 10],
+      [0, 10],
+    ],
+    [
+      [4, 4],
+      [6, 4],
+      [6, 6],
+      [4, 6],
+    ],
+  ];
+
+  it('tests points against polygons with holes', () => {
+    expect(pointInPolygon([2, 2], square)).toBe(true);
+    expect(pointInPolygon([5, 5], square)).toBe(false);
+    expect(pointInPolygon([12, 5], square)).toBe(false);
+  });
+
+  it('detects lines entering polygons', () => {
+    expect(lineIntersectsPolygon([[-5, 5], [15, 5]], square)).toBe(true);
+    expect(lineIntersectsPolygon([[-5, -5], [-1, 20]], square)).toBe(false);
+    expect(lineIntersectsPolygon([[2, 2], [3, 3]], square)).toBe(true);
+    expect(lineIntersectsPolygon([[4.5, 4.5], [5.5, 5.5]], square)).toBe(false);
+    expect(segmentsIntersect([0, 0], [2, 2], [0, 2], [2, 0])).toBe(true);
+    expect(bbox([[1, 5], [3, -2]])).toEqual([1, -2, 3, 5]);
   });
 });

@@ -70,6 +70,7 @@ export default defineModule({
       },
       'poi',
     );
+    const removePointLayer = ui.addPointLayer('pois');
     const removeOverlay = layers.registerOverlay({ id: 'pois', label: t('poi.overlay'), layerIds: ['pois', 'pois-ring'], visible: true, order: 10 });
 
     // Rendering
@@ -111,7 +112,9 @@ export default defineModule({
     const onPoiClick = (e: MapLayerMouseEvent) => {
       if (get(ui.tool)) return;
       const id = e.features?.[0]?.properties.id as string | undefined;
-      if (id) selection.set([id]);
+      if (!id) return;
+      ui.claim(e.originalEvent);
+      selection.set([id]);
     };
     const onPoiDown = (e: MapLayerMouseEvent) => {
       const id = e.features?.[0]?.properties.id as string | undefined;
@@ -166,6 +169,7 @@ export default defineModule({
       offStore();
       offSelection();
       removeOverlay();
+      removePointLayer();
       removeTool();
       removeShortcut();
       removeCard();

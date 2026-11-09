@@ -5,7 +5,7 @@ import { newId } from '../../model/ids';
 import { compareOrder, keyBetween } from '../../model/order';
 import { distance } from '../../lib/geo/geo';
 import { importedGeometry } from '../../model/segment';
-import type { Poi, Segment, Stage, TravelMode } from '../../model/types';
+import type { Poi, Segment, Stage, TravelMode, Zone } from '../../model/types';
 import type { ParsedFile, ParsedWaypoint } from './parse';
 
 /**
@@ -22,6 +22,8 @@ export interface ImportOptions {
   defaultStageId?: string;
   mode: TravelMode;
   waypoints: boolean;
+  /** Import polygons as zones of this kind, or not at all. */
+  areas?: Zone['kind'] | null;
   label: string;
   stageName: (n: number) => string;
 }
@@ -34,6 +36,7 @@ export interface ImportResult {
   poiCount: number;
   /** Existing POIs the import matched (and updated where something was new). */
   poiMatched: number;
+  zoneCount: number;
 }
 
 /** Waypoints matching an existing POI: same link, or the same name within this distance. */
@@ -59,6 +62,8 @@ export function buildImport(store: TripStore, files: ParsedFile[], opts: ImportO
   const newStages: string[] = [];
   let poiCount = 0;
   let poiMatched = 0;
+  let zoneCount = 0;
+  const today = new Date().toISOString().slice(0, 10);
   const existingPois = store.list('poi');
 
   const newStage = (name: string): string => {
@@ -122,6 +127,28 @@ export function buildImport(store: TripStore, files: ParsedFile[], opts: ImportO
       );
     }
 
+    if (opts.areas) {
+      for (const a of file.areas ?? []) {
+        zoneCount++;
+        changes.push(
+          edits.create<Zone>({
+            id: newId(),
+            type: 'zone',
+            tripId: opts.tripId,
+            kind: opts.areas,
+            polygon: a.polygon,
+            name: a.name,
+            reason: a.desc,
+            severity: opts.areas === 'avoid' ? 'nogo' : 'caution',
+            addedAt: Date.now(),
+            source: file.name,
+            ...(a.link ? { sourceUrl: a.link } : {}),
+            dataDate: today,
+          }),
+        );
+      }
+    }
+
     if (!opts.waypoints) continue;
     for (const w of file.waypoints) {
       const existing = findExistingPoi(existingPois, w);
@@ -151,5 +178,5 @@ export function buildImport(store: TripStore, files: ParsedFile[], opts: ImportO
       );
     }
   }
-  return { command: { label: opts.label, changes }, segmentIds, stageIds: newStages, poiCount, poiMatched };
+  return { command: { label: opts.label, changes }, segmentIds, stageIds: newStages, poiCount, poiMatched, zoneCount };
 }

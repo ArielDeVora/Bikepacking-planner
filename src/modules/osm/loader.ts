@@ -1,25 +1,16 @@
 import { writable, type Readable } from 'svelte/store';
 import type { OsmCategory } from '../../config/pois';
+import { cacheGet, cachePut } from '../../lib/cache';
+import { OVERPASS_ENDPOINTS as ENDPOINTS, OverpassError, overpassFetch } from '../../lib/overpass';
 import { buildQuery, parseElements, type OsmPlace, type Tile } from './overpass';
 
-// Public instance: about 10,000 requests and 1 GB a day per user. Requests go one at a time,
-// at least MIN_GAP_MS apart, and every tile is cached for TTL_MS.
-const ENDPOINT = 'https://overpass-api.de/api/interpreter';
+// Requests go one at a time, at least MIN_GAP_MS apart, and every tile is cached for TTL_MS.
 const MIN_GAP_MS = 1500;
 const TTL_MS = 14 * 24 * 3600 * 1000;
-const TIMEOUT_MS = 40_000;
 /** After a failure, wait this long, doubling with each further failure (as the server asks). */
 const BACKOFF_MS = 30_000;
 const MAX_BACKOFF_MS = 10 * 60_000;
 
-const DB_NAME = 'bikepacking-cache';
-const STORE = 'overpass';
-
-interface CacheEntry {
-  key: string;
-  fetchedAt: number;
-  places: OsmPlace[];
-}
 
 export interface LoaderState {
   queued: number;
@@ -28,45 +19,14 @@ export interface LoaderState {
 }
 
 export interface Transport {
-  query(q: string): Promise<{ elements?: unknown[] }>;
+  query(q: string, endpoint: string): Promise<{ elements?: unknown[] }>;
   sleep(ms: number): Promise<void>;
 }
 
-class HttpError extends Error {
-  constructor(readonly status: number) {
-    super(`Overpass HTTP ${status}`);
-  }
-}
-
 const http: Transport = {
-  async query(q) {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
-    try {
-      const res = await fetch(ENDPOINT, { method: 'POST', body: new URLSearchParams({ data: q }), signal: ctrl.signal });
-      if (!res.ok) throw new HttpError(res.status);
-      return (await res.json()) as { elements?: unknown[] };
-    } catch (err) {
-      throw ctrl.signal.aborted ? new HttpError(504) : err;
-    } finally {
-      clearTimeout(timer);
-    }
-  },
+  query: overpassFetch,
   sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
 };
-
-function openCache(): Promise<IDBDatabase | null> {
-  return new Promise((resolve) => {
-    try {
-      const req = indexedDB.open(DB_NAME, 1);
-      req.onupgradeneeded = () => req.result.createObjectStore(STORE, { keyPath: 'key' });
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => resolve(null);
-    } catch {
-      resolve(null);
-    }
-  });
-}
 
 /** Loads OSM places per tile and category, from memory, the local cache, or Overpass. */
 export class OverpassLoader {
@@ -75,7 +35,7 @@ export class OverpassLoader {
   #running = false;
   #lastStart = 0;
   #failures = 0;
-  #db: Promise<IDBDatabase | null>;
+  #endpoint = 0;
   #state = writable<LoaderState>({ queued: 0, busyUntil: 0, error: null });
   readonly state: Readable<LoaderState> = { subscribe: this.#state.subscribe };
 
@@ -83,10 +43,8 @@ export class OverpassLoader {
     private categories: OsmCategory[],
     private onLoaded: () => void,
     private transport: Transport = http,
-    db?: Promise<IDBDatabase | null>,
-  ) {
-    this.#db = db ?? openCache();
-  }
+    private cache: { get: typeof cacheGet; put: typeof cachePut } = { get: cacheGet, put: cachePut },
+  ) {}
 
   /** All places loaded so far for these categories. */
   places(categoryIds: Set<string>): OsmPlace[] {
@@ -105,14 +63,13 @@ export class OverpassLoader {
 
   /** Makes sure these tiles are loaded for these categories. Resolves when they are queued. */
   async ensure(tiles: Tile[], categoryIds: string[]): Promise<void> {
-    const db = await this.#db;
     for (const tile of tiles) {
       for (const cat of categoryIds) {
         const key = `${tile}|${cat}`;
         if (this.#memory.has(key) || this.#pending.get(tile)?.has(cat)) continue;
-        const cached = db ? await get(db, key) : undefined;
-        if (cached && Date.now() - cached.fetchedAt < TTL_MS) {
-          this.#memory.set(key, cached.places);
+        const cached = await this.cache.get<OsmPlace[]>(key, TTL_MS);
+        if (cached) {
+          this.#memory.set(key, cached);
           continue;
         }
         let set = this.#pending.get(tile);
@@ -144,23 +101,26 @@ export class OverpassLoader {
         const categories = this.categories.filter((c) => cats.has(c.id));
         this.#lastStart = Date.now();
         try {
-          const json = await this.transport.query(buildQuery(tile, categories));
+          const json = await this.transport.query(buildQuery(tile, categories), ENDPOINTS[this.#endpoint]!);
           const places = parseElements(json as Parameters<typeof parseElements>[0], categories);
-          const db = await this.#db;
           for (const c of categories) {
-            const entry: CacheEntry = { key: `${tile}|${c.id}`, fetchedAt: Date.now(), places: places.filter((p) => p.category === c.id) };
-            this.#memory.set(entry.key, entry.places);
-            if (db) void put(db, entry);
+            const key = `${tile}|${c.id}`;
+            const own = places.filter((p) => p.category === c.id);
+            this.#memory.set(key, own);
+            void this.cache.put(key, own);
           }
           this.#failures = 0;
           this.#state.update((s) => ({ ...s, busyUntil: 0, error: null }));
           this.onLoaded();
         } catch (err) {
           // Busy or failed: put the tile back and slow down.
-          const status = err instanceof HttpError ? err.status : 0;
+          const busyError = err instanceof OverpassError && err.busy;
           this.#pending.set(tile, new Set([...(this.#pending.get(tile) ?? []), ...cats]));
-          const pause = Math.min(MAX_BACKOFF_MS, BACKOFF_MS * 2 ** this.#failures++);
-          const busy = status === 429 || status >= 502;
+          // Try the next server straight away; once all have failed in a row, back off.
+          this.#endpoint = (this.#endpoint + 1) % ENDPOINTS.length;
+          const rounds = Math.floor(++this.#failures / ENDPOINTS.length);
+          const pause = this.#failures % ENDPOINTS.length ? 0 : Math.min(MAX_BACKOFF_MS, BACKOFF_MS * 2 ** (rounds - 1));
+          const busy = busyError;
           this.#state.update((s) => ({ ...s, busyUntil: Date.now() + pause, error: busy ? 'busy' : 'failed' }));
         }
         this.#publish();
@@ -179,21 +139,4 @@ export class OverpassLoader {
   #publish(): void {
     this.#state.update((s) => ({ ...s, queued: this.#pending.size }));
   }
-}
-
-function get(db: IDBDatabase, key: string): Promise<CacheEntry | undefined> {
-  return new Promise((resolve) => {
-    const req = db.transaction(STORE).objectStore(STORE).get(key);
-    req.onsuccess = () => resolve(req.result as CacheEntry | undefined);
-    req.onerror = () => resolve(undefined);
-  });
-}
-
-function put(db: IDBDatabase, entry: CacheEntry): Promise<void> {
-  return new Promise((resolve) => {
-    const tx = db.transaction(STORE, 'readwrite');
-    tx.objectStore(STORE).put(entry);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => resolve();
-  });
 }

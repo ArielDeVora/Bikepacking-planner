@@ -200,11 +200,19 @@ export class RouteEditor {
 
   // Map events
 
+  /** A place, crossing or other marker under the cursor: its module handles the click. */
+  #onMarker(point: { x: number; y: number }): boolean {
+    const { map, ui } = this.ctx;
+    const layers = ui.pointLayers.filter((id) => map.getLayer(id));
+    return layers.length > 0 && map.queryRenderedFeatures(box(point, HIT_PX), { layers }).length > 0;
+  }
+
   #onClick(e: MapMouseEvent): void {
     if (get(this.drawing)) {
       this.#addPoint(this.#snap(e.point, toLngLat(e)));
       return;
     }
+    if (this.#anchorAt(e.point) === null && this.#onMarker(e.point)) return;
     if (this.#otherTool) {
       const hit = this.ctx.map.queryRenderedFeatures(box(e.point, HIT_PX), { layers: this.renderer.hitLayerIds })[0];
       if (hit) this.ctx.selection.set([hit.properties.sid as string]);
@@ -212,13 +220,21 @@ export class RouteEditor {
     }
     const anchor = this.#anchorAt(e.point);
     if (anchor !== null) {
+      this.ctx.ui.claim(e.originalEvent);
       this.#anchor = anchor;
       this.refresh();
       return;
     }
     const hit = this.ctx.map.queryRenderedFeatures(box(e.point, HIT_PX), { layers: this.renderer.hitLayerIds })[0];
-    if (hit) this.ctx.selection.set([hit.properties.sid as string]);
-    else {
+    if (hit) {
+      this.ctx.ui.claim(e.originalEvent);
+      const id = hit.properties.sid as string;
+      const current = this.ctx.selection.current;
+      // Cmd/Ctrl+click adds the segment to the selection, or removes it.
+      if (e.originalEvent.metaKey || e.originalEvent.ctrlKey) {
+        this.ctx.selection.set(current.includes(id) ? current.filter((x) => x !== id) : [...current, id]);
+      } else this.ctx.selection.set([id]);
+    } else {
       this.ctx.selection.clear();
       this.ctx.ui.closePlace();
     }
@@ -229,6 +245,7 @@ export class RouteEditor {
     const seg = this.#active;
     if (!seg) return;
     const anchor = this.#anchorAt(e.point);
+    if (anchor === null && this.#onMarker(e.point)) return;
     let drag: Drag | null = null;
     if (anchor !== null) {
       drag = { segId: seg.id, index: anchor, kind: 'move', start: e.point, lngLat: seg.anchors[anchor]!.lngLat, moved: false };

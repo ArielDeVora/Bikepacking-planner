@@ -6,6 +6,7 @@ import { tileAt } from './overpass';
 
 const cats = OSM_CATEGORIES.filter((c) => c.id === 'water' || c.id === 'camp');
 const flush = () => new Promise((r) => setTimeout(r, 0));
+const noCache = { get: async () => undefined, put: async () => {} };
 
 function transport(responses: (() => unknown)[]): Transport & { queries: string[] } {
   const queries: string[] = [];
@@ -31,7 +32,7 @@ describe('OverpassLoader', () => {
       }),
     ]);
     const onLoaded = vi.fn();
-    const loader = new OverpassLoader(cats, onLoaded, tr, Promise.resolve(null));
+    const loader = new OverpassLoader(cats, onLoaded, tr, noCache);
     const tile = tileAt([7, 45]);
     await loader.ensure([tile], ['water', 'camp']);
     await flush();
@@ -45,16 +46,21 @@ describe('OverpassLoader', () => {
     expect(onLoaded).toHaveBeenCalled();
   });
 
-  it('puts a tile back and reports when Overpass is busy', async () => {
-    const tr = transport([
-      () => {
-        throw Object.assign(new Error('x'), { status: 429 });
-      },
-    ]);
-    const loader = new OverpassLoader(cats, () => {}, { ...tr, sleep: () => new Promise(() => {}) }, Promise.resolve(null));
+  it('tries the other servers, then backs off', async () => {
+    const fail = () => {
+      throw new Error('down');
+    };
+    const tr = transport([fail, fail, fail]);
+    const endpoints: string[] = [];
+    const loader = new OverpassLoader(
+      cats,
+      () => {},
+      { query: (q, e) => (endpoints.push(e), tr.query(q, e)), sleep: (ms) => (ms > 5000 ? new Promise(() => {}) : Promise.resolve()) },
+      noCache,
+    );
     await loader.ensure([tileAt([7, 45])], ['water']);
-    await flush();
-    expect(tr.queries).toHaveLength(1);
+    for (let i = 0; i < 6; i++) await flush();
+    expect(new Set(endpoints).size).toBe(3);
     expect(get(loader.state).error).toBe('failed');
     expect(get(loader.state).queued).toBe(1);
     expect(get(loader.state).busyUntil).toBeGreaterThan(Date.now());
@@ -62,7 +68,7 @@ describe('OverpassLoader', () => {
 
   it('forgets queued tiles that are no longer wanted', async () => {
     const tr = transport([]);
-    const loader = new OverpassLoader(cats, () => {}, { ...tr, sleep: () => new Promise(() => {}) }, Promise.resolve(null));
+    const loader = new OverpassLoader(cats, () => {}, { ...tr, sleep: () => new Promise(() => {}) }, noCache);
     await loader.ensure([tileAt([7, 45]), tileAt([9, 45])], ['water']);
     loader.keepOnly(new Set([tileAt([7, 45])]));
     expect(get(loader.state).queued).toBeLessThanOrEqual(1);

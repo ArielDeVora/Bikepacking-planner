@@ -7,7 +7,8 @@ import { segmentGpx, stageGpx, tripGpx } from './export';
 import { download, safeFileName } from './gpx';
 import ImportDialog from './ImportDialog.svelte';
 import IoSection from './IoSection.svelte';
-import { parseFile, type ParsedFile } from './parse';
+import { icons } from '../../lib/icons';
+import { ACCEPTED, parseFile, type ParsedFile } from './parse';
 
 const PREVIEW = 'import-preview';
 const GPX_MIME = 'application/gpx+xml';
@@ -66,6 +67,19 @@ export default defineModule({
       }
       ui.openDialog(ImportDialog, { ctx, files: parsed, preview });
     }
+
+    // Always reachable from the toolbar, not only from the side panel.
+    const picker = document.createElement('input');
+    picker.type = 'file';
+    picker.multiple = true;
+    picker.accept = ACCEPTED;
+    picker.onchange = () => {
+      void openFiles([...(picker.files ?? [])]);
+      picker.value = '';
+    };
+    const pick = () => picker.click();
+    const removeTool = ui.addTool({ id: 'io.import', label: t('io.importFiles'), icon: icons.upload, shortcut: 'i', order: 60, run: pick });
+    const removeShortcut = ctx.shortcuts.add({ keys: 'i', label: t('io.importFiles'), run: pick });
 
     const save = ({ name, xml }: { name: string; xml: string }) => download(safeFileName(name, 'gpx'), xml, GPX_MIME);
 
@@ -129,6 +143,8 @@ export default defineModule({
     window.addEventListener('drop', onDrop);
 
     return () => {
+      removeTool();
+      removeShortcut();
       removeSection();
       removeStageExport();
       removeSegmentExport();

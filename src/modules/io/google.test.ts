@@ -23,4 +23,10 @@ describe('Google Maps lists', () => {
     expect(out.unlocated).toEqual([{ name: 'Narikala', desc: 'Fortress', url: 'https://www.google.com/maps/place/Narikala/data=!4m2!3m1!1s0x404:0x4f9' }]);
     expect(parseGoogleList('a,b\n1,2')).toBeNull();
   });
+
+  it('reads exports in other languages', () => {
+    const csv = 'Titre,Note,URL,Tags,Commentaire\n,,,,\nCappadoce,,https://www.google.com/maps/place/Cappadoce/data=!4m2!3m1!1s0x14d:0xf91,,À voir\n';
+    const out = parseGoogleList(csv)!;
+    expect(out.unlocated).toEqual([{ name: 'Cappadoce', desc: 'À voir', url: 'https://www.google.com/maps/place/Cappadoce/data=!4m2!3m1!1s0x14d:0xf91' }]);
+  });
 });

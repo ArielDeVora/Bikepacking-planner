@@ -15,6 +15,10 @@ It's a static site on GitHub Pages. Everything is stored in the browser (Indexed
 - **E** opens the elevation profile for the selected segment, its stage, or the whole trip. The **Stats** section shows km and climb by travel mode.
 - **P** adds a place (POI) on the map; the **Places** section lists them. **/** focuses the search box (places or coordinates). OSM overlays (water, bike shops, campsites…) are in the **Map** section.
 - Google Maps lists: export them with Google Takeout (CSV) or Google My Maps (KML) and drop the file in; re-import a newer export to add what's new. See [docs/06](docs/06-pois-search-osm.md#google-maps-lists).
+- Click shops, restaurants and sights on the base map (from zoom 15) for details (opening hours, phone, website, Wikipedia) and **Add to trip**.
+- **A** draws an avoid zone (no-go zones are routed around). **Border crossings** in the side panel lists where the trip changes country; add notes (status, link, last verified) to each.
+- **Side panel**: Cmd/Ctrl+click or Shift+click to select several segments, then fuse, move or delete them. Drag segments to reorder them, move them to another stage, or drop one onto another to fuse them.
+- **Travel advice** (side panel) and the **Travel advisory levels** overlay: official UK and US advice for the countries on the trip. Avoid zones can be switched to information-only **risk zones**.
 - With a segment selected: **S** split, **X** erase a part (or drag across the profile and click Erase), **R** reverse, **Shift+D** duplicate, **M** merge with the next segment. The card also moves it to another stage, and makes imported tracks editable. **Esc** leaves any tool.
 
 ## Local development
@@ -28,6 +32,7 @@ npm test           # unit tests (Vitest)
 npm run check      # type check (svelte-check)
 npm run build      # production build into dist/
 npm run preview    # serve the production build
+npm run advisories # fetch US travel advisory levels into public/data/ (done automatically on deploy)
 ```
 
 ## Deploying to GitHub Pages
@@ -40,6 +45,8 @@ One-time setup:
 4. Open the **Actions** tab. The "Deploy to GitHub Pages" workflow runs on every push to `main` (or click **Run workflow**). When it's green, the site is at `https://<your-user>.github.io/<repo-name>/`.
 
 The build uses relative paths, so the repository name doesn't matter.
+
+The workflow also runs every morning, to refresh the travel advisory data. Nothing to set up; like the keep-alive job, GitHub pauses scheduled runs in repositories without commits for 60 days.
 
 ## Shared trips (Supabase setup)
 
@@ -98,8 +105,10 @@ Free Supabase projects pause after a week with little activity. The **Keep Supab
 - [Milestone 4: import, export, elevation and stats](docs/04-import-export-elevation.md).
 - [Milestone 5: advanced editing](docs/05-advanced-editing.md): split, erase, merge, reverse, duplicate, move, editable tracks.
 - [Milestone 6: places, search and OSM overlays](docs/06-pois-search-osm.md), including Google Maps lists.
+- [Milestone 7: avoid zones and borders](docs/07-zones-borders.md), plus base-map places and richer details.
+- [Milestone 8: risk layer, and editing from the side panel](docs/08-risk-and-editing.md), including the data source research.
 - [Spec](docs/SPEC.md)
 
 ## Credits
 
-Map data © OpenStreetMap contributors. Base maps: OpenFreeMap, OpenStreetMap, CyclOSM, OpenTopoMap, EOxCloudless (Sentinel-2, CC BY-NC-SA 4.0). Elevation: Mapzen Terrain Tiles on AWS. Routing: [BRouter](https://brouter.de/) (public server, run on donations). Search: [Photon](https://photon.komoot.io/) by komoot. OSM places: [Overpass API](https://overpass-api.de/).
+Map data © OpenStreetMap contributors. Base maps: OpenFreeMap, OpenStreetMap, CyclOSM, OpenTopoMap, EOxCloudless (Sentinel-2, CC BY-NC-SA 4.0). Elevation: Mapzen Terrain Tiles on AWS. Routing: [BRouter](https://brouter.de/) (public server, run on donations). Search: [Photon](https://photon.komoot.io/) by komoot. OSM places: [Overpass API](https://overpass-api.de/) (with private.coffee and VK Maps as fallbacks). Place details: [Nominatim](https://nominatim.org/), Wikipedia, Wikidata. Country outlines: [Natural Earth](https://www.naturalearthdata.com/) (public domain). Travel advice: UK FCDO via GOV.UK (Open Government Licence v3.0), U.S. Department of State (public domain).

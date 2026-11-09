@@ -6,6 +6,7 @@
   import Icon from '../../lib/ui/Icon.svelte';
   import { timeAgo } from '../../lib/time';
   import IconButton from '../../lib/ui/IconButton.svelte';
+  import { inTripOrder, mergeManyCommand, moveSegmentsCommand } from '../../lib/segment-edits';
   import type { Entity, Segment, Trip } from '../../model/types';
   import { addStage, deleteStage, moveSegment, moveStage, sortedSegments, sortedStages } from './actions';
 
@@ -63,6 +64,76 @@
     });
   }
 
+  // Selection: click selects one, Cmd/Ctrl+click adds or removes, Shift+click selects a range.
+  let anchorId: string | null = null;
+  const flat = $derived(stages.flatMap((st) => [st.id, ...(segmentsByStage.get(st.id) ?? []).map((s) => s.id)]));
+
+  function click(e: MouseEvent, id: string, segs: Segment[]) {
+    const type = store.get(id)?.type;
+    if (e.metaKey || e.ctrlKey) {
+      const current = selection.current;
+      selection.set(current.includes(id) ? current.filter((x) => x !== id) : [...current, id]);
+      anchorId = id;
+    } else if (e.shiftKey && anchorId && flat.includes(anchorId)) {
+      const [a, b] = [flat.indexOf(anchorId), flat.indexOf(id)].sort((x, y) => x - y);
+      selection.set(flat.slice(a!, b! + 1).filter((x) => store.get(x)?.type === type));
+    } else {
+      anchorId = id;
+      select(id, segs);
+    }
+  }
+
+  // Drag and drop: drop between segments to move them, onto a segment to fuse them into it, onto
+  // a stage to move them to its end. Dragging a selected segment drags the whole selection.
+  type Where = 'before' | 'after' | 'onto' | 'stage';
+  let dragging = $state<string[] | null>(null);
+  let target = $state<{ id: string; where: Where } | null>(null);
+
+  function dragStart(e: DragEvent, seg: Segment) {
+    const chosen = $selected.includes(seg.id) ? store.list('segment', (s) => $selected.includes(s.id)) : [seg];
+    dragging = inTripOrder(store, chosen).map((s) => s.id);
+    e.dataTransfer?.setData('text/plain', dragging.join(','));
+    if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+  }
+
+  function dragOver(e: DragEvent, id: string, isStage: boolean) {
+    if (!dragging || dragging.includes(id)) return;
+    e.preventDefault();
+    let where: Where = 'stage';
+    if (!isStage) {
+      const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      const y = (e.clientY - r.top) / r.height;
+      where = y < 0.3 ? 'before' : y > 0.7 ? 'after' : 'onto';
+    }
+    target = { id, where };
+  }
+
+  function drop(e: DragEvent) {
+    e.preventDefault();
+    const ids = dragging;
+    const to = target;
+    dragging = null;
+    target = null;
+    if (!ids || !to) return;
+    let cmd = null;
+    if (to.where === 'stage') cmd = moveSegmentsCommand(store, ids, to.id, null, t('cmd.moveSegment'));
+    else {
+      const seg = store.get(to.id, 'segment');
+      if (!seg) return;
+      if (to.where === 'onto') {
+        const moved = ids.map((id) => store.get(id, 'segment')).filter((s): s is Segment => !!s);
+        cmd = mergeManyCommand(store, [seg, ...moved], t('cmd.merge'));
+      } else {
+        const list = (segmentsByStage.get(seg.stageId) ?? []).filter((s) => !ids.includes(s.id));
+        const before = to.where === 'before' ? seg.id : (list[list.findIndex((s) => s.id === seg.id) + 1]?.id ?? null);
+        cmd = moveSegmentsCommand(store, ids, seg.stageId, before, t('cmd.moveSegment'));
+      }
+    }
+    if (cmd) commands.run(cmd);
+  }
+
+  const dropClass = (id: string) => (target?.id === id ? `drop-${target.where}` : '');
+
   function add() {
     const cmd = addStage(store, ctx.tripId, t('tree.stageName', { n: stages.length + 1 }), t('cmd.addStage'));
     commands.run(cmd);
@@ -114,8 +185,17 @@
     {#each stages as stage, i (stage.id)}
       {@const segs = segmentsByStage.get(stage.id) ?? []}
       <li>
-        <div class="row" class:selected={$selected.includes(stage.id)}>
-          <button type="button" class="name" onclick={() => select(stage.id, segs)}>
+        <div
+          class="row {dropClass(stage.id)}"
+          class:selected={$selected.includes(stage.id)}
+          role="treeitem"
+          aria-selected={$selected.includes(stage.id)}
+          tabindex="-1"
+          ondragover={(e) => dragOver(e, stage.id, true)}
+          ondragleave={() => target?.id === stage.id && (target = null)}
+          ondrop={drop}
+        >
+          <button type="button" class="name" onclick={(e) => click(e, stage.id, segs)}>
             <span class="swatch" style:background={stage.color ?? 'var(--accent)'}></span>
             <span class="label">{stage.name}</span>
             {@render editor(stage)}
@@ -141,8 +221,19 @@
         {#if segs.length}
           <ol class="segments">
             {#each segs as seg, j (seg.id)}
-              <li class="row" class:selected={$selected.includes(seg.id)}>
-                <button type="button" class="name" onclick={() => select(seg.id, [seg])}>
+              <li
+                class="row {dropClass(seg.id)}"
+                class:selected={$selected.includes(seg.id)}
+                class:dragged={dragging?.includes(seg.id)}
+                draggable="true"
+                title={t('tree.dragHint')}
+                ondragstart={(e) => dragStart(e, seg)}
+                ondragover={(e) => dragOver(e, seg.id, false)}
+                ondragleave={() => target?.id === seg.id && (target = null)}
+                ondrop={drop}
+                ondragend={() => ((dragging = null), (target = null))}
+              >
+                <button type="button" class="name" onclick={(e) => click(e, seg.id, [seg])}>
                   <Icon d={icons[seg.mode]} size={14} />
                   <span class="label">{seg.name}</span>
                   {@render editor(seg)}
@@ -217,6 +308,29 @@
 
   .row.selected {
     background: var(--accent-soft);
+  }
+
+  .row.drop-before {
+    box-shadow: inset 0 2px 0 var(--accent);
+  }
+
+  .row.drop-after {
+    box-shadow: inset 0 -2px 0 var(--accent);
+  }
+
+  .row.drop-onto,
+  .row.drop-stage {
+    background: var(--accent-soft);
+    outline: 2px dashed var(--accent);
+    outline-offset: -2px;
+  }
+
+  .row.dragged {
+    opacity: 0.45;
+  }
+
+  li.row[draggable='true'] {
+    cursor: grab;
   }
 
   .segments {

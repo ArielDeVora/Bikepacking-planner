@@ -17,10 +17,20 @@ export interface ParsedWaypoint {
   links: string[];
 }
 
+export interface ParsedArea {
+  name: string;
+  desc: string;
+  /** Outer ring first, then holes; rings are open (no repeated first point). */
+  polygon: LngLat[][];
+  link?: string;
+}
+
 export interface ParsedFile {
   name: string;
   tracks: ParsedTrack[];
   waypoints: ParsedWaypoint[];
+  /** Polygons, imported as avoid or risk zones. */
+  areas?: ParsedArea[];
   backup?: Backup;
   /** Places from a Google Maps list whose link has no position. */
   unlocated?: UnlocatedPlace[];
@@ -59,7 +69,7 @@ function links(props: Record<string, unknown>): string[] {
 }
 
 /** Tracks and waypoints from GeoJSON (as produced by togeojson, or a plain GeoJSON file). */
-export function fromGeoJSON(data: GeoJSON.GeoJSON<GeoJSON.Geometry | null>, fileName: string): Pick<ParsedFile, 'tracks' | 'waypoints'> {
+export function fromGeoJSON(data: GeoJSON.GeoJSON<GeoJSON.Geometry | null>, fileName: string): Pick<ParsedFile, 'tracks' | 'waypoints' | 'areas'> {
   type F = GeoJSON.Feature<GeoJSON.Geometry | null>;
   const features: F[] = !data
     ? []
@@ -70,7 +80,18 @@ export function fromGeoJSON(data: GeoJSON.GeoJSON<GeoJSON.Geometry | null>, file
         : [{ type: 'Feature', properties: {}, geometry: data as GeoJSON.Geometry }];
   const tracks: ParsedTrack[] = [];
   const waypoints: ParsedWaypoint[] = [];
+  const areas: ParsedArea[] = [];
   const fallback = baseName(fileName);
+  const ring = (r: number[][]): LngLat[] => {
+    const pts = r.map(coord).filter((c): c is Coord => !!c).map((c) => [c[0], c[1]] as LngLat);
+    const [a, z] = [pts[0], pts.at(-1)];
+    return a && z && a[0] === z[0] && a[1] === z[1] ? pts.slice(0, -1) : pts;
+  };
+  const area = (rings: number[][][], props: Record<string, unknown>) => {
+    const polygon = rings.map(ring).filter((r) => r.length >= 3);
+    if (!polygon.length) return;
+    areas.push({ name: text(props.name) || fallback, desc: text(props.desc ?? props.description), polygon, link: links(props)[0] });
+  };
 
   const visit = (g: GeoJSON.Geometry | null, props: Record<string, unknown>) => {
     if (!g) return;
@@ -91,6 +112,12 @@ export function fromGeoJSON(data: GeoJSON.GeoJSON<GeoJSON.Geometry | null>, file
         if (c) waypoints.push({ name, desc: text(props.desc ?? props.description), lngLat: [c[0], c[1]], links: links(props) });
         break;
       }
+      case 'Polygon':
+        area(g.coordinates, props);
+        break;
+      case 'MultiPolygon':
+        for (const p of g.coordinates) area(p, props);
+        break;
       case 'GeometryCollection':
         for (const child of g.geometries) visit(child, props);
         break;
@@ -101,7 +128,7 @@ export function fromGeoJSON(data: GeoJSON.GeoJSON<GeoJSON.Geometry | null>, file
   tracks.forEach((tr, i) => {
     if (!tr.name) tr.name = tracks.length > 1 ? `${fallback} ${i + 1}` : fallback;
   });
-  return { tracks, waypoints };
+  return { tracks, waypoints, areas };
 }
 
 export function parseFile(fileName: string, content: string): ParsedFile {
