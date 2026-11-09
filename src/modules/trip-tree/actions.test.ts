@@ -3,7 +3,7 @@ import { CommandStack } from '../../core/commands';
 import { TripStore } from '../../core/store';
 import type { Segment } from '../../model/types';
 import { stage, trip, TRIP_ID } from '../../test/fixtures';
-import { addStage, deleteStage, moveStage, sortedStages } from './actions';
+import { addStage, deleteStage, moveSegment, moveStage, sortedSegments, sortedStages } from './actions';
 
 let store: TripStore;
 let commands: CommandStack;
@@ -65,5 +65,31 @@ describe('trip-tree actions', () => {
     commands.undo();
     expect(names()).toEqual(['a', 'b', 'c']);
     expect(store.get('seg1')).toBeDefined();
+  });
+});
+
+describe('segment ordering', () => {
+  it('moves segments within their stage', () => {
+    const make = (id: string, order: string): Segment => ({
+      id,
+      type: 'segment',
+      tripId: TRIP_ID,
+      stageId: 'a',
+      order,
+      name: id,
+      notes: '',
+      mode: 'bike',
+      geomType: 'manual',
+      anchors: [],
+      legs: [],
+      stats: { lengthM: 0, ascentM: 0, descentM: 0 },
+      updatedAt: 0,
+      updatedBy: 'u1',
+      deleted: false,
+    });
+    store.apply([make('s1', 'V'), make('s2', 'X')], 'load');
+    commands.run(moveSegment(store, 's2', -1, 'move')!);
+    expect(sortedSegments(store, 'a').map((s) => s.id)).toEqual(['s2', 's1']);
+    expect(moveSegment(store, 's2', -1, 'move')).toBeNull();
   });
 });

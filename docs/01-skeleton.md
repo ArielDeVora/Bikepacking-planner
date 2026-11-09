@@ -53,6 +53,7 @@ commands.run({
 - Undo writes `before` (or soft-deletes, for creations); redo writes `after`. Each applied entity is stamped with `updatedAt` and `updatedBy`.
 - Commands with the same `mergeKey` collapse into one undo step (typing, dragging). `commands.seal()` ends the merge (call it on blur or drag end).
 - Each change maps one-to-one to an entity write, which is what persistence (and later sync) consumes.
+- `commands.patch(changes)` writes without an undo step. It is only for data derived from an earlier command that can be derived again, such as routed geometry (see [milestone 2](02-routes.md)).
 
 ### Persistence
 
@@ -84,6 +85,7 @@ declare module '../../core/bus' {
    import { defineModule } from '../../core/module';
    import { icons } from '../../lib/icons';
    import MyCard from './MyCard.svelte';
+   import MyLegend from './MyLegend.svelte';
    import MySection from './MySection.svelte';
 
    export default defineModule({
@@ -95,6 +97,7 @@ declare module '../../core/bus' {
        ctx.ui.addTool({ id: '<name>.tool', label: 'My tool', icon: icons.plus, shortcut: 'm', run: () => {} });
        ctx.shortcuts.add({ keys: 'm', label: 'My tool', run: () => {} });
        ctx.ui.addCardRenderer('poi', { component: MyCard, props: { ctx } });
+       ctx.ui.addWidget({ id: '<name>.legend', component: MyLegend, props: { ctx } });
      },
    });
    ```

@@ -4,4 +4,5 @@ import type { ModuleLoader } from '../core/module';
 export const modules: ModuleLoader[] = [
   () => import('./map-layers'),
   () => import('./trip-tree'),
+  () => import('./routes'),
 ];

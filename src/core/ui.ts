@@ -24,6 +24,14 @@ export interface PanelSectionSpec {
   order?: number;
 }
 
+/** A small floating element over the map, e.g. a legend. Stacked bottom-left. */
+export interface WidgetSpec {
+  id: string;
+  component: AnyComponent;
+  props?: Record<string, unknown>;
+  order?: number;
+}
+
 /** Renders the info card for a selected entity. The component receives `id` plus `props`. */
 export interface CardRenderer {
   component: AnyComponent;
@@ -52,6 +60,7 @@ function registry<T extends { id: string; order?: number }>() {
 export class UiRegistry {
   readonly tools = registry<ToolSpec>();
   readonly panelSections = registry<PanelSectionSpec>();
+  readonly widgets = registry<WidgetSpec>();
 
   #cards = writable(new Map<string, CardRenderer>());
   readonly cards: Readable<Map<string, CardRenderer>> = { subscribe: this.#cards.subscribe };
@@ -66,6 +75,10 @@ export class UiRegistry {
 
   addPanelSection(spec: PanelSectionSpec) {
     return this.panelSections.add(spec);
+  }
+
+  addWidget(spec: WidgetSpec) {
+    return this.widgets.add(spec);
   }
 
   addCardRenderer(entityType: string, renderer: CardRenderer): () => void {

@@ -10,6 +10,7 @@
   let { core }: { core: Core } = $props();
   const { t } = $derived(core);
   const sections = $derived(core.ui.panelSections);
+  const widgets = $derived(core.ui.widgets);
   const theme = $derived(core.theme);
   const status = $derived(core.status);
 
@@ -51,6 +52,13 @@
 {/if}
 
 <Toolbar {core} shifted={panelOpen} />
+{#if $widgets.length}
+  <div class="widgets" class:shifted={panelOpen}>
+    {#each $widgets as widget (widget.id)}
+      <widget.component {...widget.props} />
+    {/each}
+  </div>
+{/if}
 <InfoCard {core} />
 <Toasts {core} />
 
@@ -128,6 +136,26 @@
     padding: 4px;
   }
 
+  .widgets {
+    position: absolute;
+    bottom: calc(var(--gap) + 28px);
+    left: var(--gap);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    pointer-events: none;
+    transition: left 0.18s ease;
+  }
+
+  .widgets > :global(*) {
+    pointer-events: auto;
+  }
+
+  .widgets.shifted {
+    left: calc(var(--panel-w) + 2 * var(--gap));
+  }
+
   .loading {
     position: absolute;
     top: var(--gap);
@@ -141,6 +169,10 @@
   }
 
   @media (max-width: 640px) {
+    .widgets.shifted {
+      left: var(--gap);
+    }
+
     .panel {
       top: auto;
       left: 0;

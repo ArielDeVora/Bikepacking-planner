@@ -33,12 +33,19 @@ export type GeometryType = 'routed' | 'manual' | 'imported' | 'greatCircle';
 export interface Anchor {
   id: string;
   lngLat: LngLat;
-  /** How the leg from this anchor to the next one is drawn: routed (true) or straight (false). */
-  snap: boolean;
 }
 
-/** Compact encoding of a polyline with elevation. */
+/** Compact encoding of a polyline with optional elevation (see lib/geo/polyline.ts). */
 export type EncodedLine = string;
+
+/**
+ * Geometry between two consecutive anchors. `pending`: a straight placeholder waiting for the
+ * router. `failed`: the router gave up, so the leg is drawn straight.
+ */
+export interface Leg {
+  line: EncodedLine;
+  status?: 'pending' | 'failed';
+}
 
 export interface SegmentStats {
   lengthM: number;
@@ -56,8 +63,9 @@ export interface Segment extends BaseEntity {
   geomType: GeometryType;
   anchors: Anchor[];
   /** One entry per pair of consecutive anchors. */
-  legs: EncodedLine[];
+  legs: Leg[];
   stats: SegmentStats;
+  /** Routing profile; the provider's default for the mode when unset. */
   profile?: string;
   color?: string;
   plannedDate?: string;

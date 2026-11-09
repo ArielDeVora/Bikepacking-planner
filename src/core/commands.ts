@@ -71,6 +71,15 @@ export class CommandStack {
     return cmd;
   }
 
+  /**
+   * Writes changes without recording an undo step. Only for data derived from an earlier
+   * command (e.g. routed geometry for a pending leg), which is derived again if an undo or redo
+   * brings back the old value.
+   */
+  patch(changes: Change[]): void {
+    if (changes.length) this.#write(changes.map((c) => c.after));
+  }
+
   /** Ends any pending merge so the next command starts a new undo step. */
   seal(): void {
     const top = this.#undo.at(-1);

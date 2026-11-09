@@ -2,6 +2,7 @@ import { Map as MapLibreMap, NavigationControl, ScaleControl, setWorkerUrl } fro
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import { writable, type Readable } from 'svelte/store';
 import { newId } from '../model/ids';
+import { STAGE_COLORS } from '../config/modes';
 import { keyBetween } from '../model/order';
 import type { Entity, Stage, Trip } from '../model/types';
 import { EventBus, type Events } from './bus';
@@ -90,6 +91,7 @@ export function createCore(container: HTMLElement) {
         order: keyBetween(null, null),
         name: t('tree.stageName', { n: 1 }),
         notes: '',
+        color: STAGE_COLORS[0],
       }),
     ];
   }
