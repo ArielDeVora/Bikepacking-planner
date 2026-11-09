@@ -112,13 +112,16 @@ function distToSegment3(p: number[], a: number[], b: number[]): number {
 }
 
 /**
- * Douglas-Peucker in 3D (metres, elevation included), so that points carrying a change in
- * elevation are kept too. Drops consecutive duplicates first.
+ * Indices of the points Douglas-Peucker keeps, in metres. With `withElevation`, elevation counts
+ * as a third axis, so points carrying a change in elevation are kept too.
  */
-export function simplify<T extends readonly number[]>(coords: readonly T[], toleranceM = 2): T[] {
-  const pts = coords.filter((c, i) => i === 0 || c[0] !== coords[i - 1]![0] || c[1] !== coords[i - 1]![1]);
-  if (pts.length < 3) return [...pts];
-  const m = pts.map(toMetres);
+export function simplifyIndices(pts: readonly (readonly number[])[], toleranceM: number, withElevation = true): number[] {
+  if (pts.length < 3) return pts.map((_, i) => i);
+  const m = pts.map((c) => {
+    const v = toMetres(c);
+    if (!withElevation) v[2] = 0;
+    return v;
+  });
   const keep = new Uint8Array(pts.length);
   keep[0] = keep[pts.length - 1] = 1;
   const stack: [number, number][] = [[0, pts.length - 1]];
@@ -138,7 +141,20 @@ export function simplify<T extends readonly number[]>(coords: readonly T[], tole
       stack.push([first, index], [index, last]);
     }
   }
-  return pts.filter((_, i) => keep[i]);
+  const out: number[] = [];
+  keep.forEach((k, i) => k && out.push(i));
+  return out;
+}
+
+/** Consecutive duplicate points removed. */
+export function dedupe<T extends readonly number[]>(coords: readonly T[]): T[] {
+  return coords.filter((c, i) => i === 0 || c[0] !== coords[i - 1]![0] || c[1] !== coords[i - 1]![1]);
+}
+
+/** Douglas-Peucker in 3D (see `simplifyIndices`), after dropping consecutive duplicates. */
+export function simplify<T extends readonly number[]>(coords: readonly T[], toleranceM = 2): T[] {
+  const pts = dedupe(coords);
+  return simplifyIndices(pts, toleranceM).map((i) => pts[i]!);
 }
 
 /** Points on the straight (linear lng/lat) line from a to b, about `stepM` apart, both ends included. */

@@ -149,12 +149,12 @@
                   <span class="km muted">{km([seg])}</span>
                 </button>
                 <span class="actions">
-                  <IconButton icon={icons.up} label={t('tree.moveUp')} size={14} disabled={j === 0} onclick={() => moveSeg(seg.id, -1)} />
+                  <IconButton icon={icons.up} label={t('tree.moveUp')} size={14} disabled={j === 0 && i === 0} onclick={() => moveSeg(seg.id, -1)} />
                   <IconButton
                     icon={icons.down}
                     label={t('tree.moveDown')}
                     size={14}
-                    disabled={j === segs.length - 1}
+                    disabled={j === segs.length - 1 && i === stages.length - 1}
                     onclick={() => moveSeg(seg.id, 1)}
                   />
                   <IconButton

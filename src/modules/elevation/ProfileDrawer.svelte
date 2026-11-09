@@ -3,6 +3,8 @@
   import type { ModuleContext } from '../../core/module';
   import { icons } from '../../lib/icons';
   import IconButton from '../../lib/ui/IconButton.svelte';
+  import { eraseCommand } from '../../lib/segment-edits';
+  import { sliceLine } from '../../model/edit-ops';
   import { compareOrder } from '../../model/order';
   import type { Segment } from '../../model/types';
   import { buildProfile, eleAt, GRADE_LEGEND, gradeAt, gradeColor, positionAt, type Profile } from './profile';
@@ -13,7 +15,13 @@
     ctx,
     open,
     setHover,
-  }: { ctx: ModuleContext; open: Writable<boolean>; setHover: (pos: [number, number] | null) => void } = $props();
+    setRange,
+  }: {
+    ctx: ModuleContext;
+    open: Writable<boolean>;
+    setHover: (pos: [number, number] | null) => void;
+    setRange: (line: number[][] | null) => void;
+  } = $props();
   const { t } = $derived(ctx);
   const store = $derived(ctx.store);
   const ids = $derived(ctx.selection.ids);
@@ -25,6 +33,9 @@
   let width = $state(0);
   let canvas: HTMLCanvasElement | undefined = $state();
   let hoverX = $state<number | null>(null);
+  /** Selected range along the segment, in metres (segment scope only). */
+  let range = $state<{ from: number; to: number } | null>(null);
+  let dragFrom: number | null = null;
 
   const selected = $derived.by(() => {
     void $store;
@@ -48,6 +59,21 @@
   });
 
   const profile = $derived<Profile>(buildProfile(target.segments));
+  const rangeSegment = $derived(scope === 'segment' && selected?.type === 'segment' ? selected : null);
+
+  // A range belongs to one segment; drop it when the segment changes.
+  let rangeOwner: string | null = null;
+  $effect(() => {
+    const id = rangeSegment?.id ?? null;
+    if (id !== rangeOwner) {
+      rangeOwner = id;
+      range = null;
+    }
+  });
+  $effect(() => {
+    if (range && rangeSegment && $open) setRange(sliceLine(rangeSegment, range.from, range.to).map((c) => [c[0], c[1]]));
+    else setRange(null);
+  });
   const hasElevation = $derived(Number.isFinite(profile.maxEle));
 
   const km = (m: number) => (m >= 100_000 ? (m / 1000).toFixed(0) : (m / 1000).toFixed(1));
@@ -132,6 +158,13 @@
     g.strokeStyle = fg;
     g.stroke(outline);
 
+    if (range) {
+      const x0 = PAD.left + (Math.min(range.from, range.to) / profile.lengthM) * plotW;
+      const x1 = PAD.left + (Math.max(range.from, range.to) / profile.lengthM) * plotW;
+      g.fillStyle = 'rgba(224, 49, 49, 0.25)';
+      g.fillRect(x0, PAD.top, x1 - x0, plotH);
+    }
+
     if (hoverX !== null) {
       g.strokeStyle = fg;
       g.lineWidth = 1;
@@ -150,12 +183,44 @@
     return { d, e, grade: gradeAt(profile, d - span, d + span) };
   });
 
+  const clampX = (x: number) => Math.max(PAD.left, Math.min(PAD.left + plotW, x));
+
   function onMove(e: PointerEvent) {
     const rect = canvas!.getBoundingClientRect();
     const x = e.clientX - rect.left;
+    if (dragFrom !== null) {
+      range = { from: dragFrom, to: xToDist(clampX(x)) };
+    }
     if (x < PAD.left || x > PAD.left + plotW || !hasElevation) return onLeave();
     hoverX = x;
     setHover(positionAt(profile, xToDist(x)));
+  }
+
+  function onDown(e: PointerEvent) {
+    if (!rangeSegment || !hasElevation || e.button !== 0) return;
+    const x = e.clientX - canvas!.getBoundingClientRect().left;
+    if (x < PAD.left || x > PAD.left + plotW) return;
+    canvas!.setPointerCapture(e.pointerId);
+    dragFrom = xToDist(x);
+    range = null;
+  }
+
+  function onUp() {
+    if (dragFrom === null) return;
+    dragFrom = null;
+    // A click rather than a drag clears the selection.
+    if (range && (Math.abs(range.to - range.from) / profile.lengthM) * plotW < 4) range = null;
+  }
+
+  function eraseRange() {
+    if (!range || !rangeSegment) return;
+    ctx.commands.run(
+      eraseCommand(ctx.store, rangeSegment, range.from, range.to, {
+        label: t('cmd.erase'),
+        name: (name) => name,
+      }),
+    );
+    range = null;
   }
 
   function onLeave() {
@@ -182,6 +247,15 @@
         </span>
       {/if}
       <span class="spacer"></span>
+      {#if range}
+        <span class="selection">
+          {km(Math.abs(range.to - range.from))} km
+          <button type="button" class="erase" onclick={eraseRange}>{t('elevation.eraseRange')}</button>
+          <button type="button" class="link" onclick={() => (range = null)}>{t('io.cancel')}</button>
+        </span>
+      {:else if rangeSegment && hasElevation}
+        <span class="muted">{t('elevation.dragHint')}</span>
+      {/if}
       <span class="legend" aria-hidden="true">
         {#each GRADE_LEGEND as g (g.label)}
           <span><i style:background={g.color}></i>{g.label}</span>
@@ -193,7 +267,14 @@
       {#if !hasElevation}
         <p class="empty muted">{target.segments.length ? t('elevation.noData') : t('elevation.empty')}</p>
       {/if}
-      <canvas bind:this={canvas} style:height="{HEIGHT}px" onpointermove={onMove} onpointerleave={onLeave}></canvas>
+      <canvas
+        bind:this={canvas}
+        style:height="{HEIGHT}px"
+        onpointermove={onMove}
+        onpointerleave={onLeave}
+        onpointerdown={onDown}
+        onpointerup={onUp}
+      ></canvas>
       {#if hoverInfo && hoverX !== null}
         <div class="tip" style:left="{hoverX}px">
           {km(hoverInfo.d)} km · {Number.isNaN(hoverInfo.e) ? '–' : `${Math.round(hoverInfo.e)} m`} · {hoverInfo.grade.toFixed(1)}%
@@ -259,6 +340,31 @@
 
   .spacer {
     flex: 1;
+  }
+
+  .selection {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .erase {
+    padding: 2px 8px;
+    border: 1px solid var(--danger);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+    color: var(--danger);
+    cursor: pointer;
+    font-size: 12px;
+  }
+
+  .link {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--fg-muted);
+    cursor: pointer;
+    font-size: 12px;
   }
 
   .legend {

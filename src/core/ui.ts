@@ -78,6 +78,18 @@ export class UiRegistry {
   #cards = writable(new Map<string, CardRenderer>());
   readonly cards: Readable<Map<string, CardRenderer>> = { subscribe: this.#cards.subscribe };
 
+  #tool = writable<string | null>(null);
+  /** The active map tool (drawing, splitting…). One at a time; null when none is. */
+  readonly tool: Readable<string | null> = { subscribe: this.#tool.subscribe };
+
+  setTool(id: string | null): void {
+    this.#tool.set(id);
+  }
+
+  toggleTool(id: string): void {
+    this.#tool.update((current) => (current === id ? null : id));
+  }
+
   #dialog = writable<{ component: AnyComponent; props: Record<string, unknown> } | null>(null);
   /** The open modal dialog, if any. */
   readonly dialog: Readable<{ component: AnyComponent; props: Record<string, unknown> } | null> = { subscribe: this.#dialog.subscribe };

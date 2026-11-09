@@ -1,5 +1,5 @@
 import type { MapMouseEvent, PointLike } from 'maplibre-gl';
-import { get, writable } from 'svelte/store';
+import { derived, get, type Readable } from 'svelte/store';
 import { edits } from '../../core/commands';
 import type { ModuleContext } from '../../core/module';
 import { closestOnPolyline } from '../../lib/geo/geo';
@@ -7,6 +7,8 @@ import { insertAnchor, legCoords, moveAnchor, removeAnchor } from '../../model/s
 import type { LngLat, Segment, TravelMode } from '../../model/types';
 import { createSegment } from './actions';
 import { segmentColor, SRC, type RouteRenderer } from './render';
+
+export const DRAW_TOOL = 'routes.draw';
 
 const HIT_PX = 5;
 const SNAP_PX = 10;
@@ -32,7 +34,7 @@ const toLngLat = (e: MapMouseEvent): LngLat => [e.lngLat.lng, e.lngLat.lat];
 
 /** Map interactions for drawing segments and editing their anchors. */
 export class RouteEditor {
-  readonly drawing = writable(false);
+  readonly drawing: Readable<boolean>;
   #start: LngLat | null = null;
   #anchor: number | null = null;
   #drag: Drag | null = null;
@@ -44,7 +46,15 @@ export class RouteEditor {
     private ctx: ModuleContext,
     private renderer: RouteRenderer,
     private defaultMode: () => TravelMode,
-  ) {}
+  ) {
+    this.drawing = derived(ctx.ui.tool, (tool) => tool === DRAW_TOOL);
+  }
+
+  /** Another module's tool is active: leave the map to it, apart from selecting segments. */
+  get #otherTool(): boolean {
+    const tool = get(this.ctx.ui.tool);
+    return !!tool && tool !== DRAW_TOOL;
+  }
 
   /** The selected segment, if its points can be edited (imported tracks can't be, yet). */
   get #active(): Segment | undefined {
@@ -63,8 +73,18 @@ export class RouteEditor {
       mouseout: () => this.#setHover(null, null),
     };
     for (const [type, fn] of Object.entries(handlers)) map.on(type as 'click', fn);
+    const offTool = this.ctx.ui.tool.subscribe((tool) => {
+      if (tool !== DRAW_TOOL && (this.#start || this.#cursor)) {
+        this.#start = null;
+        this.#cursor = null;
+      }
+      this.#ghost = null;
+      this.#updateCursor();
+      this.refresh();
+    });
     return () => {
       for (const [type, fn] of Object.entries(handlers)) map.off(type as 'click', fn);
+      offTool();
     };
   }
 
@@ -75,20 +95,13 @@ export class RouteEditor {
   }
 
   toggleDrawing(): void {
-    if (get(this.drawing)) this.stopDrawing();
-    else {
-      this.drawing.set(true);
-      this.ctx.ui.notify(this.ctx.t('routes.drawHint'), 'info', 4000);
-    }
-    this.#updateCursor();
+    const starting = !get(this.drawing);
+    this.ctx.ui.toggleTool(DRAW_TOOL);
+    if (starting) this.ctx.ui.notify(this.ctx.t('routes.drawHint'), 'info', 4000);
   }
 
   stopDrawing(): void {
-    this.drawing.set(false);
-    this.#start = null;
-    this.#cursor = null;
-    this.#updateCursor();
-    this.refresh();
+    if (get(this.drawing)) this.ctx.ui.setTool(null);
   }
 
   #addPoint(lngLat: LngLat): void {
@@ -192,6 +205,11 @@ export class RouteEditor {
       this.#addPoint(this.#snap(e.point, toLngLat(e)));
       return;
     }
+    if (this.#otherTool) {
+      const hit = this.ctx.map.queryRenderedFeatures(box(e.point, HIT_PX), { layers: this.renderer.hitLayerIds })[0];
+      if (hit) this.ctx.selection.set([hit.properties.sid as string]);
+      return;
+    }
     const anchor = this.#anchorAt(e.point);
     if (anchor !== null) {
       this.#anchor = anchor;
@@ -204,7 +222,7 @@ export class RouteEditor {
   }
 
   #onMouseDown(e: MapMouseEvent): void {
-    if (get(this.drawing) || e.originalEvent.button !== 0) return;
+    if (get(this.drawing) || this.#otherTool || e.originalEvent.button !== 0) return;
     const seg = this.#active;
     if (!seg) return;
     const anchor = this.#anchorAt(e.point);
@@ -238,6 +256,7 @@ export class RouteEditor {
       this.refresh();
       return;
     }
+    if (this.#otherTool) return;
     this.#hover(e);
   }
 
@@ -266,7 +285,7 @@ export class RouteEditor {
   #onContextMenu(e: MapMouseEvent): void {
     const seg = this.#active;
     const anchor = this.#anchorAt(e.point);
-    if (!seg || anchor === null) return;
+    if (!seg || anchor === null || this.#otherTool) return;
     e.preventDefault();
     e.originalEvent.preventDefault();
     this.#removeAnchor(seg, anchor);
@@ -299,14 +318,14 @@ export class RouteEditor {
 
   #setHover(cursor: string | null, ghost: Ghost): void {
     if (this.#drag) return;
-    if (!get(this.drawing)) this.ctx.map.getCanvas().style.cursor = cursor ?? '';
+    if (!get(this.ctx.ui.tool)) this.ctx.map.getCanvas().style.cursor = cursor ?? '';
     const changed = (ghost === null) !== (this.#ghost === null) || ghost !== null;
     this.#ghost = ghost;
     if (changed) this.refresh();
   }
 
   #updateCursor(): void {
-    this.ctx.map.getCanvas().style.cursor = get(this.drawing) ? 'crosshair' : '';
+    this.ctx.map.getCanvas().style.cursor = get(this.ctx.ui.tool) ? 'crosshair' : '';
   }
 
   // Overlay (anchors, ghost point, preview lines)

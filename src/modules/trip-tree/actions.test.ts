@@ -91,5 +91,12 @@ describe('segment ordering', () => {
     commands.run(moveSegment(store, 's2', -1, 'move')!);
     expect(sortedSegments(store, 'a').map((s) => s.id)).toEqual(['s2', 's1']);
     expect(moveSegment(store, 's2', -1, 'move')).toBeNull();
+
+    commands.run(moveSegment(store, 's1', 1, 'move')!);
+    expect(sortedSegments(store, 'b').map((s) => s.id)).toEqual(['s1']);
+    store.apply([make('s3', 'V')].map((s) => ({ ...s, stageId: 'b' })), 'load');
+    commands.run(moveSegment(store, 's1', -1, 'move')!);
+    expect(sortedSegments(store, 'a').map((s) => s.id)).toEqual(['s2', 's1']);
+    expect(sortedSegments(store, 'b').map((s) => s.id)).toEqual(['s3']);
   });
 });

@@ -10,6 +10,7 @@ import ProfileDrawer from './ProfileDrawer.svelte';
 import { applyTerrain, terrainJobs } from './terrain';
 
 const HOVER = 'profile-hover';
+const RANGE = 'profile-range';
 /** Someone else's legs are filled in here only if they still lack elevation after this long. */
 const STALE_MS = 30_000;
 
@@ -74,6 +75,23 @@ export default defineModule({
         features: pos ? [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: pos } }] : [],
       });
 
+    layers.addSource(RANGE, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+    layers.addLayer(
+      {
+        id: RANGE,
+        type: 'line',
+        source: RANGE,
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': '#e03131', 'line-width': 8, 'line-opacity': 0.6 },
+      },
+      'top',
+    );
+    const setRange = (line: number[][] | null) =>
+      (map.getSource(RANGE) as GeoJSONSource | undefined)?.setData({
+        type: 'FeatureCollection',
+        features: line && line.length > 1 ? [{ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: line } }] : [],
+      });
+
     const open = writable(settings.get('open', false));
     const offOpen = open.subscribe((v) => {
       settings.set('open', v);
@@ -81,7 +99,7 @@ export default defineModule({
     });
     const toggle = () => open.update((v) => !v);
 
-    const removeDrawer = ui.addDrawer({ id: 'elevation', component: ProfileDrawer, props: { ctx, open, setHover } });
+    const removeDrawer = ui.addDrawer({ id: 'elevation', component: ProfileDrawer, props: { ctx, open, setHover, setRange } });
     const removeTool = ui.addTool({
       id: 'elevation.profile',
       label: t('elevation.title'),

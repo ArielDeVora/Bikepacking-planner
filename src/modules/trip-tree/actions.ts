@@ -41,9 +41,21 @@ function moveAmong(store: TripStore, list: (Stage | Segment)[], id: string, dir:
 export const moveStage = (store: TripStore, id: string, dir: -1 | 1, label: string) =>
   moveAmong(store, sortedStages(store), id, dir, label);
 
+/**
+ * Moves a segment one position up or down. From the first or last place of its stage it moves to
+ * the end of the previous stage, or the start of the next one. Null when there is nowhere to go.
+ */
 export function moveSegment(store: TripStore, id: string, dir: -1 | 1, label: string): Command | null {
   const seg = store.get(id, 'segment');
-  return seg ? moveAmong(store, sortedSegments(store, seg.stageId), id, dir, label) : null;
+  if (!seg) return null;
+  const within = moveAmong(store, sortedSegments(store, seg.stageId), id, dir, label);
+  if (within) return within;
+  const stages = sortedStages(store);
+  const target = stages[stages.findIndex((s) => s.id === seg.stageId) + dir];
+  if (!target) return null;
+  const list = sortedSegments(store, target.id);
+  const order = dir < 0 ? keyBetween(list.at(-1)?.order ?? null, null) : keyBetween(null, list[0]?.order ?? null);
+  return { label, changes: [edits.update<Segment>(store, id, { stageId: target.id, order })] };
 }
 
 /** Soft-deletes a stage and everything in it. */

@@ -1,4 +1,4 @@
-import { writable } from 'svelte/store';
+import { get, writable } from 'svelte/store';
 import { edits } from '../../core/commands';
 import { defineModule } from '../../core/module';
 import { icons } from '../../lib/icons';
@@ -112,7 +112,7 @@ export default defineModule({
         keys: 'escape',
         label: t('card.close'),
         run: () => {
-          if (editor.isDrawing()) editor.stopDrawing();
+          if (get(ui.tool)) ui.setTool(null);
           else if (!editor.clearAnchor()) selection.clear();
         },
       }),

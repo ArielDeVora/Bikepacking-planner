@@ -9,4 +9,5 @@ export const modules: ModuleLoader[] = [
   () => import('./io'),
   () => import('./elevation'),
   () => import('./stats'),
+  () => import('./editing'),
 ];

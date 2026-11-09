@@ -1,0 +1,140 @@
+import { derived } from 'svelte/store';
+import { defineModule } from '../../core/module';
+import { icons } from '../../lib/icons';
+import {
+  duplicateCommand,
+  makeEditableCommand,
+  mergeCommand,
+  moveToStageCommand,
+  nextSegment,
+  reverseCommand,
+} from '../../lib/segment-edits';
+import EditCard from './EditCard.svelte';
+import { EditTools, ERASE_TOOL, PREVIEW, SPLIT_TOOL } from './tools';
+
+export interface EditActions {
+  split: () => void;
+  erase: () => void;
+  /** These act on the given segment, or the selected one. */
+  reverse: (id?: string) => void;
+  duplicate: (id?: string) => void;
+  merge: (id?: string) => void;
+  moveTo: (id: string, stageId: string) => void;
+  makeEditable: (id: string) => void;
+}
+
+export default defineModule({
+  id: 'editing',
+  setup(ctx) {
+    const { ui, store, commands, selection, shortcuts, layers, t } = ctx;
+
+    layers.addSource(PREVIEW, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+    layers.addLayer(
+      {
+        id: `${PREVIEW}-range`,
+        type: 'line',
+        source: PREVIEW,
+        filter: ['==', ['geometry-type'], 'LineString'],
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': '#e03131', 'line-width': 8, 'line-opacity': 0.6 },
+      },
+      'top',
+    );
+    layers.addLayer(
+      {
+        id: `${PREVIEW}-point`,
+        type: 'circle',
+        source: PREVIEW,
+        filter: ['==', ['geometry-type'], 'Point'],
+        paint: {
+          'circle-radius': 6,
+          'circle-color': ['case', ['==', ['get', 'tool'], ERASE_TOOL], '#e03131', '#ffffff'],
+          'circle-stroke-color': '#212529',
+          'circle-stroke-width': 2,
+        },
+      },
+      'top',
+    );
+    const detach = new EditTools(ctx).attach();
+
+    const selectedSegment = () => {
+      const ids = selection.current;
+      return ids.length === 1 ? store.get(ids[0]!, 'segment') : undefined;
+    };
+    /** Runs `fn` with the given (or selected) segment, or tells the user to select one. */
+    const withSegment = (fn: (id: string) => void) => (id?: string) => {
+      const target = id ?? selectedSegment()?.id;
+      if (target) fn(target);
+      else ui.notify(t('edit.selectFirst'));
+    };
+    const useTool = (tool: string) => () => {
+      if (!selectedSegment()) return ui.notify(t('edit.selectFirst'));
+      ui.toggleTool(tool);
+    };
+
+    const actions: EditActions = {
+      split: useTool(SPLIT_TOOL),
+      erase: useTool(ERASE_TOOL),
+      reverse: withSegment((id) => commands.run(reverseCommand(store, store.get(id, 'segment')!, t('cmd.reverse')))),
+      duplicate: withSegment((id) => {
+        const res = duplicateCommand(store, store.get(id, 'segment')!, {
+          label: t('cmd.duplicate'),
+          name: (name) => t('edit.copyName', { name }),
+        });
+        commands.run(res.command);
+        selection.set([res.newId]);
+      }),
+      merge: withSegment((id) => {
+        const seg = store.get(id, 'segment')!;
+        const next = nextSegment(store, seg);
+        if (!next) return ui.notify(t('edit.noNext'));
+        if (next.mode !== seg.mode) ui.notify(t('edit.mergedModes', { mode: t(`mode.${seg.mode}`) }));
+        commands.run(mergeCommand(store, seg, next, t('cmd.merge')));
+      }),
+      moveTo: (id, stageId) => {
+        const cmd = moveToStageCommand(store, store.get(id, 'segment')!, stageId, t('cmd.moveSegment'));
+        if (cmd) commands.run(cmd);
+      },
+      makeEditable: (id) => {
+        const cmd = makeEditableCommand(store, store.get(id, 'segment')!, t('cmd.makeEditable'));
+        if (cmd) commands.run(cmd);
+      },
+    };
+
+    const removeCard = ui.addCardSection({ id: 'editing', component: EditCard, props: { ctx, actions }, types: ['segment'], order: 1 });
+    const removeTools = [
+      ui.addTool({
+        id: SPLIT_TOOL,
+        label: t('edit.split'),
+        icon: icons.scissors,
+        shortcut: 's',
+        order: 20,
+        active: derived(ui.tool, (tool) => tool === SPLIT_TOOL),
+        run: actions.split,
+      }),
+      ui.addTool({
+        id: ERASE_TOOL,
+        label: t('edit.erase'),
+        icon: icons.eraser,
+        shortcut: 'x',
+        order: 21,
+        active: derived(ui.tool, (tool) => tool === ERASE_TOOL),
+        run: actions.erase,
+      }),
+    ];
+    const offShortcuts = [
+      shortcuts.add({ keys: 's', label: t('edit.split'), run: actions.split }),
+      shortcuts.add({ keys: 'x', label: t('edit.erase'), run: actions.erase }),
+      shortcuts.add({ keys: 'r', label: t('edit.reverse'), run: () => actions.reverse() }),
+      shortcuts.add({ keys: 'shift+d', label: t('edit.duplicate'), run: () => actions.duplicate() }),
+      shortcuts.add({ keys: 'm', label: t('edit.merge'), run: () => actions.merge() }),
+    ];
+
+    return () => {
+      detach();
+      removeCard();
+      removeTools.forEach((off) => off());
+      offShortcuts.forEach((off) => off());
+    };
+  },
+});

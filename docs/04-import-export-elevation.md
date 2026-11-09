@@ -50,7 +50,7 @@ Train, bus, car, boat and plane segments get no terrain elevation: a straight li
 
 ## Imported segments
 
-An imported track keeps its geometry exactly. Its points can't be edited yet: point editing and converting a track into editable anchors come with the advanced editing milestone. Changing its travel mode only changes the style.
+An imported track keeps its geometry exactly, and changing its travel mode only changes the style. To edit its points, use **Make editable** (see [milestone 5](05-advanced-editing.md)).
 
 ## Known limitations
 
