@@ -6,6 +6,8 @@ It's a static site on GitHub Pages. Everything is stored in the browser (Indexed
 
 ## Using it
 
+Press **?** (or the **?** button at the bottom of the toolbar) for a cheatsheet of every keyboard shortcut and mouse action.
+
 - Press **D** (or the route button in the toolbar) and click the map to draw a segment; it snaps to roads. **Esc** finishes.
 - Click a segment to select it. Drag its points to move them, drag the line to add a point, right-click a point to delete it.
 - Change the travel mode, routing profile and colour in the card on the right. Line styles live in `src/config/modes.ts`.

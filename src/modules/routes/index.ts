@@ -115,7 +115,7 @@ export default defineModule({
       shortcuts.add({ keys: 'd', label: t('routes.draw'), run: () => editor.toggleDrawing() }),
       shortcuts.add({
         keys: 'escape',
-        label: t('card.close'),
+        label: t('help.escape'),
         run: () => {
           if (get(ui.tool)) ui.setTool(null);
           else if (!editor.clearAnchor()) {
@@ -124,8 +124,8 @@ export default defineModule({
           }
         },
       }),
-      shortcuts.add({ keys: 'delete', label: t('tree.delete'), run: deleteSelection }),
-      shortcuts.add({ keys: 'backspace', label: t('tree.delete'), run: deleteSelection }),
+      shortcuts.add({ keys: 'delete', label: t('help.delete'), run: deleteSelection }),
+      shortcuts.add({ keys: 'backspace', label: t('help.delete'), run: deleteSelection }),
     ];
 
     const removeCard = ui.addCardRenderer('segment', {

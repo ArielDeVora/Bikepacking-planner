@@ -3,6 +3,7 @@
   import { createSettings } from '../core/settings';
   import { icons } from '../lib/icons';
   import IconButton from '../lib/ui/IconButton.svelte';
+  import Cheatsheet from './Cheatsheet.svelte';
   import InfoCard from './InfoCard.svelte';
   import Toasts from './Toasts.svelte';
   import Toolbar from './Toolbar.svelte';
@@ -23,6 +24,8 @@
   }
   const theme = $derived(core.theme);
   const status = $derived(core.status);
+
+  $effect(() => core.shortcuts.add({ keys: 'shift+?', label: t('help.open'), run: () => core.ui.openDialog(Cheatsheet, { core }) }));
 
   const prefs = createSettings('app');
   let panelOpen = $state(prefs.get('panelOpen', window.innerWidth > 640));

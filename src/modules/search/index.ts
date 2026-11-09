@@ -60,7 +60,7 @@ export default defineModule({
       props: { ctx, photon, choose, goTo, register: (f: () => void) => (focus = f) },
       position: 'top',
     });
-    const removeShortcut = shortcuts.add({ keys: '/', label: t('search.placeholder'), run: () => focus() });
+    const removeShortcut = shortcuts.add({ keys: '/', label: t('help.search'), run: () => focus() });
 
     return () => {
       offPlace();

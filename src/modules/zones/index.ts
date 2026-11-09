@@ -160,7 +160,7 @@ export default defineModule({
     let offEnter: (() => void) | null = null;
     const offDrawing = drawing.subscribe((on) => {
       offEnter?.();
-      offEnter = on ? shortcuts.add({ keys: 'enter', label: t('zone.add'), run: () => editor.finish() }) : null;
+      offEnter = on ? shortcuts.add({ keys: 'enter', label: t('help.finishZone'), run: () => editor.finish() }) : null;
       if (on) ui.notify(t('zone.drawHint'), 'info', 5000);
     });
 

@@ -3,6 +3,7 @@
   import type { ToolSpec } from '../core/ui';
   import { icons } from '../lib/icons';
   import IconButton from '../lib/ui/IconButton.svelte';
+  import Cheatsheet from './Cheatsheet.svelte';
   import ToolButton from './ToolButton.svelte';
 
   let { core, shifted }: { core: Core; shifted: boolean } = $props();
@@ -29,6 +30,8 @@
   {#if $tools.length}<hr />{/if}
   <IconButton icon={icons.undo} label={undoLabel} disabled={!$history.canUndo} onclick={() => commands.undo()} />
   <IconButton icon={icons.redo} label={redoLabel} disabled={!$history.canRedo} onclick={() => commands.redo()} />
+  <hr />
+  <IconButton icon={icons.help} label={`${t('help.title')} (?)`} onclick={() => core.ui.openDialog(Cheatsheet, { core })} />
 </nav>
 
 <style>

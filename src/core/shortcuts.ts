@@ -35,6 +35,18 @@ function isEditable(target: EventTarget | null): boolean {
   return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName);
 }
 
+const KEY_NAMES: Record<string, string> = {
+  escape: 'Esc',
+  enter: 'Enter',
+  delete: 'Delete',
+  backspace: '⌫',
+  arrowup: '↑',
+  arrowdown: '↓',
+  arrowleft: '←',
+  arrowright: '→',
+  ' ': 'Space',
+};
+
 export class ShortcutManager {
   #shortcuts: { combo: Combo; shortcut: Shortcut }[] = [];
   #isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
@@ -49,10 +61,26 @@ export class ShortcutManager {
 
   /** Human-readable form of a combo for tooltips. */
   format(keys: string): string {
-    return keys
-      .split('+')
-      .map((k) => (k === 'mod' ? (this.#isMac ? '⌘' : 'Ctrl') : k === 'shift' ? '⇧' : k.toUpperCase()))
+    const parts = keys.split('+');
+    // A symbol such as "?" already implies the Shift needed to type it.
+    const key = parts.at(-1) ?? '';
+    const symbol = key.length === 1 && !/[a-z0-9]/i.test(key);
+    return parts
+      .filter((k) => !(symbol && k === 'shift'))
+      .map((k) => (k === 'mod' ? (this.#isMac ? '⌘' : 'Ctrl') : k === 'shift' ? '⇧' : k === 'alt' ? (this.#isMac ? '⌥' : 'Alt') : (KEY_NAMES[k] ?? k.toUpperCase())))
       .join(this.#isMac ? '' : '+');
+  }
+
+  /**
+   * The shortcuts in effect, in registration order, with combos that do the same thing grouped
+   * (e.g. Redo: ⌘⇧Z, ⌘Y). Where two shortcuts share a combo, only the one that runs is listed.
+   */
+  list(): { label: string; keys: string[] }[] {
+    const effective = new Map<string, Shortcut>();
+    for (const { shortcut } of this.#shortcuts) effective.set(shortcut.keys.toLowerCase(), shortcut);
+    const byLabel = new Map<string, string[]>();
+    for (const [keys, s] of effective) byLabel.set(s.label, [...(byLabel.get(s.label) ?? []), keys]);
+    return [...byLabel].map(([label, keys]) => ({ label, keys }));
   }
 
   handle = (e: KeyboardEvent): void => {

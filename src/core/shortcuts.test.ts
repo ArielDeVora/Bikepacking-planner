@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { matches, parseCombo } from './shortcuts';
+import { matches, parseCombo, ShortcutManager } from './shortcuts';
 
 const key = (k: string, mods: Partial<Record<'ctrlKey' | 'metaKey' | 'shiftKey' | 'altKey', boolean>> = {}) => ({
   key: k,
@@ -26,5 +26,25 @@ describe('shortcuts', () => {
 
   it('matches named keys', () => {
     expect(matches(parseCombo('escape'), key('Escape'), false)).toBe(true);
+  });
+});
+
+describe('ShortcutManager.list', () => {
+  it('groups combos by action and lists only the shortcut that runs', () => {
+    const m = new ShortcutManager();
+    const run = () => {};
+    m.add({ keys: 'mod+shift+z', label: 'Redo', run });
+    m.add({ keys: 'mod+y', label: 'Redo', run });
+    m.add({ keys: 'escape', label: 'Clear selection', run });
+    m.add({ keys: 'escape', label: 'Leave the tool', run });
+    expect(m.list()).toEqual([
+      { label: 'Redo', keys: ['mod+shift+z', 'mod+y'] },
+      { label: 'Leave the tool', keys: ['escape'] },
+    ]);
+  });
+
+  it('names keys readably', () => {
+    const m = new ShortcutManager();
+    expect(['escape', 'backspace', 'shift+d', '/', 'shift+?'].map((k) => m.format(k).replace('Ctrl+', ''))).toEqual(['Esc', '⌫', expect.stringMatching(/⇧\+?D/), '/', '?']);
   });
 });

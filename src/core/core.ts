@@ -92,7 +92,7 @@ export function createCore(container: HTMLElement) {
   shortcuts.add({ keys: 'mod+z', label: t('toolbar.undo'), run: () => commands.undo() });
   shortcuts.add({ keys: 'mod+shift+z', label: t('toolbar.redo'), run: () => commands.redo() });
   shortcuts.add({ keys: 'mod+y', label: t('toolbar.redo'), run: () => commands.redo() });
-  shortcuts.add({ keys: 'escape', label: 'Clear selection', run: () => selection.clear() });
+  shortcuts.add({ keys: 'escape', label: t('help.escape'), run: () => selection.clear() });
 
   bus.on('selection:changed', ({ ids }) => {
     if (ids.length) ui.closePlace();
