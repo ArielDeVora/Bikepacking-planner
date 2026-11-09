@@ -8,13 +8,14 @@
   const store = $derived(core.store);
   const ids = $derived(core.selection.ids);
   const cards = $derived(core.ui.cards);
+  const sections = $derived(core.ui.cardSections);
 
   const target = $derived.by(() => {
     void $store;
     if ($ids.length !== 1) return null;
     const entity = store.get($ids[0]!);
     const renderer = entity && $cards.get(entity.type);
-    return entity && renderer ? { id: entity.id, renderer } : null;
+    return entity && renderer ? { id: entity.id, type: entity.type, renderer } : null;
   });
 </script>
 
@@ -25,6 +26,9 @@
     </div>
     {#key target.id}
       <target.renderer.component id={target.id} {...target.renderer.props} />
+      {#each $sections.filter((s) => !s.types || s.types.includes(target.type)) as section (section.id)}
+        <section.component id={target.id} {...section.props} />
+      {/each}
     {/key}
   </div>
 {/if}

@@ -42,6 +42,16 @@ export interface Toast {
   id: number;
   message: string;
   kind: 'info' | 'warn' | 'error';
+  action?: { label: string; run: () => void };
+}
+
+/** Extra content shown under the info card of the listed entity types (all types if omitted). */
+export interface CardSectionSpec {
+  id: string;
+  component: AnyComponent;
+  props?: Record<string, unknown>;
+  types?: string[];
+  order?: number;
 }
 
 function registry<T extends { id: string; order?: number }>() {
@@ -61,6 +71,7 @@ export class UiRegistry {
   readonly tools = registry<ToolSpec>();
   readonly panelSections = registry<PanelSectionSpec>();
   readonly widgets = registry<WidgetSpec>();
+  readonly cardSections = registry<CardSectionSpec>();
 
   #cards = writable(new Map<string, CardRenderer>());
   readonly cards: Readable<Map<string, CardRenderer>> = { subscribe: this.#cards.subscribe };
@@ -81,6 +92,10 @@ export class UiRegistry {
     return this.widgets.add(spec);
   }
 
+  addCardSection(spec: CardSectionSpec) {
+    return this.cardSections.add(spec);
+  }
+
   addCardRenderer(entityType: string, renderer: CardRenderer): () => void {
     this.#cards.update((m) => new Map(m).set(entityType, renderer));
     return () =>
@@ -91,9 +106,9 @@ export class UiRegistry {
       });
   }
 
-  notify(message: string, kind: Toast['kind'] = 'info', ms = 5000): void {
+  notify(message: string, kind: Toast['kind'] = 'info', ms = 5000, action?: Toast['action']): void {
     const id = ++this.#toastId;
-    this.#toasts.update((list) => [...list, { id, message, kind }]);
+    this.#toasts.update((list) => [...list, { id, message, kind, action }]);
     if (ms > 0) setTimeout(() => this.dismiss(id), ms);
   }
 

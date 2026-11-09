@@ -104,7 +104,9 @@ declare module '../../core/bus' {
 
 2. Add one line to `src/modules/index.ts`.
 
-What a module receives (`ModuleContext`, `core/module.ts`): `map`, `store`, `commands`, `selection`, `bus`, `layers`, `ui`, `shortcuts`, `settings` (namespaced to the module), `user`, `tripId`, `t`.
+What a module receives (`ModuleContext`, `core/module.ts`): `map`, `store`, `commands`, `selection`, `bus`, `layers`, `ui`, `shortcuts`, `settings` (namespaced to the module), `user`, `cloud` (sign-in, members, sync status; see [milestone 3](03-collaboration.md)), `trips` (list, open, create), `tripId`, `t`.
+
+`ui` also has `addCardSection({ id, component, types? })` for content under other modules' info cards (comments, "edited by").
 
 Rules:
 

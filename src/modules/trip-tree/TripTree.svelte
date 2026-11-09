@@ -5,13 +5,24 @@
   import { icons } from '../../lib/icons';
   import Icon from '../../lib/ui/Icon.svelte';
   import IconButton from '../../lib/ui/IconButton.svelte';
-  import type { Segment, Trip } from '../../model/types';
+  import type { Entity, Segment, Trip } from '../../model/types';
   import { addStage, deleteStage, moveSegment, moveStage, sortedSegments, sortedStages } from './actions';
 
   let { ctx }: { ctx: ModuleContext } = $props();
   const { t, commands, selection } = $derived(ctx);
   const store = $derived(ctx.store);
   const selected = $derived(ctx.selection.ids);
+  const shared = $derived(ctx.cloud.shared);
+  const members = $derived(ctx.cloud.members);
+
+  const RECENT_MS = 24 * 60 * 60 * 1000;
+
+  /** Who else changed this in the last day, if anyone. */
+  function recentEditor(e: Entity) {
+    void $members;
+    if (!$shared || !e.updatedBy || ctx.cloud.isMine(e.updatedBy) || Date.now() - e.updatedAt > RECENT_MS) return null;
+    return ctx.cloud.profileOf(e.updatedBy) ?? { name: t('collab.someone'), color: 'var(--fg-muted)' };
+  }
 
   const trip = $derived.by(() => {
     void $store;
@@ -84,6 +95,13 @@
   <IconButton icon={icons.plus} label={t('tree.addStage')} size={16} onclick={add} />
 </div>
 
+{#snippet recent(e: Entity)}
+  {@const who = recentEditor(e)}
+  {#if who}
+    <span class="recent" style:border-color={who.color} title={t('tree.recentEdit', { name: who.name })}></span>
+  {/if}
+{/snippet}
+
 {#if stages.length === 0}
   <p class="muted">{t('tree.empty')}</p>
 {:else}
@@ -95,6 +113,7 @@
           <button type="button" class="name" onclick={() => select(stage.id, segs)}>
             <span class="swatch" style:background={stage.color ?? 'var(--accent)'}></span>
             <span class="label">{stage.name}</span>
+            {@render recent(stage)}
             <span class="km muted">{km(segs)}</span>
           </button>
           <span class="actions">
@@ -121,6 +140,7 @@
                 <button type="button" class="name" onclick={() => select(seg.id, [seg])}>
                   <Icon d={icons[seg.mode]} size={14} />
                   <span class="label">{seg.name}</span>
+                  {@render recent(seg)}
                   <span class="km muted">{km([seg])}</span>
                 </button>
                 <span class="actions">
@@ -208,6 +228,14 @@
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  .recent {
+    flex: none;
+    width: 8px;
+    height: 8px;
+    border: 2px solid;
+    border-radius: 50%;
   }
 
   .km {

@@ -84,3 +84,26 @@ describe('CommandStack', () => {
     expect(get(commands.state)).toMatchObject({ canUndo: true, canRedo: false, undoLabel: 'rename' });
   });
 });
+
+describe('CommandStack guard', () => {
+  it('can cancel an undo or redo', () => {
+    const store = new TripStore();
+    store.apply([stage('a', 'V')], 'load');
+    const commands = new CommandStack(store, () => 'me');
+    commands.run({ label: 'rename', changes: [edits.update<Stage>(store, 'a', { name: 'Mine' })] });
+    store.apply([{ ...store.get('a', 'stage')!, name: 'Theirs', updatedBy: 'them' }], 'remote');
+
+    let seen: string[] = [];
+    commands.guard = (current) => {
+      seen = current.map((e) => e.updatedBy);
+      return false;
+    };
+    expect(commands.undo()).toBeUndefined();
+    expect(seen).toEqual(['them']);
+    expect(store.get('a', 'stage')!.name).toBe('Theirs');
+
+    commands.guard = () => true;
+    expect(commands.undo()).toBeDefined();
+    expect(store.get('a', 'stage')!.name).toBe('a');
+  });
+});

@@ -42,6 +42,11 @@ export class TripStore {
     return out;
   }
 
+  /** Every entity, including soft-deleted ones. */
+  all(): Entity[] {
+    return [...this.#entities.values()];
+  }
+
   get size(): number {
     return this.#entities.size;
   }

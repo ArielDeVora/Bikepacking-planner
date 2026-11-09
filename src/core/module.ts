@@ -1,5 +1,7 @@
 import type { Map as MapLibreMap } from 'maplibre-gl';
+import type { Trip } from '../model/types';
 import type { EventBus, Events } from './bus';
+import type { Cloud } from './cloud/cloud';
 import type { CommandStack } from './commands';
 import type { t } from './i18n';
 import type { LayerManager } from './layers';
@@ -21,8 +23,18 @@ export interface ModuleContext {
   /** Preferences namespaced to this module. */
   readonly settings: Settings;
   readonly user: { id: string };
+  /** Sign-in, sharing and sync. */
+  readonly cloud: Cloud;
+  readonly trips: TripManager;
   readonly tripId: string;
   readonly t: typeof t;
+}
+
+export interface TripManager {
+  listLocal(): Promise<Trip[]>;
+  /** Reloads the app on another trip. */
+  open(id: string): Promise<void>;
+  create(name?: string): Promise<void>;
 }
 
 export type Teardown = () => void;

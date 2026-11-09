@@ -29,6 +29,12 @@ export class CommandStack {
   #state = writable<HistoryState>({ canUndo: false, canRedo: false });
   readonly state: Readable<HistoryState> = { subscribe: this.#state.subscribe };
 
+  /**
+   * Called with the current version of the entities an undo or redo is about to overwrite.
+   * Returning false cancels it (e.g. after asking before overwriting someone else's edit).
+   */
+  guard: ((current: Entity[]) => boolean) | null = null;
+
   constructor(
     private store: TripStore,
     private userId: () => string,
@@ -54,8 +60,9 @@ export class CommandStack {
   }
 
   undo(): Command | undefined {
-    const cmd = this.#undo.pop();
-    if (!cmd) return undefined;
+    const cmd = this.#undo.at(-1);
+    if (!cmd || !this.#allowed(cmd)) return undefined;
+    this.#undo.pop();
     this.#write(cmd.changes.map((c) => c.before ?? { ...c.after, deleted: true }).reverse());
     this.#redo.push(cmd);
     this.#publish();
@@ -63,8 +70,9 @@ export class CommandStack {
   }
 
   redo(): Command | undefined {
-    const cmd = this.#redo.pop();
-    if (!cmd) return undefined;
+    const cmd = this.#redo.at(-1);
+    if (!cmd || !this.#allowed(cmd)) return undefined;
+    this.#redo.pop();
     this.#write(cmd.changes.map((c) => c.after));
     this.#undo.push(cmd);
     this.#publish();
@@ -90,6 +98,12 @@ export class CommandStack {
     this.#undo = [];
     this.#redo = [];
     this.#publish();
+  }
+
+  #allowed(cmd: Command): boolean {
+    if (!this.guard) return true;
+    const current = cmd.changes.map((c) => this.store.getRaw(c.id)).filter((e): e is Entity => !!e);
+    return this.guard(current);
   }
 
   #write(entities: Entity[]): void {

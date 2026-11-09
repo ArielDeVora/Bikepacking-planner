@@ -12,6 +12,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.119.0",
     "maplibre-gl": "^6.17.0"
   },
   "devDependencies": {

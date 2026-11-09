@@ -5,4 +5,5 @@ export const modules: ModuleLoader[] = [
   () => import('./map-layers'),
   () => import('./trip-tree'),
   () => import('./routes'),
+  () => import('./collab'),
 ];

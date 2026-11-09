@@ -11,6 +11,16 @@
   {#each $toasts as toast (toast.id)}
     <div class="toast {toast.kind}" role={toast.kind === 'error' ? 'alert' : 'status'}>
       <span>{toast.message}</span>
+      {#if toast.action}
+        <button
+          type="button"
+          class="action"
+          onclick={() => {
+            toast.action?.run();
+            core.ui.dismiss(toast.id);
+          }}>{toast.action.label}</button
+        >
+      {/if}
       <IconButton icon={icons.close} label="Dismiss" size={14} onclick={() => core.ui.dismiss(toast.id)} />
     </div>
   {/each}
@@ -42,6 +52,21 @@
 
   .toast span {
     flex: 1;
+  }
+
+  .action {
+    flex: none;
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+    color: var(--accent);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .action:hover {
+    background: var(--bg-hover);
   }
 
   .toast.warn {

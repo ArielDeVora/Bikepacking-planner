@@ -6,6 +6,7 @@ import { STAGE_COLORS } from '../config/modes';
 import { keyBetween } from '../model/order';
 import type { Entity, Stage, Trip } from '../model/types';
 import { EventBus, type Events } from './bus';
+import { createCloud } from './cloud/cloud';
 import { CommandStack } from './commands';
 import { t } from './i18n';
 import { LayerManager } from './layers';
@@ -32,12 +33,13 @@ export function createCore(container: HTMLElement) {
   const settings = createSettings('core');
   const mapSettings = createSettings('map');
 
-  let userId = settings.get<string | null>('userId', null);
-  if (!userId) {
-    userId = newId();
-    settings.set('userId', userId);
+  let localUserId = settings.get<string | null>('userId', null);
+  if (!localUserId) {
+    localUserId = newId();
+    settings.set('userId', localUserId);
   }
-  const user = { id: userId };
+  /** The signed-in account's id, or a per-browser id when signed out. */
+  const user = { id: localUserId };
 
   setWorkerUrl(maplibreWorkerUrl);
   const view = mapSettings.get<MapView>('view', { center: [60, 42], zoom: 2.5 });
@@ -57,14 +59,34 @@ export function createCore(container: HTMLElement) {
 
   const bus = new EventBus<Events>();
   const store = new TripStore();
+  const status = writable<CoreStatus>('loading');
+  let tripId = '';
+  let flushLocal: () => Promise<void> = async () => {};
+  let db: IDBDatabase | null = null;
+
+  const cloudSettings = createSettings('cloud');
+  const cloud = createCloud({
+    store,
+    bus,
+    settings: cloudSettings,
+    user,
+    localUserId,
+    tripId: () => tripId,
+    openTrip: (id) => void trips.open(id),
+  });
+
   const commands = new CommandStack(store, () => user.id);
+  commands.guard = (current) => {
+    const foreign = current.filter((e) => e.updatedBy && !cloud.isMine(e.updatedBy));
+    if (!foreign.length) return true;
+    const names = [...new Set(foreign.map((e) => cloud.profileOf(e.updatedBy)?.name || t('collab.someone')))];
+    return window.confirm(t('collab.undoOverwrite', { names: names.join(', ') }));
+  };
   const selection = new Selection(bus);
   const layers = new LayerManager(map, createSettings('layers'));
   const ui = new UiRegistry();
   const shortcuts = new ShortcutManager();
   const theme = createTheme(settings);
-  const status = writable<CoreStatus>('loading');
-  let tripId = '';
 
   window.addEventListener('keydown', shortcuts.handle);
   shortcuts.add({ keys: 'mod+z', label: t('toolbar.undo'), run: () => commands.undo() });
@@ -80,10 +102,10 @@ export function createCore(container: HTMLElement) {
   const stamp = <E extends Entity>(e: Omit<E, 'updatedAt' | 'updatedBy' | 'deleted'>): E =>
     ({ ...e, updatedAt: Date.now(), updatedBy: user.id, deleted: false }) as unknown as E;
 
-  function newTripEntities(): Entity[] {
+  function newTripEntities(name = t('trip.defaultName')): Entity[] {
     const id = newId();
     return [
-      stamp<Trip>({ id, type: 'trip', tripId: id, name: t('trip.defaultName'), ownerId: user.id }),
+      stamp<Trip>({ id, type: 'trip', tripId: id, name, ownerId: user.id }),
       stamp<Stage>({
         id: newId(),
         type: 'stage',
@@ -96,8 +118,24 @@ export function createCore(container: HTMLElement) {
     ];
   }
 
+  /** Trips in this browser, and switching between them (by reloading the app). */
+  const trips = {
+    async listLocal(): Promise<Trip[]> {
+      return db ? listTrips(db) : [];
+    },
+    async open(id: string): Promise<void> {
+      await flushLocal();
+      settings.set('tripId', id);
+      location.reload();
+    },
+    async create(name?: string): Promise<void> {
+      const entities = newTripEntities(name);
+      if (db) await putEntities(db, entities);
+      await trips.open(entities[0]!.id);
+    },
+  };
+
   async function loadLocalTrip(): Promise<void> {
-    let db: IDBDatabase | null = null;
     try {
       db = await openDb();
     } catch (err) {
@@ -105,17 +143,20 @@ export function createCore(container: HTMLElement) {
       ui.notify(t('app.storageUnavailable'), 'warn', 0);
     }
 
+    // A shared trip just joined has no local data yet; sync fills it in.
+    let id: string | null = null;
     let entities: Entity[] = [];
     if (db) {
       const wanted = settings.get<string | null>('tripId', null);
-      const trips = await listTrips(db);
-      const trip = trips.find((tr) => tr.id === wanted) ?? trips[0];
-      if (trip) entities = await loadTripEntities(db, trip.id);
+      const local = await listTrips(db);
+      const shared = cloudSettings.get<string[]>('sharedTrips', []);
+      id = wanted && (local.some((tr) => tr.id === wanted) || shared.includes(wanted)) ? wanted : (local[0]?.id ?? null);
+      if (id) entities = await loadTripEntities(db, id);
     }
 
-    const fresh = entities.length === 0;
+    const fresh = !id;
     if (fresh) entities = newTripEntities();
-    tripId = entities.find((e) => e.type === 'trip')!.id;
+    tripId = id ?? entities.find((e) => e.type === 'trip')!.id;
     settings.set('tripId', tripId);
 
     store.apply(entities, fresh ? 'local' : 'load');
@@ -126,6 +167,7 @@ export function createCore(container: HTMLElement) {
         ui.notify(t('app.storageUnavailable'), 'error');
       });
       if (fresh) await putEntities(db, entities);
+      flushLocal = saver.flush;
       window.addEventListener('pagehide', () => void saver.flush());
     }
     bus.emit('trip:loaded', { tripId });
@@ -151,6 +193,8 @@ export function createCore(container: HTMLElement) {
           ui,
           shortcuts,
           user,
+          cloud,
+          trips,
           t,
           settings: createSettings(mod.id),
           get tripId() {
@@ -165,6 +209,7 @@ export function createCore(container: HTMLElement) {
         }
       }
       status.set('ready');
+      void cloud.start();
     } catch (err) {
       console.error(err);
       status.set('error');
@@ -183,6 +228,8 @@ export function createCore(container: HTMLElement) {
     shortcuts,
     theme,
     user,
+    cloud,
+    trips,
     t,
     status: { subscribe: status.subscribe } as Readable<CoreStatus>,
     get tripId() {
