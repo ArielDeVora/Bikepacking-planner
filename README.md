@@ -19,6 +19,8 @@ Press **?** (or the **?** button at the bottom of the toolbar) for a cheatsheet 
 - Google Maps lists: export them with Google Takeout (CSV) or Google My Maps (KML) and drop the file in; re-import a newer export to add what's new. See [docs/06](docs/06-pois-search-osm.md#google-maps-lists).
 - Click shops, restaurants and sights on the base map (from zoom 15) for details (opening hours, phone, website, Wikipedia) and **Add to trip**.
 - **A** draws an avoid zone (no-go zones are routed around). **Border crossings** in the side panel lists where the trip changes country; add notes (status, link, last verified) to each.
+- **Map and overlays** (`O`, or the layers button at the top of the side panel): a pane that drops down with the base map and every overlay, grouped (your trip, map, climate and safety, OpenStreetMap places last). `O` again closes it.
+- **Climate** (map pane): usual temperature and rain for any week of the year, with a slider and a play button to watch the seasons and monsoons move. Click the map for a place's year; stage cards show the usual weather for their planned date.
 - **History** (`H`, or the clock button): every change to the trip, who made it and when, on a timeline. Restore the whole trip to any earlier point, or undo just one change. Each card has a "History of this item" link.
 - **Routes**: keep several versions of the trip (another group's plan, your own variant) side by side. Add one with the route button in the side panel, drag stages into it, duplicate it to try a variant, show only one on the map, and compare their distances under Stats.
 - **Side panel**: Cmd/Ctrl+click or Shift+click to select several segments, then fuse them (they're put end to end, turned round where needed), put them in order, move or delete them. Drag segments to reorder them, move them to another stage, or drop one onto another to fuse them; drag stages to reorder them. **Groups**: select segments and press **G** (or Group in the card) to group them within their stage; drop segments onto a group to put them in it. The eye hides a segment, group or stage from the map; the arrow collapses a stage or group. Drag the panel's right edge to make it wider, and the details card's left or bottom edge to resize it. The selection glows yellow on the map.
@@ -115,6 +117,7 @@ Free Supabase projects pause after a week with little activity. The **Keep Supab
 - [What's new, the guide, and update notices](docs/09-whats-new.md): how to announce a release.
 - [Routes](docs/10-routes.md): several ways of doing the trip, side by side.
 - [History](docs/11-history.md): every change, who made it, and restoring the trip to an earlier point.
+- [Climate](docs/12-climate.md): usual temperature and rain by week (TerraClimate).
 - [Spec](docs/SPEC.md)
 
 ## Credits

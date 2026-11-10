@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Readable } from 'svelte/store';
   import type { t as translate } from '../../core/i18n';
-  import type { LayerManager } from '../../core/layers';
+  import { OVERLAY_GROUPS, type LayerManager, type OverlayState } from '../../core/layers';
   import type { BaseMap } from './bases';
 
   let {
@@ -19,6 +19,10 @@
   } = $props();
 
   const overlays = $derived(layers.overlays);
+  /** Overlays under their headings; ungrouped ones go with the map's. */
+  const groups = $derived(
+    OVERLAY_GROUPS.map((g) => ({ id: g, items: $overlays.filter((o: OverlayState) => (o.spec.group ?? 'map') === g) })).filter((g) => g.items.length),
+  );
 </script>
 
 <fieldset>
@@ -31,10 +35,10 @@
   {/each}
 </fieldset>
 
-{#if $overlays.length}
+{#each groups as group (group.id)}
   <fieldset>
-    <legend>{t('layers.overlays')}</legend>
-    {#each $overlays as o (o.spec.id)}
+    <legend>{t(`layers.group.${group.id}`)}</legend>
+    {#each group.items as o (o.spec.id)}
       <div class="overlay">
         <label class="row">
           <input
@@ -57,7 +61,7 @@
       </div>
     {/each}
   </fieldset>
-{/if}
+{/each}
 
 <style>
   fieldset {

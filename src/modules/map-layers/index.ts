@@ -67,6 +67,8 @@ export default defineModule({
       layerIds: ['hillshade'],
       visible: false,
       opacity: 0.4,
+      order: 12,
+      group: 'map',
       applyOpacity: (m, opacity) => m.setPaintProperty('hillshade', 'hillshade-exaggeration', opacity),
     });
 
@@ -78,6 +80,7 @@ export default defineModule({
       component: LayersSection,
       props: { bases: BASE_MAPS, current, select, layers, t },
       order: 90,
+      placement: 'pane',
     });
   },
 });

@@ -44,6 +44,17 @@
     prefs.set('panelOpen', panelOpen);
   }
 
+  // Map pane: base map and overlays, dropping down from the panel header (button or O).
+  let paneOpen = $state(prefs.get('mapPane', false));
+  const paneSections = $derived($sections.filter((s) => s.placement === 'pane'));
+  const listSections = $derived($sections.filter((s) => s.placement !== 'pane'));
+  function togglePane() {
+    paneOpen = !paneOpen;
+    if (paneOpen && !panelOpen) togglePanel();
+    prefs.set('mapPane', paneOpen);
+  }
+  $effect(() => core.shortcuts.add({ keys: 'o', label: t('layers.togglePane'), run: togglePane }));
+
   // Panel width: drag the panel's edge; double-click it to go back to the default.
   const DEFAULT_W = 320;
   const MIN_W = 260;
@@ -89,6 +100,7 @@
   ></div>
   <header>
     <h1>{t('app.title')}</h1>
+    <IconButton icon={icons.layers} label={t('layers.pane')} active={paneOpen} onclick={togglePane} />
     <IconButton
       icon={$theme === 'dark' ? icons.sun : icons.moon}
       label={t('toolbar.theme')}
@@ -96,8 +108,19 @@
     />
     <IconButton icon={icons.panel} label={t('toolbar.panel')} onclick={togglePanel} />
   </header>
+  {#if paneOpen && paneSections.length}
+    <div class="map-pane" role="region" aria-label={t('layers.paneTitle')}>
+      <div class="pane-head">
+        <span>{t('layers.paneTitle')}</span>
+        <IconButton icon={icons.close} label={t('card.close')} size={14} onclick={togglePane} />
+      </div>
+      {#each paneSections as section (section.id)}
+        <section.component {...section.props} />
+      {/each}
+    </div>
+  {/if}
   <div class="sections">
-    {#each $sections as section (section.id)}
+    {#each listSections as section (section.id)}
       <details open>
         <summary>{section.title}</summary>
         <div class="section-body">
@@ -201,6 +224,35 @@
     border-bottom: 1px solid var(--border);
   }
 
+  .map-pane {
+    flex: none;
+    max-height: 60%;
+    overflow-y: auto;
+    padding: 6px 14px 4px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-sunken);
+    animation: drop 0.14s ease-out;
+  }
+
+  @keyframes drop {
+    from {
+      opacity: 0;
+      transform: translateY(-6px);
+    }
+  }
+
+  .pane-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--fg-muted);
+  }
+
   h1 {
     flex: 1;
     margin: 0;
@@ -248,7 +300,7 @@
     left: calc(var(--gap) + 104px);
     right: calc(var(--gap) + var(--card-w, 300px) + 16px);
     display: flex;
-    justify-content: center;
+    justify-content: safe center;
     pointer-events: none;
     transition: left 0.18s ease;
   }

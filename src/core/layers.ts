@@ -13,12 +13,18 @@ export type LayerSlot = (typeof LAYER_SLOTS)[number];
 
 const slotMarker = (slot: LayerSlot) => `slot:${slot}`;
 
+/** Overlay headings in the map pane, in this order. */
+export const OVERLAY_GROUPS = ['trip', 'map', 'conditions', 'osm'] as const;
+export type OverlayGroup = (typeof OVERLAY_GROUPS)[number];
+
 export interface OverlaySpec {
   id: string;
   label: string;
   layerIds: string[];
   visible?: boolean;
   opacity?: number;
+  /** Heading it is listed under in the map pane. */
+  group?: OverlayGroup;
   /** Custom opacity handling, for layer types without an opacity property (e.g. hillshade). */
   applyOpacity?: (map: MapLibreMap, opacity: number) => void;
   order?: number;

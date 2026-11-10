@@ -52,7 +52,7 @@ export default defineModule({
       },
       'overlay',
     );
-    const removeOverlay = layers.registerOverlay({ id: 'risk-levels', label: t('risk.overlay'), layerIds: ['risk-levels'], visible: false, order: 30 });
+    const removeOverlay = layers.registerOverlay({ id: 'risk-levels', label: t('risk.overlay'), layerIds: ['risk-levels'], visible: false, order: 30, group: 'conditions' });
 
     let filled = false;
     const fill = async () => {

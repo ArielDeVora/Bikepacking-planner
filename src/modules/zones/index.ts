@@ -112,6 +112,7 @@ export default defineModule({
       layerIds: ['zones-fill', 'zones-line', 'zones-label'],
       visible: true,
       order: 20,
+      group: 'trip',
     });
 
     /** Sends legs that enter these no-go zones back to the router. Returns how many segments changed. */

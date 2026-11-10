@@ -71,7 +71,7 @@ export default defineModule({
       'poi',
     );
     const removePointLayer = ui.addPointLayer('pois');
-    const removeOverlay = layers.registerOverlay({ id: 'pois', label: t('poi.overlay'), layerIds: ['pois', 'pois-ring'], visible: true, order: 10 });
+    const removeOverlay = layers.registerOverlay({ id: 'pois', label: t('poi.overlay'), layerIds: ['pois', 'pois-ring'], visible: true, order: 10, group: 'trip' });
 
     // Rendering
     let dragging: { id: string; lngLat: LngLat } | null = null;

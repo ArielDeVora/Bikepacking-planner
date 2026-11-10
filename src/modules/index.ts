@@ -18,4 +18,5 @@ export const modules: ModuleLoader[] = [
   () => import('./stats'),
   () => import('./editing'),
   () => import('./history'),
+  () => import('./climate'),
 ];

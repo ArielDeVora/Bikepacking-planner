@@ -14,7 +14,7 @@ None of these publishes the advisory *zones* as polygons. Zones within a country
 
 ## What was built
 
-- **Travel advisory levels** overlay (Map section): countries coloured by US level, from green (1) to red (4). Click a country for its advice card. Loaded when first switched on (country outlines ~3 MB, shared with border crossings).
+- **Travel advisory levels** overlay (map pane): countries coloured by US level, from green (1) to red (4). Click a country for its advice card. Loaded when first switched on (country outlines ~3 MB, shared with border crossings).
 - **Travel advice** (side panel): the countries the trip passes through, in order, with their US level. Click one for:
   - UK FCDO: alert level, the areas it names, its official map (click to enlarge), link and update date;
   - US: level and link;
@@ -42,6 +42,7 @@ The State Department identifies countries with FIPS codes, which clash with ISO 
 - **Groups** within a stage (see below).
 - **Eye** on each segment and stage: hides it from the map (or shows it again); hiding a stage hides all its segments. **Show all** at the top brings everything back. This is a viewing preference, kept per trip in each browser and not shared (`ctx.visibility`, `src/core/visibility.ts`).
 - **Collapse**: the arrow next to a stage hides its segments in the list; the button at the top collapses or expands every stage. Remembered per trip in each browser.
+- **Map pane**: the layers button at the top of the side panel (left of the theme button), or `O`, drops down a pane with the base map and all overlays, under headings: Your trip (places, border crossings, zones), Map (hillshading, country borders), Climate and safety (travel advisories, climate), OpenStreetMap places last. The button or `O` closes it again. Open or closed is remembered in each browser. Modules put their section there with `placement: 'pane'` (`ui.addPanelSection`) and their overlays under a heading with `group` (`layers.registerOverlay`).
 - **Panel width**: drag the panel's right edge (260 to 640 px); double-click it for the default. Remembered in each browser.
 - **Details card size**: drag the card's left edge for its width (260 to 720 px) and its bottom edge for its height; double-click an edge to reset it. Remembered in each browser. On a phone the card keeps its fixed layout.
 - **Selection on the map**: the selected segments get a yellow glow with a white edge, and the other segments fade. Selecting a stage or group highlights all its segments; a multiple selection highlights everything in it. Colours and the fade are `HIGHLIGHT` and `DIMMED` in `src/modules/routes/render.ts`.

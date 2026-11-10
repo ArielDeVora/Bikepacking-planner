@@ -48,7 +48,7 @@ export default defineModule({
         },
         'overlay',
       );
-      return layers.registerOverlay({ id, label: t(`osm.cat.${cat.id}` as 'osm.cat.water'), layerIds: [id], visible: false, order: 50 + i });
+      return layers.registerOverlay({ id, label: t(`osm.cat.${cat.id}` as 'osm.cat.water'), layerIds: [id], visible: false, order: 50 + i, group: 'osm' });
     });
 
     const visible = derived(layers.overlays, (list) =>

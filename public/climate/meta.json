@@ -1,0 +1,9 @@
+{
+  "source": "TerraClimate 1991–2020 monthly climatology, Climatology Lab, UC Merced (Abatzoglou et al. 2018, doi:10.1038/sdata.2017.191)",
+  "license": "CC0 1.0 (public domain)",
+  "url": "https://www.climatologylab.org/terraclimate.html",
+  "width": 1440,
+  "height": 720,
+  "cellDegrees": 0.25,
+  "fetchedAt": "2026-11-10T13:38:48.297Z"
+}

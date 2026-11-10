@@ -11,6 +11,16 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    id: '2026-11-10d',
+    title: 'Usual weather by week',
+    items: [
+      'Two new map overlays: usual temperature and usual rain, for any week of the year. Press play to watch the seasons and monsoons move.',
+      'Click the map (with one of them on) for a place’s whole year: rain, daytime highs and night lows.',
+      'Stage cards show the usual weather for their planned date.',
+      'Base maps and overlays now drop down from the layers button at the top of the side panel (or press O), grouped, instead of sitting at the bottom of the panel.',
+    ],
+  },
+  {
     id: '2026-11-10c',
     title: 'History of changes',
     items: [

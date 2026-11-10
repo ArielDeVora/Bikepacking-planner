@@ -7,7 +7,7 @@
 - **Places list** in the side panel, filterable by status; click to select and fly there.
 - **Search** box at the top of the map (`/` to focus): places worldwide via Photon, biased to the map's centre, or coordinates (`41.69, 44.80`, latitude first). Choosing a result shows its card; **Add to trip** turns it into one of our places, keeping its OSM reference.
 - **Base-map places** and richer details (opening hours from Nominatim, Wikipedia summaries) came in [milestone 7](07-zones-borders.md#base-map-places).
-- **OSM overlays** (Map section of the side panel): bike shops and repair stations, food shops, drinking water, campsites, hotels/hostels/huts, pharmacies, ATMs. Loaded from Overpass for the visible area from zoom 12, or along a whole stage with **Load OSM places along this stage** in the stage card. Click one for its card and **Add to trip**.
+- **OSM overlays** (map pane: `O`, or the layers button at the top of the side panel): bike shops and repair stations, food shops, drinking water, campsites, hotels/hostels/huts, pharmacies, ATMs. Loaded from Overpass for the visible area from zoom 12, or along a whole stage with **Load OSM places along this stage** in the stage card. Click one for its card and **Add to trip**.
 - **Google Maps lists**: import a list exported from Google Takeout (CSV) or from Google My Maps (KML). Re-importing a newer export updates matching places instead of duplicating them (see below).
 
 ## Files

@@ -10,7 +10,8 @@
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
-    "advisories": "node scripts/fetch-advisories.mjs"
+    "advisories": "node scripts/fetch-advisories.mjs",
+    "climate": "node scripts/fetch-climate.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.119.0",

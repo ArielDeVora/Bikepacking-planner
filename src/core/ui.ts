@@ -22,6 +22,8 @@ export interface PanelSectionSpec {
   component: AnyComponent;
   props?: Record<string, unknown>;
   order?: number;
+  /** In the side panel's list (default), or in the map pane that drops down from its header. */
+  placement?: 'list' | 'pane';
 }
 
 /** A small floating element over the map, e.g. a legend. Stacked bottom-left. */

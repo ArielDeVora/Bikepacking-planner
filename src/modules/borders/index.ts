@@ -100,7 +100,7 @@ export default defineModule({
       syncLabels();
       removers.push(() => map.off('styledata', syncLabels));
       removers.push(
-        layers.registerOverlay({ id: 'borders', label: t('border.overlay'), layerIds: ['borders-casing', 'borders-line', 'borders-disputed'], visible: true, order: 15 }),
+        layers.registerOverlay({ id: 'borders', label: t('border.overlay'), layerIds: ['borders-casing', 'borders-line', 'borders-disputed'], visible: true, order: 15, group: 'map' }),
       );
     }
 
@@ -145,6 +145,7 @@ export default defineModule({
         layerIds: ['border-detected', 'border-detected-label', 'border-crossings'],
         visible: true,
         order: 16,
+        group: 'trip',
       }),
     );
 
