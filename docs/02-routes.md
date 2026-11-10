@@ -9,7 +9,7 @@
 - **Editing the selected segment**: drag a point to move it; hover the line and drag the white dot to insert a point; right-click a point (or click it and press `Delete`) to remove it. `Delete` with no point selected removes the segment. Removing a point from a two-point segment removes the segment.
 - **Segment card**: name, travel mode, snap to roads/railways, routing profile, colour, planned date, notes, distance / climb / descent, routing status with a Retry button.
 - **Travel modes and line styles** from one config file, with a legend (bottom left) that lists the modes visible on screen. Planes are drawn as great-circle arcs with a plane icon.
-- **Trip tree**: segments under each stage, with kilometres per segment and stage; click to select (the map pans to it if it's off screen), reorder within a stage, delete.
+- **Trip tree**: segments under each stage, with kilometres per segment and stage; click to select (the map pans to it if it's off screen), drag to reorder, delete.
 - Every edit is one undo step.
 
 ## Files

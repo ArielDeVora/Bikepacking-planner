@@ -29,6 +29,10 @@ export const SRC = {
 } as const;
 
 const PLANE_ICON = 'route-plane';
+/** Glow around selected segments. */
+const HIGHLIGHT = '#fcc419';
+/** Opacity factor for the other segments while something is selected. */
+const DIMMED = 0.35;
 const EMPTY: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
 
 /** The segment's own colour, else its group's or stage's (bike and walk only), else its mode's. */
@@ -101,6 +105,8 @@ export class RouteRenderer {
   #dirtyActive = true;
   #frame = 0;
   #cache = new WeakMap<Segment, { color: string; features: LineFeature[] }>();
+  /** Background line layers and their normal opacity, faded while something is selected. */
+  #dimmable = new Map<string, number>();
 
   readonly modeLayerIds: string[] = [];
   readonly hitLayerIds = [`${SRC.bg}-hit`, `${SRC.active}-hit`];
@@ -122,18 +128,8 @@ export class RouteRenderer {
       const attribution = id === SRC.bg ? 'Routing: <a href="https://brouter.de/">BRouter</a>' : undefined;
       this.layers.addSource(id, { type: 'geojson', data: EMPTY, ...(attribution ? { attribution } : {}) });
     }
-    // Outline under the segments of a multiple selection (one selected segment has its own source).
-    this.layers.addLayer(
-      {
-        id: 'routes-selected',
-        type: 'line',
-        source: SRC.bg,
-        filter: ['in', ['get', 'sid'], ['literal', []]],
-        layout: { 'line-join': 'round', 'line-cap': 'round' },
-        paint: { 'line-color': '#ffffff', 'line-width': ['+', ['get', 'width'], 6], 'line-opacity': 0.9, 'line-blur': 1 },
-      },
-      'route',
-    );
+    // Glow under the selected segments of the background source (one selected segment has its own source).
+    this.#addHalo(SRC.bg, ['in', ['get', 'sid'], ['literal', []]]);
     this.#addRouteLayers(SRC.bg, false);
     this.#addRouteLayers(SRC.active, true);
 
@@ -183,14 +179,7 @@ export class RouteRenderer {
       this.layers.addLayer({ ...layer, source } as LineLayerSpecification, 'route');
     const notStatus: ExpressionSpecification = ['!', ['has', 'status']];
 
-    if (active) {
-      add({
-        id: `${source}-casing`,
-        type: 'line',
-        layout: { 'line-join': 'round', 'line-cap': 'round' },
-        paint: { 'line-color': '#ffffff', 'line-width': ['+', ['get', 'width'], 6], 'line-opacity': 0.85, 'line-blur': 1 },
-      });
-    }
+    if (active) this.#addHalo(source);
 
     const width: ExpressionSpecification = active ? ['+', ['get', 'width'], 1] : ['get', 'width'];
     for (const mode of MODE_ORDER) {
@@ -205,6 +194,7 @@ export class RouteRenderer {
         paint: linePaint(style, ['get', 'color'], width),
       });
       this.modeLayerIds.push(id);
+      if (!active) this.#dimmable.set(id, style.opacity ?? 1);
       if (style.overlay) {
         add({
           id: `${id}-overlay`,
@@ -213,6 +203,7 @@ export class RouteRenderer {
           layout: { 'line-join': 'round', 'line-cap': 'butt' },
           paint: linePaint({ ...style.overlay }, style.overlay.color),
         });
+        if (!active) this.#dimmable.set(`${id}-overlay`, 1);
       }
     }
 
@@ -236,6 +227,7 @@ export class RouteRenderer {
         paint: { 'line-color': ['get', 'color'], 'line-width': width, 'line-dasharray': dashes },
       });
       this.modeLayerIds.push(id);
+      if (!active) this.#dimmable.set(id, 1);
     }
 
     for (const status of ['pending', 'failed'] as const) {
@@ -276,9 +268,44 @@ export class RouteRenderer {
     });
   }
 
-  /** Outlines these segments (used for multiple selections). */
+  /** A yellow glow with a white edge, under the line (all of the source, or the filtered features). */
+  #addHalo(source: string, filter?: ExpressionSpecification): void {
+    const layout = { 'line-join': 'round', 'line-cap': 'round' } as const;
+    this.layers.addLayer(
+      {
+        id: `${source}-glow`,
+        type: 'line',
+        source,
+        ...(filter ? { filter } : {}),
+        layout,
+        paint: { 'line-color': HIGHLIGHT, 'line-width': ['+', ['get', 'width'], 14], 'line-opacity': 0.55, 'line-blur': 3 },
+      },
+      'route',
+    );
+    this.layers.addLayer(
+      {
+        id: `${source}-edge`,
+        type: 'line',
+        source,
+        ...(filter ? { filter } : {}),
+        layout,
+        paint: { 'line-color': '#ffffff', 'line-width': ['+', ['get', 'width'], 5] },
+      },
+      'route',
+    );
+  }
+
+  /**
+   * Highlights these segments (the selected one, or those of the selected stages, groups and
+   * segments) and fades the others. An empty list shows everything normally.
+   */
   setSelected(ids: string[]): void {
-    if (this.map.getLayer('routes-selected')) this.map.setFilter('routes-selected', ['in', ['get', 'sid'], ['literal', ids]]);
+    const filter: ExpressionSpecification = ['in', ['get', 'sid'], ['literal', ids]];
+    for (const id of [`${SRC.bg}-glow`, `${SRC.bg}-edge`]) if (this.map.getLayer(id)) this.map.setFilter(id, filter);
+    for (const [id, base] of this.#dimmable) {
+      if (!this.map.getLayer(id)) continue;
+      this.map.setPaintProperty(id, 'line-opacity', ids.length ? ['case', filter, base, base * DIMMED] : base);
+    }
   }
 
   get activeId(): string | null {

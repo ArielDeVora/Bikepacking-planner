@@ -1,7 +1,6 @@
 import { get, writable } from 'svelte/store';
 import { removeChanges } from '../../lib/segment-edits';
-import { groupSegments } from '../../lib/tree';
-import { edits } from '../../core/commands';
+import { segmentsOf } from '../../lib/tree';
 import { defineModule } from '../../core/module';
 import { icons } from '../../lib/icons';
 import type { Segment, TravelMode } from '../../model/types';
@@ -59,12 +58,15 @@ export default defineModule({
     const editor = new RouteEditor(ctx, renderer, lastMode.get);
     const detach = editor.attach();
 
+    /** Highlights the segments of everything selected (segments, groups, stages). */
+    const syncHighlight = () => {
+      renderer.setSelected([...new Set(selection.current.flatMap((id) => segmentsOf(store, id).map((s) => s.id)))]);
+    };
     const syncSelection = () => {
       const ids = selection.current;
       const seg = ids.length === 1 ? store.get(ids[0]!, 'segment') : undefined;
       renderer.setActive(seg?.id ?? null);
-      const outlined = ids.flatMap((id) => (store.get(id, 'group') ? groupSegments(store, id).map((s) => s.id) : [id]));
-      renderer.setSelected(ids.length > 1 || store.get(ids[0] ?? '', 'group') ? outlined : []);
+      syncHighlight();
       editor.onSelectionChanged();
     };
 
@@ -76,6 +78,7 @@ export default defineModule({
       }
       const changed = ids.map((id) => store.get(id, 'segment')).filter((s) => !!s);
       if (changed.length) reconciler.scan(changed);
+      if (changed.length && selection.current.length) syncHighlight();
     });
     const offSelection = bus.on('selection:changed', syncSelection);
     const offVisibility = ctx.visibility.hidden.subscribe(() => {

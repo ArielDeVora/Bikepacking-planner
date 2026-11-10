@@ -237,7 +237,7 @@
     position: absolute;
     top: var(--gap);
     left: calc(var(--gap) + 104px);
-    right: calc(var(--gap) + 316px);
+    right: calc(var(--gap) + var(--card-w, 300px) + 16px);
     display: flex;
     justify-content: center;
     pointer-events: none;

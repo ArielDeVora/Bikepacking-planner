@@ -31,7 +31,7 @@ The State Department identifies countries with FIPS codes, which clash with ISO 
 
 ## Editing from the side panel
 
-- **Several at once**: Cmd/Ctrl+click adds or removes a stage or segment from the selection; Shift+click selects everything in between. Cmd/Ctrl+click also works on routes on the map. The selected segments are outlined on the map.
+- **Several at once**: Cmd/Ctrl+click adds or removes a stage or segment from the selection; Shift+click selects everything in between. Cmd/Ctrl+click also works on routes on the map.
 - **Multiple-selection card**: total distance and climb, **Fuse** (joins them in trip order into the first one), **Delete**, **Move the segments to** a stage.
 - **Drag and drop** segments in the tree:
   - drop between two segments to move it there (into another stage too);
@@ -43,6 +43,9 @@ The State Department identifies countries with FIPS codes, which clash with ISO 
 - **Eye** on each segment and stage: hides it from the map (or shows it again); hiding a stage hides all its segments. **Show all** at the top brings everything back. This is a viewing preference, kept per trip in each browser and not shared (`ctx.visibility`, `src/core/visibility.ts`).
 - **Collapse**: the arrow next to a stage hides its segments in the list; the button at the top collapses or expands every stage. Remembered per trip in each browser.
 - **Panel width**: drag the panel's right edge (260 to 640 px); double-click it for the default. Remembered in each browser.
+- **Details card size**: drag the card's left edge for its width (260 to 720 px) and its bottom edge for its height; double-click an edge to reset it. Remembered in each browser. On a phone the card keeps its fixed layout.
+- **Selection on the map**: the selected segments get a yellow glow with a white edge, and the other segments fade. Selecting a stage or group highlights all its segments; a multiple selection highlights everything in it. Colours and the fade are `HIGHLIGHT` and `DIMMED` in `src/modules/routes/render.ts`.
+- Items are reordered by dragging only; the tree has no move up/down buttons.
 - **Import** has its own toolbar button (`I`), always visible.
 
 ## Groups
@@ -50,11 +53,10 @@ The State Department identifies countries with FIPS codes, which clash with ISO 
 A stage can hold groups of segments (a day, a detour, a variant…), next to segments that aren't in a group.
 
 - **Create**: select segments (Cmd/Ctrl+click, Shift+click), then **Group** in the multiple-selection card, or press **G**. The group takes the place of the first segment. A group stays within one stage: when the selection spans stages, only the first stage's segments are grouped, and a toast says so. A single selected segment can be grouped too.
-- **Tree**: a group row has a folder icon in the group's colour, its total distance, an arrow to collapse it, an eye, up/down, **Ungroup** and delete. Shift+click ranges include groups and the segments inside them.
+- **Tree**: a group row has a folder icon in the group's colour, its total distance, an arrow to collapse it, an eye, **Ungroup** and delete. Shift+click ranges include groups and the segments inside them.
 - **Drag and drop**:
   - a segment dropped onto a group goes in at the end; dropped between two segments of a group, it goes there; dragged out between items of the stage, it leaves the group;
   - a group is dragged between the items of its stage, or onto another stage (its segments go with it). Groups can't go inside groups;
-  - up/down on the first or last segment of a group takes it out of the group.
 - **Group card**: name, planned date, colour, notes, stats, **Ungroup** (keeps the segments where the group was), **Delete group and segments**, GPX export, OSM places along it, and comments.
 - **Colour**: bike and walk segments use the group's colour instead of the stage's (a segment's own colour still wins). The × next to it goes back to the stage colour.
 - **Map and profile**: the eye on a group hides its segments; selecting a group outlines its segments on the map and highlights them in the stage's elevation profile.

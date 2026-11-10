@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { CommandStack } from '../core/commands';
 import { TripStore } from '../core/store';
 import type { Group, Segment } from '../model/types';
-import { moveGroup, moveSegment, deleteStage } from '../modules/trip-tree/actions';
+import { deleteStage } from '../modules/trip-tree/actions';
 import { createSegment } from '../modules/routes/actions';
 import { stage, trip, TRIP_ID } from '../test/fixtures';
 import {
@@ -110,14 +110,6 @@ describe('moving with groups', () => {
   it('does not put a group inside a group', () => {
     store.apply([group('h', 'a', 'Z')], 'load');
     expect(moveIntoCommand(store, ['h'], { stageId: 'a', groupId: 'g' }, null, 'move')).toBeNull();
-  });
-
-  it('steps segments out of a group at its ends, and groups among stage items', () => {
-    commands.run(moveSegment(store, 'g1', -1, 'move')!);
-    expect(get('g1').groupId).toBeUndefined();
-    expect(ids(stageChildren(store, 'a'))).toEqual(['s1', 's2', 's3', 'g1', 'g', 's4']);
-    commands.run(moveGroup(store, 'g', -1, 'move')!);
-    expect(ids(stageChildren(store, 'a'))).toEqual(['s1', 's2', 's3', 'g', 'g1', 's4']);
   });
 
   it('keeps trip order and moving to a stage consistent', () => {

@@ -10,7 +10,7 @@
   import { groupSegments, inGroup, siblingsOf, stageChildren, type StageChild } from '../../lib/tree';
   import type { Entity, Group, Segment, Trip } from '../../model/types';
   import { untrack } from 'svelte';
-  import { addStage, deleteStage, moveGroup, moveSegment, moveStage, moveStagesCommand, sortedStages } from './actions';
+  import { addStage, deleteStage, moveStagesCommand, sortedStages } from './actions';
 
   let { ctx }: { ctx: ModuleContext } = $props();
   const { t, commands, selection } = $derived(ctx);
@@ -211,21 +211,6 @@
     selection.set([cmd.changes[0]!.id]);
   }
 
-  function move(id: string, dir: -1 | 1) {
-    const cmd = moveStage(store, id, dir, t('cmd.moveStage'));
-    if (cmd) commands.run(cmd);
-  }
-
-  function moveSeg(id: string, dir: -1 | 1) {
-    const cmd = moveSegment(store, id, dir, t('cmd.moveSegment'));
-    if (cmd) commands.run(cmd);
-  }
-
-  function moveGrp(id: string, dir: -1 | 1) {
-    const cmd = moveGroup(store, id, dir, t('cmd.moveGroup'));
-    if (cmd) commands.run(cmd);
-  }
-
   function ungroup(group: Group) {
     const cmd = ungroupCommand(store, group.id, t('cmd.ungroup'));
     if (cmd) commands.run(cmd);
@@ -290,7 +275,7 @@
   {/if}
 {/snippet}
 
-{#snippet segmentRow(seg: Segment, parentHidden: boolean, firstOfTrip: boolean, lastOfTrip: boolean)}
+{#snippet segmentRow(seg: Segment, parentHidden: boolean)}
   <li
     class="row {dropClass(seg.id)}"
     class:selected={$selected.includes(seg.id)}
@@ -312,8 +297,6 @@
     </button>
     {@render eye(seg.id, parentHidden)}
     <span class="actions">
-      <IconButton icon={icons.up} label={t('tree.moveUp')} size={14} disabled={firstOfTrip} onclick={() => moveSeg(seg.id, -1)} />
-      <IconButton icon={icons.down} label={t('tree.moveDown')} size={14} disabled={lastOfTrip} onclick={() => moveSeg(seg.id, 1)} />
       <IconButton
         icon={icons.trash}
         label={t('tree.delete')}
@@ -328,7 +311,7 @@
   <p class="muted">{t('tree.empty')}</p>
 {:else}
   <ol>
-    {#each stages as stage, i (stage.id)}
+    {#each stages as stage (stage.id)}
       {@const segs = segmentsByStage.get(stage.id) ?? []}
       {@const children = childrenByStage.get(stage.id) ?? []}
       {@const stageHidden = $hidden.has(stage.id)}
@@ -368,14 +351,6 @@
           </button>
           {@render eye(stage.id)}
           <span class="actions">
-            <IconButton icon={icons.up} label={t('tree.moveUp')} size={14} disabled={i === 0} onclick={() => move(stage.id, -1)} />
-            <IconButton
-              icon={icons.down}
-              label={t('tree.moveDown')}
-              size={14}
-              disabled={i === stages.length - 1}
-              onclick={() => move(stage.id, 1)}
-            />
             <IconButton
               icon={icons.trash}
               label={t('tree.delete')}
@@ -386,7 +361,7 @@
         </div>
         {#if children.length && !collapsed.has(stage.id)}
           <ol class="segments">
-            {#each children as child, k (child.id)}
+            {#each children as child (child.id)}
               {#if child.type === 'group'}
                 {@const gsegs = segmentsByGroup.get(child.id) ?? []}
                 {@const groupHidden = $hidden.has(child.id)}
@@ -427,14 +402,6 @@
                     </button>
                     {@render eye(child.id, stageHidden)}
                     <span class="actions">
-                      <IconButton icon={icons.up} label={t('tree.moveUp')} size={14} disabled={k === 0} onclick={() => moveGrp(child.id, -1)} />
-                      <IconButton
-                        icon={icons.down}
-                        label={t('tree.moveDown')}
-                        size={14}
-                        disabled={k === children.length - 1}
-                        onclick={() => moveGrp(child.id, 1)}
-                      />
                       <IconButton icon={icons.ungroup} label={t('tree.ungroup')} size={14} onclick={() => ungroup(child)} />
                       <IconButton
                         icon={icons.trash}
@@ -447,13 +414,13 @@
                   {#if gsegs.length && !collapsed.has(child.id)}
                     <ol class="segments">
                       {#each gsegs as seg (seg.id)}
-                        {@render segmentRow(seg, stageHidden || groupHidden, false, false)}
+                        {@render segmentRow(seg, stageHidden || groupHidden)}
                       {/each}
                     </ol>
                   {/if}
                 </li>
               {:else}
-                {@render segmentRow(child, stageHidden, i === 0 && k === 0, i === stages.length - 1 && k === children.length - 1)}
+                {@render segmentRow(child, stageHidden)}
               {/if}
             {/each}
           </ol>
