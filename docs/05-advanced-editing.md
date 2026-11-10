@@ -11,7 +11,7 @@ All of these act on the selected segment, are one undo step each, and are in the
 | Erase from the profile | | In the elevation profile (segment view), drag across the chart to select a part, then **Erase**. The part is highlighted on the map too. |
 | Reverse | `R` | The other way round. Routed segments are routed again, since roads can be one-way; other segments keep their exact geometry. |
 | Duplicate | `Shift+D` | A copy right after the original. |
-| Merge with next | `M` | Appends the next segment of the stage. If they don't touch, a leg joins them (routed for routed segments). The merged segment keeps the first one's travel mode; comments move over. |
+| Merge with next | `M` | Joins the next segment of the stage (or group), the right way round: if the two only meet end to end or start to start, the next one is turned round first (smart merge, see [docs/08](08-risk-and-editing.md#smart-merge-and-put-in-order)). If they don't touch, a leg joins them (routed for routed segments). The merged segment keeps the first one's travel mode; comments move over. |
 | Move to stage | | The **Stage** field in the card moves the segment to the end of another stage. In the trip tree, moving the first segment of a stage up (or the last one down) moves it into the neighbouring stage. |
 | Make editable | | For imported tracks: adds points at the track's main bends so they can be dragged like a drawn route. The geometry between points is kept; after that, editing a point re-routes (or redraws) only its two legs, as for drawn segments. |
 

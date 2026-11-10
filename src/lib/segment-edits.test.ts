@@ -9,14 +9,13 @@ import { stage, trip, TRIP_ID } from '../test/fixtures';
 import {
   duplicateCommand,
   inTripOrder,
-  mergeManyCommand,
   moveSegmentsCommand,
   eraseCommand,
   makeEditableCommand,
-  mergeCommand,
   moveToStageCommand,
   nextSegment,
   reverseCommand,
+  smartMergeCommand,
   splitCommand,
 } from './segment-edits';
 
@@ -68,7 +67,7 @@ describe('segment edit commands', () => {
     expect(nextSegment(store, s)!.id).toBe('t');
     const comment = { id: 'c', type: 'comment', tripId: TRIP_ID, targetId: 't', body: 'hi', authorId: 'u1', createdAt: 0 } as Comment;
     commands.run({ label: 'c', changes: [edits.create<Comment>(comment)] });
-    commands.run(mergeCommand(store, s, t, 'merge'));
+    commands.run(smartMergeCommand(store, [s, t], 'merge', s.id)!.command);
     expect(order()).toEqual(['s']);
     expect(store.get('s', 'segment')!.anchors).toHaveLength(3);
     expect(store.get('c', 'comment')!.targetId).toBe('s');
@@ -114,10 +113,10 @@ describe('several segments at once', () => {
     const p = add('p', 'V', [[7, 45], [7.01, 45]]);
     const q = add('q', 'X', [[7.01, 45], [7.02, 45]]);
     const r = add('r', 'Y', [[7.05, 45], [7.06, 45]], 'manual', 'b');
-    commands.run(mergeManyCommand(store, inTripOrder(store, [r, p, q]), 'fuse')!);
+    commands.run(smartMergeCommand(store, inTripOrder(store, [r, p, q]), 'fuse')!.command);
     expect(store.list('segment').map((s) => s.id)).toEqual(['p']);
     expect(store.get('p', 'segment')!.anchors).toHaveLength(5);
-    expect(mergeManyCommand(store, [store.get('p', 'segment')!], 'fuse')).toBeNull();
+    expect(smartMergeCommand(store, [store.get('p', 'segment')!], 'fuse')).toBeNull();
   });
 
   it('moves segments into a stage at a given place', () => {

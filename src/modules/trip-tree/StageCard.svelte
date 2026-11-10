@@ -2,6 +2,8 @@
   import { edits } from '../../core/commands';
   import type { ModuleContext } from '../../core/module';
   import type { Stage } from '../../model/types';
+  import { arrangeAction } from '../../lib/segment-actions';
+  import { stageSegments } from '../../lib/tree';
 
   let { id, ctx }: { id: string; ctx: ModuleContext } = $props();
   const { t, commands } = $derived(ctx);
@@ -43,6 +45,9 @@
     <span>{t('stage.notes')}</span>
     <textarea value={stage.notes} oninput={(e) => edit('notes', e.currentTarget.value)} onblur={() => commands.seal()}></textarea>
   </label>
+  <button type="button" class="btn" title={t('arrange.stageHint')} onclick={() => arrangeAction(ctx, stageSegments(store, id))}>
+    {t('arrange.button')}
+  </button>
 {/if}
 
 <style>
@@ -50,6 +55,14 @@
     display: grid;
     grid-template-columns: 1fr auto;
     gap: 10px;
+  }
+
+  .btn {
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+    cursor: pointer;
   }
 
   .color input {

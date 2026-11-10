@@ -1,11 +1,11 @@
 <script lang="ts">
   import { edits } from '../../core/commands';
   import type { ModuleContext } from '../../core/module';
-  import { inTripOrder, mergeManyCommand, moveSegmentsCommand, removeChanges } from '../../lib/segment-edits';
+  import { inTripOrder, moveSegmentsCommand, removeChanges } from '../../lib/segment-edits';
   import LineStyleFields from '../../lib/ui/LineStyleFields.svelte';
   import { lineStyleOf } from '../../lib/ui/line-style';
   import { MODES } from '../../config/modes';
-  import { groupSegmentsAction } from '../../lib/group-actions';
+  import { arrangeAction, fuseAction, groupSegmentsAction } from '../../lib/segment-actions';
   import { sortedStages } from '../../lib/tree';
   import type { Segment } from '../../model/types';
 
@@ -28,12 +28,6 @@
   const km = $derived(segments.reduce((sum, s) => sum + s.stats.lengthM, 0) / 1000);
   const climb = $derived(segments.reduce((sum, s) => sum + s.stats.ascentM, 0));
 
-  function fuse() {
-    const cmd = mergeManyCommand(store, segments, t('cmd.merge'));
-    if (!cmd) return;
-    commands.run(cmd);
-    selection.set([segments[0]!.id]);
-  }
 
   function restyle(patch: Partial<Segment>, field: string) {
     commands.run({ label: t('cmd.lineStyle'), changes: segments.map((s) => edits.update<Segment>(store, s.id, patch)), mergeKey: `segments:${field}` });
@@ -54,7 +48,8 @@
 
 <div class="actions">
   {#if segments.length >= 2}
-    <button type="button" class="btn primary" onclick={fuse} title={t('multi.fuseHint')}>{t('multi.fuse', { n: segments.length })}</button>
+    <button type="button" class="btn primary" onclick={() => fuseAction(ctx, segments)} title={t('multi.fuseHint')}>{t('multi.fuse', { n: segments.length })}</button>
+    <button type="button" class="btn" onclick={() => arrangeAction(ctx, segments)} title={t('arrange.hint')}>{t('arrange.button')}</button>
   {/if}
   {#if segments.length}
     <button type="button" class="btn" onclick={() => groupSegmentsAction(ctx, segments)} title={t('multi.groupHint')}>{t('multi.group')}</button>

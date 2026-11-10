@@ -12,8 +12,10 @@ export interface Release {
 export const RELEASES: Release[] = [
   {
     id: '2026-11-10',
-    title: 'Easier to see what you selected',
+    title: 'Clearer selection and smarter fusing',
     items: [
+      'Fusing segments puts them end to end first: in the right order, and turned round where they run the other way. Same for M (merge with next) and dropping a segment onto another.',
+      '“Put in order” (selection, group and stage cards) sorts segments along the route and turns round the backward ones, without fusing them.',
       'The selected segment, group or stage glows yellow on the map, and the other routes fade.',
       'Resize the details card on the right: drag its left edge (width) or bottom edge (height). Double-click an edge to reset it.',
       'Reorder stages, groups and segments by dragging them in the side panel (the up/down arrows are gone).',

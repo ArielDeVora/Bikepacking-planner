@@ -4,12 +4,11 @@ import { icons } from '../../lib/icons';
 import {
   duplicateCommand,
   makeEditableCommand,
-  mergeCommand,
   moveToStageCommand,
   nextSegment,
   reverseCommand,
 } from '../../lib/segment-edits';
-import { groupSegmentsAction } from '../../lib/group-actions';
+import { fuseAction, groupSegmentsAction } from '../../lib/segment-actions';
 import EditCard from './EditCard.svelte';
 import MultiCard from './MultiCard.svelte';
 import { EditTools, ERASE_TOOL, PREVIEW, SPLIT_TOOL } from './tools';
@@ -91,7 +90,7 @@ export default defineModule({
         const next = nextSegment(store, seg);
         if (!next) return ui.notify(t('edit.noNext'));
         if (next.mode !== seg.mode) ui.notify(t('edit.mergedModes', { mode: t(`mode.${seg.mode}`) }));
-        commands.run(mergeCommand(store, seg, next, t('cmd.merge')));
+        fuseAction(ctx, [seg, next], seg.id);
       }),
       moveTo: (id, stageId) => {
         const cmd = moveToStageCommand(store, store.get(id, 'segment')!, stageId, t('cmd.moveSegment'));

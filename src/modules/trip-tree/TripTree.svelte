@@ -6,7 +6,8 @@
   import Icon from '../../lib/ui/Icon.svelte';
   import { timeAgo } from '../../lib/time';
   import IconButton from '../../lib/ui/IconButton.svelte';
-  import { deleteGroupCommand, inTripOrder, mergeManyCommand, moveIntoCommand, ungroupCommand, type Container } from '../../lib/segment-edits';
+  import { deleteGroupCommand, inTripOrder, moveIntoCommand, ungroupCommand, type Container } from '../../lib/segment-edits';
+  import { fuseAction } from '../../lib/segment-actions';
   import { groupSegments, inGroup, siblingsOf, stageChildren, type StageChild } from '../../lib/tree';
   import type { Entity, Group, Segment, Trip } from '../../model/types';
   import { untrack } from 'svelte';
@@ -189,7 +190,7 @@
     } else if (onto?.type === 'segment') {
       if (to.where === 'onto') {
         const moved = ids.map((id) => store.get(id, 'segment')).filter((s): s is Segment => !!s);
-        cmd = mergeManyCommand(store, [onto, ...moved], t('cmd.merge'));
+        fuseAction(ctx, [onto, ...moved], onto.id);
       } else {
         const container = inGroup(store, onto) ? { stageId: onto.stageId, groupId: onto.groupId } : { stageId: onto.stageId };
         cmd = place(ids, container, siblingsOf(store, onto), onto.id, to.where, label);

@@ -2,6 +2,7 @@ import { MODES } from '../config/modes';
 import { edits, type Change, type Command } from '../core/commands';
 import type { TripStore } from '../core/store';
 import { copyGeometry, editableGeometry, eraseRange, mergeGeometry, reverseGeometry, splitAt } from '../model/edit-ops';
+import { chainChanges, chainSegments, type Chain } from './chain';
 import { newId } from '../model/ids';
 import { keyBetween } from '../model/order';
 import type { SegmentGeometry } from '../model/segment';
@@ -68,19 +69,6 @@ export function eraseCommand(store: TripStore, seg: Segment, fromM: number, toM:
   return { label: names.label, changes };
 }
 
-/** Appends `b` to `a` and deletes `b`; its comments move to `a`. */
-export function mergeCommand(store: TripStore, a: Segment, b: Segment, label: string): Command {
-  const comments = store.list('comment', (c) => c.targetId === b.id);
-  return {
-    label,
-    changes: [
-      edits.update<Segment>(store, a.id, mergeGeometry(a, b)),
-      edits.remove(store, b.id),
-      ...comments.map((c) => edits.update<Comment>(store, c.id, { targetId: a.id })),
-    ],
-  };
-}
-
 export function reverseCommand(store: TripStore, seg: Segment, label: string): Command {
   return { label, changes: [edits.update<Segment>(store, seg.id, reverseGeometry(seg))] };
 }
@@ -111,25 +99,89 @@ export function inTripOrder(store: TripStore, segments: Segment[]): Segment[] {
   return [...segments].sort((a, b) => (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0));
 }
 
+export interface MergeResult {
+  command: Command;
+  /** How the segments were put end to end. */
+  chain: Chain;
+  /** The order differs from the trip order. */
+  reordered: boolean;
+  /** Segments turned round to fit. */
+  reversed: number;
+  /** Largest distance bridged between two segments, in metres. */
+  maxGapM: number;
+}
+
 /**
- * Fuses segments into the first one, in the given order: each is appended (joined by a new leg
- * where they don't touch) and then deleted; their comments move to the first.
+ * Fuses segments into one: they are put end to end first (best order, segments turned round
+ * where they run the other way), then joined, with a new leg across any gap. The result keeps
+ * the identity of `keepId` (default: the first in trip order); the others are deleted and their
+ * comments move to it. Null with fewer than two segments.
  */
-export function mergeManyCommand(store: TripStore, segments: Segment[], label: string): Command | null {
-  const [first, ...rest] = segments;
-  if (!first || !rest.length) return null;
-  let geometry: SegmentGeometry = { anchors: first.anchors, legs: first.legs, stats: first.stats };
-  for (const s of rest) geometry = mergeGeometry({ ...geometry, geomType: first.geomType }, s);
-  const ids = new Set(rest.map((s) => s.id));
+export function smartMergeCommand(store: TripStore, segments: Segment[], label: string, keepId?: string): MergeResult | null {
+  if (segments.length < 2) return null;
+  const sorted = inTripOrder(store, segments);
+  const keep = sorted.find((s) => s.id === keepId) ?? sorted[0]!;
+  const chain = chainSegments(sorted);
+  const parts = chain.links.map((l) => ({ ...l.seg, ...(l.reversed ? reverseGeometry(l.seg) : {}) }));
+  let geometry: SegmentGeometry = { anchors: parts[0]!.anchors, legs: parts[0]!.legs, stats: parts[0]!.stats };
+  for (const part of parts.slice(1)) geometry = mergeGeometry({ ...geometry, geomType: keep.geomType }, part);
+  const others = sorted.filter((s) => s.id !== keep.id);
+  const ids = new Set(others.map((s) => s.id));
   const comments = store.list('comment', (c) => ids.has(c.targetId));
   return {
-    label,
-    changes: [
-      edits.update<Segment>(store, first.id, geometry),
-      ...rest.map((s) => edits.remove(store, s.id)),
-      ...comments.map((c) => edits.update<Comment>(store, c.id, { targetId: first.id })),
-    ],
+    command: {
+      label,
+      changes: [
+        edits.update<Segment>(store, keep.id, geometry),
+        ...others.map((s) => edits.remove(store, s.id)),
+        ...comments.map((c) => edits.update<Comment>(store, c.id, { targetId: keep.id })),
+      ],
+    },
+    chain,
+    ...chainChanges(sorted, chain),
+    maxGapM: Math.max(0, ...chain.gapsM),
   };
+}
+
+export interface ArrangeResult {
+  command: Command;
+  /** Segments that changed place. */
+  moved: number;
+  /** Segments turned round. */
+  reversed: number;
+}
+
+/**
+ * Puts segments in order along the route, each in its own list (its group, or its stage's
+ * ungrouped items): they swap places so that each starts where the previous one ends, and those
+ * running the other way are turned round (unless `reverse` is false). Null when nothing changes.
+ */
+export function arrangeCommand(store: TripStore, segments: Segment[], label: string, { reverse = true } = {}): ArrangeResult | null {
+  const lists = new Map<string, Segment[]>();
+  for (const seg of inTripOrder(store, segments)) {
+    const key = inGroup(store, seg) ? `g:${seg.groupId}` : `s:${seg.stageId}`;
+    lists.set(key, [...(lists.get(key) ?? []), seg]);
+  }
+  const changes: Change[] = [];
+  let moved = 0;
+  let reversed = 0;
+  for (const list of lists.values()) {
+    if (list.length < 2) continue;
+    const slots = list.map((s) => s.order);
+    chainSegments(list, { reverse }).links.forEach((link, i) => {
+      const patch: Partial<Segment> = {};
+      if (link.seg.order !== slots[i]) {
+        patch.order = slots[i]!;
+        moved++;
+      }
+      if (link.reversed) {
+        Object.assign(patch, reverseGeometry(link.seg));
+        reversed++;
+      }
+      if (Object.keys(patch).length) changes.push(edits.update<Segment>(store, link.seg.id, patch));
+    });
+  }
+  return changes.length ? { command: { label, changes }, moved, reversed } : null;
 }
 
 /** Where items go: directly in a stage, or in one of its groups. */
@@ -180,7 +232,8 @@ export function moveSegmentsCommand(store: TripStore, ids: string[], stageId: st
 
 /**
  * Puts segments of one stage into a new group, placed where the first of them is (in trip
- * order). Segments of other stages are left alone. Null when there is nothing to group.
+ * order), and in order along the route (their directions are left as they are). Segments of
+ * other stages are left alone. Null when there is nothing to group.
  */
 export function groupCommand(store: TripStore, segments: Segment[], name: string, label: string): { command: Command; groupId: string } | null {
   const sorted = inTripOrder(store, segments);
@@ -198,9 +251,9 @@ export function groupCommand(store: TripStore, segments: Segment[], name: string
     edits.create<Group>({ id, type: 'group', tripId: first.tripId, stageId: first.stageId, order: keyBetween(prev, next), name, notes: '' }),
   ];
   let order: string | null = null;
-  for (const s of members) {
+  for (const { seg } of chainSegments(members, { reverse: false }).links) {
     order = keyBetween(order, null);
-    changes.push(edits.update<Segment>(store, s.id, { groupId: id, order }));
+    changes.push(edits.update<Segment>(store, seg.id, { groupId: id, order }));
   }
   return { command: { label, changes }, groupId: id };
 }

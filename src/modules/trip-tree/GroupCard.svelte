@@ -2,6 +2,8 @@
   import { edits } from '../../core/commands';
   import type { ModuleContext } from '../../core/module';
   import { deleteGroupCommand, ungroupCommand } from '../../lib/segment-edits';
+  import { arrangeAction } from '../../lib/segment-actions';
+  import { groupSegments } from '../../lib/tree';
   import type { Group } from '../../model/types';
 
   let { id, ctx }: { id: string; ctx: ModuleContext } = $props();
@@ -79,6 +81,7 @@
     <textarea value={group.notes} oninput={(e) => edit('notes', e.currentTarget.value)} onblur={() => commands.seal()}></textarea>
   </label>
   <div class="actions">
+    <button type="button" class="btn" title={t('arrange.hint')} onclick={() => arrangeAction(ctx, groupSegments(store, id))}>{t('arrange.button')}</button>
     <button type="button" class="btn" title={t('group.ungroupHint')} onclick={ungroup}>{t('tree.ungroup')}</button>
     <button type="button" class="btn danger" onclick={remove}>{t('group.delete')}</button>
   </div>
