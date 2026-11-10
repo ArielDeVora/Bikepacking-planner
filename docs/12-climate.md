@@ -1,6 +1,6 @@
 # Climate: usual temperature and rain by week
 
-Two overlays in the map pane (`O`) show what the weather is usually like at any time of year: **Temperature (usual, by week)** and **Rain (usual, by week)**. They're for planning around monsoons, rainy seasons, heat and cold, not forecasts.
+Two overlays in the map pane (`Cmd+O`) show what the weather is usually like at any time of year: **Temperature (usual, by week)** and **Rain (usual, by week)**. They're for planning around monsoons, rainy seasons, heat and cold, not forecasts.
 
 ## Using it
 

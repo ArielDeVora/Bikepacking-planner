@@ -63,7 +63,8 @@ export function planSchedule(store: TripStore, source: string): Schedule {
     lengthM: s.stats.lengthM,
     ascentM: s.stats.ascentM,
     fixed: fixedDate(store, s),
-    days: s.transportDays,
+    days: s.planDays,
+    kmPerDay: s.planKmPerDay,
   }));
   return buildSchedule(segments, planSettings(store, source), restPeriods(store, source));
 }

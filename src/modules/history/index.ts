@@ -1,3 +1,4 @@
+import { KEYS } from '../../config/shortcuts';
 import { defineModule } from '../../core/module';
 import { icons } from '../../lib/icons';
 import HistoryDialog from './HistoryDialog.svelte';
@@ -9,8 +10,8 @@ export default defineModule({
     const { ui, t } = ctx;
     const open = (focus: string | null = null) => ui.openDialog(HistoryDialog, { ctx, focus });
     const removers = [
-      ui.addTool({ id: 'history', label: t('history.title'), icon: icons.history, shortcut: 'h', order: 70, run: () => open() }),
-      ctx.shortcuts.add({ keys: 'h', label: t('history.title'), run: () => open() }),
+      ui.addTool({ id: 'history', label: t('history.title'), icon: icons.history, shortcut: KEYS.history, order: 70, run: () => open() }),
+      ctx.shortcuts.add({ keys: KEYS.history, label: t('history.title'), run: () => open() }),
       ui.addCardSection({ id: 'history.item', component: ItemHistory, props: { ctx, open }, order: 11 }),
     ];
     return () => removers.forEach((off) => off());

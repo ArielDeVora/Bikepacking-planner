@@ -1,3 +1,4 @@
+import { KEYS } from '../config/shortcuts';
 import { Map as MapLibreMap, NavigationControl, ScaleControl, setWorkerUrl } from 'maplibre-gl';
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import { writable, type Readable } from 'svelte/store';
@@ -117,9 +118,9 @@ export function createCore(container: HTMLElement) {
   const visibility = new Visibility(settings, () => tripId);
 
   window.addEventListener('keydown', shortcuts.handle);
-  shortcuts.add({ keys: 'mod+z', label: t('toolbar.undo'), run: () => commands.undo() });
-  shortcuts.add({ keys: 'mod+shift+z', label: t('toolbar.redo'), run: () => commands.redo() });
-  shortcuts.add({ keys: 'mod+y', label: t('toolbar.redo'), run: () => commands.redo() });
+  shortcuts.add({ global: true, keys: KEYS.undo, label: t('toolbar.undo'), run: () => commands.undo() });
+  shortcuts.add({ global: true, keys: KEYS.redo, label: t('toolbar.redo'), run: () => commands.redo() });
+  shortcuts.add({ global: true, keys: KEYS.redoAlt, label: t('toolbar.redo'), run: () => commands.redo() });
   shortcuts.add({ keys: 'escape', label: t('help.escape'), run: () => selection.clear() });
 
   bus.on('selection:changed', ({ ids }) => {

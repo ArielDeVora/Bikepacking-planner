@@ -22,7 +22,7 @@
   import { planRows, RouteLine } from './rows';
   import { fromDayNumber, toDayNumber } from './schedule';
   import { nearestRegion, seasonAt, seasonWeek, type Rating } from './seasons';
-  import type { ScheduleSettings } from '../../model/types';
+  import type { ScheduleSettings, Segment } from '../../model/types';
 
   let { ctx, close }: { ctx: ModuleContext; close: () => void } = $props();
   const { t, commands } = $derived(ctx);
@@ -181,6 +181,7 @@
             kind: 'row',
             label: r.country && (rowsBySegment.get(seg.id)?.length ?? 0) > 1 ? `${r.name} · ${r.country.name}` : r.name,
             flag: r.country ? flag(r.country.code) : undefined,
+            country: r.country ?? undefined,
             sub: `${Math.round(r.toKm - r.fromKm)} km`,
             segmentId: seg.id,
             heat: heatFor(weeklyRatings(r.mid)),
@@ -195,6 +196,25 @@
   function flag(code: string): string {
     return /^[A-Z]{2}$/.test(code) ? String.fromCodePoint(...[...code].map((ch) => 0x1f1e6 + ch.charCodeAt(0) - 65)) : '';
   }
+
+  // Countries in the order we reach them: when we're there and for how long (visas!).
+  const VISA_DAYS = 30;
+  const stays = $derived.by(() => {
+    const byCode = new Map<string, { code: string; name: string; flag: string; cols: Set<number> }>();
+    for (const row of calRows) {
+      if (!row.country || !row.bars?.length) continue;
+      let stay = byCode.get(row.country.code);
+      if (!stay) byCode.set(row.country.code, (stay = { ...row.country, flag: row.flag ?? '', cols: new Set() }));
+      for (const bar of row.bars) for (let c = bar.from; c <= bar.to; c++) stay.cols.add(c);
+    }
+    return [...byCode.values()]
+      .map((s) => {
+        const cols = [...s.cols].sort((a, b) => a - b);
+        return { ...s, from: fromDayNumber(range.first + cols[0]!), to: fromDayNumber(range.first + cols.at(-1)!), days: cols.at(-1)! - cols[0]! + 1 };
+      })
+      .sort((a, b) => a.from.localeCompare(b.from));
+  });
+  const shortDate = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString(undefined, { day: 'numeric', month: 'short', timeZone: 'UTC' });
 
   const rests = $derived(periods.map((p): CalRest => ({ id: p.id, from: colOf(p.from), to: colOf(p.to), name: p.name })));
 
@@ -279,7 +299,25 @@
   }
   let focusRest = $state<string | null>(null);
 
-  function showOnMap(row: CalRow) {
+  // The segment picked in the calendar, edited in the side panel.
+  let picked = $state<string | null>(null);
+  const pickedSeg = $derived.by(() => {
+    void $store;
+    return picked ? store.get(picked, 'segment') : undefined;
+  });
+  const pickedSpan = $derived(picked && schedule ? schedule.spans.get(picked) : undefined);
+  const spanDates = $derived.by(() => {
+    if (!pickedSpan || !schedule) return null;
+    const startDay = toDayNumber(schedule.start);
+    return { from: fromDayNumber(startDay + pickedSpan.first), to: fromDayNumber(startDay + pickedSpan.last), days: pickedSpan.last - pickedSpan.first + 1 };
+  });
+  function editSegment(patch: { plannedDate?: string; planKmPerDay?: number; planDays?: number }, field: string) {
+    if (!pickedSeg) return;
+    commands.run({ label: t('cmd.editSchedule'), changes: [edits.update<Segment>(store, pickedSeg.id, patch)], mergeKey: `plan:${pickedSeg.id}:${field}` });
+  }
+  const optional = (v: string) => (v.trim() === '' ? undefined : Math.max(0, Number(v)) || undefined);
+
+  function showOnMap(row: CalRow | { segmentId?: string }) {
     const seg = row.segmentId ? store.get(row.segmentId, 'segment') : undefined;
     if (!seg) return;
     ctx.selection.set([seg.id]);
@@ -350,7 +388,8 @@
           {width}
           {describe}
           onAddRest={addRest}
-          onRowClick={showOnMap}
+          selected={picked}
+          onRowClick={(row) => (picked = row.segmentId ?? null)}
           onRestClick={(id) => (focusRest = id)}
         />
       </div>
@@ -369,6 +408,62 @@
         {#each late as l (l.name + l.date)}
           <p class="late">{t('plan.late', { name: l.name, n: l.n, date: fmtDate(l.date) })}</p>
         {/each}
+
+        {#if pickedSeg}
+          <section class="picked">
+            <h2>{t('plan.segment')}</h2>
+            <strong>{pickedSeg.name}</strong>
+            {#if spanDates}
+              <span class="muted small">{fmtDate(spanDates.from)} → {fmtDate(spanDates.to)} · {t('plan.days', { n: spanDates.days })}</span>
+            {/if}
+            <label class="field">
+              <span>{t('plan.fixedDate')}</span>
+              <input type="date" value={pickedSeg.plannedDate ?? ''} onchange={(e) => editSegment({ plannedDate: e.currentTarget.value || undefined }, 'date')} />
+            </label>
+            <div class="pair">
+              <label class="field">
+                <span>{t('plan.ownKmPerDay')}</span>
+                <input
+                  type="number"
+                  min="5"
+                  step="5"
+                  placeholder={String(pickedSeg.mode === 'walk' ? settings?.walkKmPerDay : settings?.kmPerDay)}
+                  value={pickedSeg.planKmPerDay ?? ''}
+                  onchange={(e) => editSegment({ planKmPerDay: optional(e.currentTarget.value) }, 'pace')}
+                />
+              </label>
+              <label class="field">
+                <span>{t('plan.ownDays')}</span>
+                <input
+                  type="number"
+                  min="0.5"
+                  step="0.5"
+                  placeholder={t('plan.auto')}
+                  value={pickedSeg.planDays ?? ''}
+                  onchange={(e) => editSegment({ planDays: optional(e.currentTarget.value) }, 'days')}
+                />
+              </label>
+            </div>
+            <p class="muted small">{t('plan.paceHint')}</p>
+            <button type="button" class="link" onclick={() => showOnMap({ segmentId: pickedSeg.id })}>{t('plan.showOnMap')}</button>
+          </section>
+        {/if}
+
+        {#if stays.length}
+          <section>
+            <h2>{t('plan.countries')}</h2>
+            <ul class="stays">
+              {#each stays as s (s.code)}
+                <li class:long={s.days > VISA_DAYS} title={s.days > VISA_DAYS ? t('plan.visaWarning', { n: VISA_DAYS }) : undefined}>
+                  <span class="flag">{s.flag}</span>
+                  <span class="cname">{s.name}</span>
+                  <span class="muted when">{shortDate(s.from)} → {shortDate(s.to)}</span>
+                  <span class="ndays">{t('plan.days', { n: s.days })}{s.days > VISA_DAYS ? ' ⚠' : ''}</span>
+                </li>
+              {/each}
+            </ul>
+          </section>
+        {/if}
 
         <section>
           <h2>{t('plan.restPeriods')}</h2>
@@ -584,6 +679,88 @@
 
   .del:hover {
     color: var(--danger);
+  }
+
+  .stays {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 12px;
+  }
+
+  .stays li {
+    display: grid;
+    grid-template-columns: 18px 1fr auto;
+    grid-template-areas: 'flag name days' 'flag when when';
+    column-gap: 6px;
+    padding: 4px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .stays .flag {
+    grid-area: flag;
+  }
+
+  .stays .cname {
+    grid-area: name;
+    font-weight: 600;
+  }
+
+  .stays .when {
+    grid-area: when;
+  }
+
+  .stays .ndays {
+    grid-area: days;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .stays li.long .ndays {
+    color: var(--danger);
+    font-weight: 700;
+  }
+
+  .picked {
+    display: grid;
+    gap: 6px;
+    padding: 10px;
+    border-radius: var(--radius-sm);
+    background: var(--accent-soft);
+  }
+
+  .field {
+    display: grid;
+    gap: 2px;
+    font-size: 11px;
+    color: var(--fg-muted);
+  }
+
+  .field input {
+    min-width: 0;
+    padding: 4px 6px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+    color: var(--fg);
+    font: inherit;
+    font-size: 13px;
+  }
+
+  .pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .link {
+    justify-self: start;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--accent);
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
   }
 
   .legend div {

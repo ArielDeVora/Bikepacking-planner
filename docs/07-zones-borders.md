@@ -4,7 +4,7 @@ Also in this milestone, following feedback on milestone 6: clickable base-map pl
 
 ## Avoid zones
 
-- **Draw** with `A` (or the hatched-shape button): click the corners, then click the first corner or press `Enter`. `Esc` cancels.
+- **Draw** with `Cmd+A` (or the hatched-shape button): click the corners, then click the first corner or press `Enter`. `Esc` cancels.
 - **No-go** zones (red hatching) are sent to BRouter as no-go polygons, so new routes go around them. **Caution** zones (orange) are only shown and warned about.
 - **Edit** the selected zone: drag its corners, drag the small dots between corners to add one, right-click a corner to remove it. Click inside a zone to select it (the smallest zone wins where they overlap; segments, places and crossings on top of a zone take the click first).
 - **Card**: name, severity, reason, source and source link, date added, and the segments that go through it, with **Re-route around it**. Only the legs that enter the zone are sent back to the router.
@@ -15,7 +15,7 @@ Zones use the `Zone` entity with `kind: 'avoid'`; milestone 8 adds `kind: 'risk'
 
 ## Borders
 
-- **Country borders** are drawn in violet over every base map (including satellite), stronger than the base map's own, from the OpenFreeMap tiles' boundary layer (country level, land only). Disputed borders are dashed. On raster base maps, country names are added too. Toggle in the map pane (`O`) → Map → Country borders.
+- **Country borders** are drawn in violet over every base map (including satellite), stronger than the base map's own, from the OpenFreeMap tiles' boundary layer (country level, land only). Disputed borders are dashed. On raster base maps, country names are added too. Toggle in the map pane (`Cmd+O`) → Map → Country borders.
 - **Border crossings along the trip** (side panel → Border crossings → Find border crossings): the trip is checked against country outlines from Natural Earth (public domain, 1:50m), downloaded once (~3 MB, then cached by the browser). Ground segments are sampled every 2 km and each change of country is narrowed down to ~150 m on the line; flights and ferries count by the countries at both ends. Only continuous parts of the trip count: when one segment ends more than 5 km from where the next one starts (a part not drawn yet, tracks imported out of order), nothing is reported across the gap. Crossing a border and back within 3 km (a road running along it) isn't reported either. Crossings are listed in trip order with their kilometre, and shown on the map as violet dots on the route. The list updates by itself as the trip changes.
 - **Crossing card** (click a dot or a list row): the countries, the kilometre and segment, the nearest OSM border posts (`barrier=border_control` within 8 km, via Overpass, cached 30 days), and **Add notes** at a border post or at the crossing point.
 - **Our notes** (`BorderCrossing` entity): status (open / closed to foreigners / unknown, shown as a green / red / grey flag), notes, a link (paste the Caravanistan page, for instance), last verified date, plus the usual place info (OSM details for the post, elevation, links). They sync and take comments like everything else. Nothing is fetched from Caravanistan.

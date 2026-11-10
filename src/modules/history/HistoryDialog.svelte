@@ -116,6 +116,23 @@
     else if (!changes.length) ctx.ui.notify(t('history.nothingToRevert'));
   }
 
+  // Owners of a shared trip can delete old history, to keep the free database small.
+  const role = $derived(ctx.cloud.role);
+  let keepMonths = $state(3);
+  let pruning = $state<'ask' | 'busy' | null>(null);
+  async function prune() {
+    pruning = 'busy';
+    try {
+      const n = await ctx.history.log.prune(Math.round(keepMonths * 30.5));
+      ctx.ui.notify(t('history.pruned', { n }));
+      await load(true);
+    } catch (err) {
+      ctx.ui.notify(t('history.pruneFailed', { reason: err instanceof Error ? err.message : String(err) }), 'error', 8000);
+    } finally {
+      pruning = null;
+    }
+  }
+
   function show(id: string) {
     if (!store.get(id)) return;
     selection.set([id]);
@@ -251,6 +268,21 @@
   </div>
 
   <div class="buttons">
+    {#if $scope === 'shared' && $role === 'owner'}
+      <div class="prune">
+        {#if pruning === 'ask'}
+          <span class="warn">{t('history.pruneConfirm', { n: keepMonths })}</span>
+          <button type="button" class="btn danger" onclick={prune}>{t('history.pruneYes')}</button>
+          <button type="button" class="btn" onclick={() => (pruning = null)}>{t('history.cancel')}</button>
+        {:else}
+          <span class="muted small">{t('history.pruneLabel')}</span>
+          <select bind:value={keepMonths} aria-label={t('history.pruneLabel')}>
+            {#each [1, 3, 6, 12] as m (m)}<option value={m}>{t('history.months', { n: m })}</option>{/each}
+          </select>
+          <button type="button" class="btn" disabled={pruning === 'busy'} onclick={() => (pruning = 'ask')}>{t('history.prune')}</button>
+        {/if}
+      </div>
+    {/if}
     <button type="button" class="btn" onclick={() => ctx.ui.closeDialog()}>{t('card.close')}</button>
   </div>
 </div>
@@ -465,5 +497,22 @@
     .list {
       max-height: 45vh;
     }
+  }
+
+  .prune {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-right: auto;
+  }
+
+  .prune .warn {
+    font-size: 12px;
+    color: var(--danger);
+  }
+
+  .btn.danger {
+    color: var(--danger);
   }
 </style>

@@ -1,3 +1,4 @@
+import { KEYS } from '../../config/shortcuts';
 import type { GeoJSONSource } from 'maplibre-gl';
 import { get } from 'svelte/store';
 import { defineModule } from '../../core/module';
@@ -60,7 +61,7 @@ export default defineModule({
       props: { ctx, photon, choose, goTo, register: (f: () => void) => (focus = f) },
       position: 'top',
     });
-    const removeShortcut = shortcuts.add({ keys: '/', label: t('help.search'), run: () => focus() });
+    const removeShortcut = shortcuts.add({ keys: KEYS.search, label: t('help.search'), run: () => focus() });
 
     return () => {
       offPlace();

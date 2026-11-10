@@ -1,3 +1,4 @@
+import { KEYS } from '../../config/shortcuts';
 import { get, writable } from 'svelte/store';
 import { removeChanges } from '../../lib/segment-edits';
 import { segmentsOf } from '../../lib/tree';
@@ -113,7 +114,7 @@ export default defineModule({
       id: 'routes.draw',
       label: t('routes.draw'),
       icon: icons.route,
-      shortcut: 'd',
+      shortcut: KEYS.draw,
       order: 10,
       active: editor.drawing,
       run: () => editor.toggleDrawing(),
@@ -129,7 +130,7 @@ export default defineModule({
       if (ids.length) ctx.commands.run({ label: t('tree.delete'), changes: removeChanges(store, ids) });
     };
     const offShortcuts = [
-      shortcuts.add({ keys: 'd', label: t('routes.draw'), run: () => editor.toggleDrawing() }),
+      shortcuts.add({ keys: KEYS.draw, label: t('routes.draw'), run: () => editor.toggleDrawing() }),
       shortcuts.add({
         keys: 'escape',
         label: t('help.escape'),
@@ -141,8 +142,8 @@ export default defineModule({
           }
         },
       }),
-      shortcuts.add({ keys: 'delete', label: t('help.delete'), run: deleteSelection }),
-      shortcuts.add({ keys: 'backspace', label: t('help.delete'), run: deleteSelection }),
+      shortcuts.add({ keys: KEYS.deleteAlt, label: t('help.delete'), run: deleteSelection }),
+      shortcuts.add({ keys: KEYS.delete, label: t('help.delete'), run: deleteSelection }),
     ];
 
     const removeCard = ui.addCardRenderer('segment', {

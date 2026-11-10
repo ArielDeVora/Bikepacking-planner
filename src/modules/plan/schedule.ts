@@ -17,8 +17,10 @@ export interface PlanSegment {
   ascentM: number;
   /** A date it must start on (a visa, a flight, friends joining). */
   fixed?: string;
-  /** Days a train, bus, boat, plane or car journey takes (default 1). */
+  /** Days it takes, whatever its length (default: from the daily distance; 1 for motorised journeys). */
   days?: number;
+  /** Its own daily distance, instead of the plan's. */
+  kmPerDay?: number;
 }
 
 export interface RestPeriodInput {
@@ -170,21 +172,22 @@ export function buildSchedule(segments: PlanSegment[], settings: ScheduleSetting
       span.last = day - start;
       nextDay();
     } else {
-      const pace = seg.mode === 'walk' ? settings.walkKmPerDay : settings.kmPerDay;
+      const pace = seg.kmPerDay ?? (seg.mode === 'walk' ? settings.walkKmPerDay : settings.kmPerDay);
       const effort = length + (settings.climbKm * seg.ascentM) / 100;
-      // Days this segment takes, spread over the ones left after earlier segments.
-      let left = pace > 0 ? effort / pace : 0;
+      // Days this segment takes (its own, or from its effort), spread over the ones left after earlier segments.
+      const total = seg.days !== undefined && seg.days > 0 ? seg.days : pace > 0 ? effort / pace : 0;
+      let left = total;
       let done = 0;
       if (1 - used < CRUMB && left >= CRUMB) nextDay();
       span.first = day - start;
       while (left > 1e-9) {
         const take = Math.min(left, 1 - used);
-        const from = km + (done / (effort / pace || 1)) * length;
+        const from = km + (done / (total || 1)) * length;
         done += take;
         left -= take;
         // A last crumb rides on the day before instead of starting a new one.
         const finish = left < CRUMB;
-        const to = finish ? km + length : km + (done / (effort / pace)) * length;
+        const to = finish ? km + length : km + (done / total) * length;
         note(seg.id, from, to);
         used += take;
         span.last = day - start;

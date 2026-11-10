@@ -224,6 +224,8 @@ export class RouteEditor {
     }
     if (this.#anchorAt(e.point) === null && this.#onMarker(e.point)) return;
     if (this.#otherTool) {
+      const tool = get(this.ctx.ui.tool);
+      if (get(this.ctx.ui.tools).find((t) => t.id === tool)?.keepSelection) return;
       const hit = this.ctx.map.queryRenderedFeatures(box(e.point, HIT_PX), { layers: this.renderer.hitLayerIds })[0];
       if (hit) this.ctx.selection.set([hit.properties.sid as string]);
       return;

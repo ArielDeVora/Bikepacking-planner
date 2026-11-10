@@ -1,3 +1,4 @@
+import { KEYS } from '../../config/shortcuts';
 import type { GeoJSONSource } from 'maplibre-gl';
 import { writable } from 'svelte/store';
 import { edits } from '../../core/commands';
@@ -104,12 +105,12 @@ export default defineModule({
       id: 'elevation.profile',
       label: t('elevation.title'),
       icon: icons.mountain,
-      shortcut: 'e',
+      shortcut: KEYS.elevation,
       order: 50,
       active: open,
       run: toggle,
     });
-    const removeShortcut = shortcuts.add({ keys: 'e', label: t('elevation.title'), run: toggle });
+    const removeShortcut = shortcuts.add({ keys: KEYS.elevation, label: t('elevation.title'), run: toggle });
 
     return () => {
       offStore();

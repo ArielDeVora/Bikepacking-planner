@@ -61,3 +61,32 @@ describe('history diffs', () => {
     expect(res.changes.map((x) => [x.id, (x.after as Segment).notes])).toEqual([['o', '']]);
   });
 });
+
+describe('history of drawn segments', () => {
+  const pt = (x: number) => ({ id: `a${x}`, lngLat: [x, 0] as [number, number] });
+  const leg = (line: string, status?: 'pending') => ({ line, ...(status ? { status } : {}) });
+  const routed = (anchors: ReturnType<typeof pt>[], legs: { line: string; status?: 'pending' }[]) =>
+    seg({ geomType: 'routed', anchors, legs, stats: { lengthM: 1, ascentM: 0, descentM: 0 } } as Partial<Segment>);
+
+  it('leaves out lines and distances, which come back from the points', () => {
+    const d = diffChange(change(routed([pt(0), pt(1)], [leg('ROUTED01')]), routed([pt(0), pt(2)], [leg('ROUTED02')])))!;
+    expect(Object.keys(d.after)).toEqual(['anchors']);
+    expect(Object.keys(diffChange(change(null, routed([pt(0), pt(1)], [leg('X')])))!.after)).not.toContain('legs');
+  });
+
+  it('keeps an imported track’s lines', () => {
+    const imported = (line: string) => seg({ geomType: 'imported', anchors: [pt(0), pt(1)], legs: [leg(line)] } as Partial<Segment>);
+    expect(diffChange(change(imported('A'), imported('B')))!.after).toHaveProperty('legs');
+  });
+
+  it('redraws lines on undo, keeping the routing of legs that didn’t change', () => {
+    const before = routed([pt(0), pt(1), pt(2)], [leg('KEEP'), leg('OLD')]);
+    const after = routed([pt(0), pt(1), pt(3)], [leg('KEEP'), leg('NEW')]);
+    const c = commit('c1', change(before, after));
+    const { changes } = revertChanges(c, () => after);
+    const restored = changes[0]!.after as Segment;
+    expect(restored.anchors.map((a) => a.lngLat[0])).toEqual([0, 1, 2]);
+    expect(restored.legs[0]!.line).toBe('KEEP');
+    expect(restored.legs[1]!.status).toBe('pending');
+  });
+});

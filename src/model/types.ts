@@ -123,8 +123,10 @@ export interface Segment extends BaseEntity {
   /** Line pattern, overriding the travel mode's. */
   dash?: LineDash;
   plannedDate?: string;
-  /** Days a train, bus, boat, plane or car journey takes in the plan (default 1). */
-  transportDays?: number;
+  /** Days it takes in the plan, whatever its length (by default: from the daily distance; 1 for motorised journeys). */
+  planDays?: number;
+  /** Daily distance for this segment, instead of the plan's. */
+  planKmPerDay?: number;
 }
 
 export type PoiCategory =

@@ -62,3 +62,17 @@ describe('schedule', () => {
     expect(s.days.map((d) => d.kind)).toEqual(['rest', 'ride']);
   });
 });
+
+describe('per-segment pace', () => {
+  it('rides a segment at its own daily distance', () => {
+    const s = buildSchedule([bike('a', 160, 0, { kmPerDay: 40 }), bike('b', 80)], settings());
+    expect(s.spans.get('a')).toMatchObject({ first: 0, last: 3 });
+    expect(s.spans.get('b')).toMatchObject({ first: 4, last: 4 });
+  });
+
+  it('gives a segment a set number of days, whatever its length', () => {
+    const s = buildSchedule([bike('a', 300, 0, { days: 1 }), bike('b', 40, 0, { days: 2 })], settings());
+    expect(s.days.map((d) => d.parts.map((p) => p.segmentId).join(''))).toEqual(['a', 'b', 'b']);
+    expect(s.days[0]!.parts[0]!.toKm).toBe(300);
+  });
+});

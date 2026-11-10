@@ -10,7 +10,7 @@
   - One undo step for the whole import.
 - **Export**: the whole trip as GPX (optionally bike and walk segments only), a stage or a segment as GPX (links in their cards). One track per segment, named after it, with the stage as description and the travel mode as `<type>`. Waypoints: all POIs for the trip, POIs within 1 km for a stage or segment. No timestamps, so Garmin/Wahoo treat it as a course.
 - **Backup**: the whole trip as JSON. Dropping a backup file restores it as a new trip (fresh ids, so it never clashes with the original).
-- **Elevation profile** drawer (toolbar mountain button, or `E`): segment, stage or whole trip (planes left out). Distance, climb, descent, highest point; the area is coloured by gradient; hovering shows distance, elevation and gradient, and a marker on the map.
+- **Elevation profile** drawer (toolbar mountain button, or `Cmd+E`): segment, stage or whole trip (planes left out). Distance, climb, descent, highest point; the area is coloured by gradient; hovering shows distance, elevation and gradient, and a marker on the map.
 - **Terrain elevation**: straight and imported legs of bike and walk segments that have no elevation get it from the AWS Terrain Tiles (straight legs are sampled every 100 m). Routed legs use BRouter's elevation.
 - **Stats**: a Stats section for the trip (km and climb by travel mode, total, climb on bike and on foot, number of stages, days between the first and last planned date) and the same per stage in the stage card.
 - **Trip tree**: in a shared trip, every stage and segment shows a dot in the colour of whoever changed it last (you included); hover it for name and time.

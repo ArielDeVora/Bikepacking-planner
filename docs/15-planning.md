@@ -15,6 +15,10 @@ Pick a route, or the stages outside routes, at the top. Its settings are shared 
 
 The schedule (`src/modules/plan/schedule.ts`) walks the route day by day: bike and walk segments at their daily distance plus climbing (several segments can share a day), one day per train, bus, boat, plane or car journey (`transportDays` on a segment for longer ones), a rest day every few days of riding, no riding during **rest periods**, and waiting for **fixed dates**. A segment's fixed date is its planned date, else its group's or stage's planned date when it comes first in them. When a fixed date can't be met, the side panel says how many days late.
 
+**One segment at its own pace**: click a row's name to pick its segment; the side panel then shows when it's ridden and lets you set its fixed date, **its own km/day**, or **a number of days** it takes whatever its length (1 makes a whole segment one day; 0.5 half a day). Empty fields use the plan's settings. **Show on the map** goes to it.
+
+**Countries**: the side panel lists the countries in the order we reach them, with entry and exit dates and the number of days; more than 30 days is flagged, to check the visa.
+
 **Rest periods**: drag across the dates at the top of the calendar to add one, then rename it or change its dates in the side panel. They're shared and undoable.
 
 ## The calendar

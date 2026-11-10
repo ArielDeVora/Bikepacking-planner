@@ -8,6 +8,7 @@
     label: string;
     sub?: string;
     flag?: string;
+    country?: { code: string; name: string };
     color?: string;
     segmentId?: string;
     /** Season rating per column (null: unknown). */
@@ -32,6 +33,7 @@
     rows,
     rests,
     width,
+    selected = null,
     describe,
     onAddRest,
     onRowClick,
@@ -44,6 +46,8 @@
     rests: CalRest[];
     /** Width of a day, in pixels. */
     width: number;
+    /** The selected segment, highlighted. */
+    selected?: string | null;
     describe: (col: number, row: CalRow | null) => string[];
     onAddRest: (fromCol: number, toCol: number) => void;
     onRowClick: (row: CalRow) => void;
@@ -160,7 +164,7 @@
 
     <div class="body">
       {#each rows as row (row.key)}
-        <div class="row {row.kind}">
+        <div class="row {row.kind}" class:selected={!!row.segmentId && row.segmentId === selected}>
           <button type="button" class="label" disabled={!row.segmentId} onclick={() => onRowClick(row)} title={row.label}>
             {#if row.color}<span class="swatch" style:background={row.color}></span>{/if}
             {#if row.flag}<span class="flag">{row.flag}</span>{/if}
@@ -331,6 +335,16 @@
 
   .label:disabled {
     cursor: default;
+  }
+
+  .row.selected .label {
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  .row.selected .track {
+    box-shadow: inset 0 0 0 2px var(--accent);
   }
 
   .row.stage .label {

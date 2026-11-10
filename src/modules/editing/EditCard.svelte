@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { KEYS } from '../../config/shortcuts';
   import type { ModuleContext } from '../../core/module';
   import { icons } from '../../lib/icons';
   import { nextSegment } from '../../lib/segment-edits';
@@ -37,19 +38,22 @@
       <p class="muted hint">{t('edit.makeEditableHint')}</p>
     {/if}
     <div class="buttons">
-      <button type="button" class="btn" class:active={$tool === 'editing.split'} title={label(t('edit.split'), 's')} onclick={actions.split}>
+      <button type="button" class="btn" class:active={$tool === 'editing.split'} title={label(t('edit.split'), KEYS.split)} onclick={actions.split}>
         <Icon d={icons.scissors} size={15} />{t('edit.split')}
       </button>
-      <button type="button" class="btn" class:active={$tool === 'editing.erase'} title={label(t('edit.erase'), 'x')} onclick={actions.erase}>
+      <button type="button" class="btn" class:active={$tool === 'editing.erase'} title={label(t('edit.erase'), KEYS.erase)} onclick={actions.erase}>
         <Icon d={icons.eraser} size={15} />{t('edit.erase')}
       </button>
-      <button type="button" class="btn" title={label(t('edit.reverse'), 'r')} onclick={() => actions.reverse(id)}>
+      <button type="button" class="btn" class:active={$tool === 'editing.follow'} title={t('edit.followTitle')} onclick={actions.follow}>
+        <Icon d={icons.follow} size={15} />{t('edit.follow')}
+      </button>
+      <button type="button" class="btn" title={label(t('edit.reverse'), KEYS.reverse)} onclick={() => actions.reverse(id)}>
         <Icon d={icons.reverse} size={15} />{t('edit.reverse')}
       </button>
-      <button type="button" class="btn" title={label(t('edit.duplicate'), 'shift+d')} onclick={() => actions.duplicate(id)}>
+      <button type="button" class="btn" title={label(t('edit.duplicate'), KEYS.duplicate)} onclick={() => actions.duplicate(id)}>
         <Icon d={icons.copy} size={15} />{t('edit.duplicate')}
       </button>
-      <button type="button" class="btn" disabled={!hasNext} title={label(t('edit.merge'), 'm')} onclick={() => actions.merge(id)}>
+      <button type="button" class="btn" disabled={!hasNext} title={label(t('edit.merge'), KEYS.merge)} onclick={() => actions.merge(id)}>
         <Icon d={icons.merge} size={15} />{t('edit.merge')}
       </button>
     </div>
@@ -57,6 +61,8 @@
       <p class="muted hint">{t('edit.splitHint')}</p>
     {:else if $tool === 'editing.erase'}
       <p class="muted hint">{t('edit.eraseHint')}</p>
+    {:else if $tool === 'editing.follow'}
+      <p class="muted hint">{t('edit.followHint')}</p>
     {/if}
     <label class="field">
       <span>{t('edit.stage')}</span>

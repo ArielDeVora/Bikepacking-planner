@@ -3,6 +3,8 @@ export interface Shortcut {
   keys: string;
   label: string;
   run: (e: KeyboardEvent) => void;
+  /** Also works while a full-screen view (planning…) is open. */
+  global?: boolean;
 }
 
 interface Combo {
@@ -31,7 +33,7 @@ export function matches(combo: Combo, e: KeyLike, isMac: boolean): boolean {
 }
 
 function isEditable(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
+  if (typeof HTMLElement === 'undefined' || !(target instanceof HTMLElement)) return false;
   return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName);
 }
 
@@ -83,14 +85,14 @@ export class ShortcutManager {
     return [...byLabel].map(([label, keys]) => ({ label, keys }));
   }
 
-  /** While a full-screen view is open, only shortcuts with Cmd/Ctrl (undo, redo…) apply. */
+  /** While a full-screen view is open, only global shortcuts (undo, redo…) apply. */
   paused = false;
 
   handle = (e: KeyboardEvent): void => {
     if (e.defaultPrevented || isEditable(e.target)) return;
     for (let i = this.#shortcuts.length - 1; i >= 0; i--) {
       const { combo, shortcut } = this.#shortcuts[i]!;
-      if (this.paused && !combo.mod) continue;
+      if (this.paused && !shortcut.global) continue;
       if (matches(combo, e, this.#isMac)) {
         e.preventDefault();
         shortcut.run(e);

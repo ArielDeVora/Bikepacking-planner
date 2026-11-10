@@ -10,6 +10,8 @@ export interface ToolSpec {
   shortcut?: string;
   active?: Readable<boolean>;
   disabled?: Readable<boolean>;
+  /** Clicking other segments while it's on doesn't select them (the tool uses those clicks). */
+  keepSelection?: boolean;
   run: () => void;
 }
 

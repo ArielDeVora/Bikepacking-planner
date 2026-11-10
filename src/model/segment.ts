@@ -85,6 +85,26 @@ export function removeAnchor(seg: GeomSource, index: number): SegmentGeometry {
   return geometry(anchors, legs);
 }
 
+/**
+ * Legs matching a segment's anchors, after its anchors were set without them (e.g. restored from
+ * the history, which doesn't keep drawn lines): a leg between the same two points as before is
+ * kept as it was; the others are drawn again (routed ones get routed again).
+ */
+export function realignLegs(seg: Pick<Segment, 'anchors' | 'geomType'>, previous: Pick<Segment, 'anchors' | 'legs'> | undefined): SegmentGeometry {
+  const key = (a: LngLat, b: LngLat) => `${a[0]},${a[1]}|${b[0]},${b[1]}`;
+  const known = new Map<string, Leg>();
+  if (previous) previous.legs.forEach((leg, i) => {
+    const a = previous.anchors[i];
+    const b = previous.anchors[i + 1];
+    if (a && b) known.set(key(a.lngLat, b.lngLat), leg);
+  });
+  const legs = seg.anchors.slice(1).map((b, i) => {
+    const a = seg.anchors[i]!.lngLat;
+    return known.get(key(a, b.lngLat)) ?? makeLeg(seg.geomType, a, b.lngLat);
+  });
+  return geometry(seg.anchors, legs);
+}
+
 /** Redraws every leg for a new geometry type (routed legs become pending). */
 export function rebuildLegs(seg: Pick<Segment, 'anchors'>, geomType: GeometryType): SegmentGeometry {
   const legs = seg.anchors.slice(1).map((a, i) => makeLeg(geomType, seg.anchors[i]!.lngLat, a.lngLat));

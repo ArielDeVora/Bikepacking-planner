@@ -1,3 +1,4 @@
+import { KEYS } from '../../config/shortcuts';
 import { LngLatBounds, type ExpressionSpecification, type GeoJSONSource, type MapLayerMouseEvent, type MapMouseEvent } from 'maplibre-gl';
 import { derived, get } from 'svelte/store';
 import { POI_CATEGORIES, POI_CATEGORY_ORDER } from '../../config/pois';
@@ -285,8 +286,8 @@ export default defineModule({
       if (!map.getBounds().contains(poi.lngLat)) map.flyTo({ center: poi.lngLat, zoom: Math.max(map.getZoom(), 13) });
     };
 
-    const removeTool = ui.addTool({ id: ADD_TOOL, label: t('poi.add'), icon: icons.pin, shortcut: 'p', order: 30, active: tool, run: toggleAdd });
-    const removeShortcut = shortcuts.add({ keys: 'p', label: t('poi.add'), run: toggleAdd });
+    const removeTool = ui.addTool({ id: ADD_TOOL, label: t('poi.add'), icon: icons.pin, shortcut: KEYS.addPlace, order: 30, active: tool, run: toggleAdd });
+    const removeShortcut = shortcuts.add({ keys: KEYS.addPlace, label: t('poi.add'), run: toggleAdd });
     /**
      * Selects a category (a custom one opens its card; a built-in one selects its places) and
      * brings its places into view if some are off screen.

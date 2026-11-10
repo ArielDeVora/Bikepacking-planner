@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Core } from '../core/core';
+  import { KEYS } from '../config/shortcuts';
   import { createSettings } from '../core/settings';
   import { icons } from '../lib/icons';
   import IconButton from '../lib/ui/IconButton.svelte';
@@ -31,9 +32,9 @@
   const theme = $derived(core.theme);
   const status = $derived(core.status);
 
-  $effect(() => core.shortcuts.add({ keys: 'shift+?', label: t('help.open'), run: () => core.ui.openDialog(Cheatsheet, { core }) }));
+  $effect(() => core.shortcuts.add({ global: true, keys: KEYS.help, label: t('help.open'), run: () => core.ui.openDialog(Cheatsheet, { core }) }));
   const openSettings = () => core.ui.openDialog(SettingsDialog, { core });
-  $effect(() => core.shortcuts.add({ keys: 'mod+,', label: t('settings.title'), run: openSettings }));
+  $effect(() => core.shortcuts.add({ global: true, keys: KEYS.settings, label: t('settings.title'), run: openSettings }));
 
   let onboarded = false;
   $effect(() => {
@@ -81,7 +82,7 @@
     if (paneOpen && !panelOpen) togglePanel();
     prefs.set('mapPane', paneOpen);
   }
-  $effect(() => core.shortcuts.add({ keys: 'o', label: t('layers.togglePane'), run: togglePane }));
+  $effect(() => core.shortcuts.add({ keys: KEYS.mapPane, label: t('layers.togglePane'), run: togglePane }));
 
   // Panel width: drag the panel's edge; double-click it to go back to the default.
   const DEFAULT_W = 320;
@@ -131,13 +132,13 @@
     {#each $views as view (view.id)}
       <IconButton icon={view.icon} label={view.label} onclick={() => openView(view.id)} />
     {/each}
-    <IconButton icon={icons.layers} label={t('layers.pane')} active={paneOpen} onclick={togglePane} />
+    <IconButton icon={icons.layers} label={`${t('layers.pane')} (${core.shortcuts.format(KEYS.mapPane)})`} active={paneOpen} onclick={togglePane} />
     <IconButton
       icon={$theme === 'dark' ? icons.sun : icons.moon}
       label={t('toolbar.theme')}
       onclick={() => theme.toggle()}
     />
-    <IconButton icon={icons.settings} label={`${t('settings.title')} (${core.shortcuts.format('mod+,')})`} onclick={openSettings} />
+    <IconButton icon={icons.settings} label={`${t('settings.title')} (${core.shortcuts.format(KEYS.settings)})`} onclick={openSettings} />
     <IconButton icon={icons.panel} label={t('toolbar.panel')} onclick={togglePanel} />
   </header>
   {#if paneOpen && paneSections.length}
@@ -294,6 +295,10 @@
 
   h1 {
     flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     margin: 0;
     font-size: 15px;
     font-weight: 600;

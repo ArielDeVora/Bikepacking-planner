@@ -53,5 +53,11 @@ export function supabaseHistoryApi(client: SupabaseClient): RemoteHistory {
         changes: r.changes,
       }));
     },
+
+    async prune(tripId, keepDays) {
+      const { data, error } = await client.rpc('prune_changes', { p_trip: tripId, p_keep_days: keepDays });
+      check(error);
+      return Number(data) || 0;
+    },
   };
 }

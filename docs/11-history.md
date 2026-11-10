@@ -1,6 +1,6 @@
 # History
 
-Every change to the trip is kept as a **commit**: what one action changed (only the fields that changed), who did it and when. Press **H** or the clock button in the toolbar to see them.
+Every change to the trip is kept as a **commit**: what one action changed (only the fields that changed), who did it and when. Press **Cmd+Shift+H** or the clock button in the toolbar to see them.
 
 ## Using it
 
@@ -18,7 +18,16 @@ Typing in a field or dragging a point makes one change, not one per keystroke (t
 - **On the server**, for shared trips: each change is also sent to the `changes` table, so everyone sees everyone's changes. Changes made offline are sent when the connection comes back.
   - This needs [`supabase/migrations/002_history.sql`](../supabase/migrations/002_history.sql), run once in the Supabase SQL editor (like `001_init.sql`). Until then the History window says so and shows each person their own changes; nothing else is affected.
   - Members can read and add changes; nobody can edit or delete them (they go when the trip is deleted). The server sets the time and the author.
-  - Size: a change keeps only the fields that changed, so a rename is tiny; moving a point of a long routed segment keeps that segment's geometry before and after (some kilobytes). Supabase's free plan (500 MB) holds a very long history for a few people.
+  - Size: a change keeps only the fields that changed, so a rename is tiny. See below for drawn segments.
+
+## Keeping it small
+
+Drawn lines used to fill the history: moving one point of a long routed segment stored its whole line twice (before and after), so the `changes` table grew to most of the database. Now:
+
+- A drawn segment's lines and distances (`legs`, `stats`) aren't kept in the history, only its points: they come back from the points when you restore or undo. Legs between the same two points as before keep their exact routing; the others are routed again (or redrawn). Imported tracks keep their lines, which are the only copy of the track.
+- [`supabase/migrations/003_history_slim.sql`](../supabase/migrations/003_history_slim.sql) removes those lines from the history already there (run it once in the SQL editor), then `vacuum full public.changes;` on its own gives the space back.
+- The trip owner can delete history older than 1, 3, 6 or 12 months from the History window (shared trips). The trip can't be restored past that point afterwards; the trip itself is untouched. In SQL: `select public.prune_changes('<trip id>', 90);`
+- Each browser also keeps its own copy of the history (IndexedDB), and **Export → trip backup (JSON)** saves the whole trip as a file.
 
 ## Deploying it safely
 

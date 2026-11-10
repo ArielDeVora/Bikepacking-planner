@@ -1,3 +1,4 @@
+import { KEYS } from '../../config/shortcuts';
 import type { GeoJSONSource } from 'maplibre-gl';
 import { defineModule } from '../../core/module';
 import { makeBackup, restoreBackup } from './backup';
@@ -78,8 +79,8 @@ export default defineModule({
       picker.value = '';
     };
     const pick = () => picker.click();
-    const removeTool = ui.addTool({ id: 'io.import', label: t('io.importFiles'), icon: icons.upload, shortcut: 'i', order: 60, run: pick });
-    const removeShortcut = ctx.shortcuts.add({ keys: 'i', label: t('io.importFiles'), run: pick });
+    const removeTool = ui.addTool({ id: 'io.import', label: t('io.importFiles'), icon: icons.upload, shortcut: KEYS.importFiles, order: 60, run: pick });
+    const removeShortcut = ctx.shortcuts.add({ keys: KEYS.importFiles, label: t('io.importFiles'), run: pick });
 
     const save = ({ name, xml }: { name: string; xml: string }) => download(safeFileName(name, 'gpx'), xml, GPX_MIME);
 

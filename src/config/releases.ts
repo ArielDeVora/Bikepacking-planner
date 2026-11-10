@@ -11,6 +11,16 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    id: '2026-11-16',
+    title: 'Cmd shortcuts, segment pace, follow another segment',
+    items: [
+      'Every keyboard shortcut now uses Cmd (Ctrl on Windows): Cmd+D draws, Cmd+P adds a place, Cmd+K searches, Cmd+/ shows them all. A stray key no longer does anything.',
+      'Planning: pick a segment in the calendar to give it its own km/day, or a number of days whatever its length. The countries list shows when we’re in each one and for how long (over 30 days is flagged, for visas).',
+      'Follow… (segment card): replace a stretch of a segment with the same stretch of another one, e.g. to make an imported track follow a road you drew.',
+      'The shared history takes much less space.',
+    ],
+  },
+  {
     id: '2026-11-15',
     title: 'Planning: when we’ll be where',
     items: [

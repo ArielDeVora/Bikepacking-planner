@@ -1,5 +1,6 @@
 import type { Change } from '../commands';
-import type { Entity, EntityType } from '../../model/types';
+import { realignLegs } from '../../model/segment';
+import type { Entity, EntityType, Segment } from '../../model/types';
 
 /**
  * The trip's history as a list of commits: what one action changed (only the fields that changed),
@@ -34,6 +35,15 @@ export interface Commit {
 /** Bookkeeping fields, never part of a diff. */
 const IGNORED = new Set(['updatedAt', 'updatedBy']);
 
+/**
+ * Fields left out of the history because they can be worked out again: a drawn segment's lines
+ * and distances come from its points (routed again if needed). Imported tracks keep their lines,
+ * which are the only copy of the track.
+ */
+function derived(entity: Record<string, unknown> | null | undefined): Set<string> {
+  return entity?.type === 'segment' && entity.geomType !== 'imported' ? new Set(['legs', 'stats']) : new Set();
+}
+
 const same = (a: unknown, b: unknown) => a === b || JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 
 /** The fields that differ between two versions of an entity. */
@@ -42,15 +52,18 @@ export function diffChange(change: Change): ChangeDiff | null {
   const name = typeof after.name === 'string' && after.name ? after.name : undefined;
   const base = { id: change.id, type: change.after.type, ...(name ? { name } : {}) };
   if (!change.before) {
+    const skip = derived(after);
     const full: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(after)) if (!IGNORED.has(k) && v !== undefined) full[k] = v;
+    for (const [k, v] of Object.entries(after)) if (!IGNORED.has(k) && !skip.has(k) && v !== undefined) full[k] = v;
     return { ...base, before: null, after: full };
   }
   const before = change.before as unknown as Record<string, unknown>;
+  // A segment that is or was imported keeps its lines (they'd be lost otherwise).
+  const skip = before.geomType === 'imported' ? new Set<string>() : derived(after);
   const b: Record<string, unknown> = {};
   const a: Record<string, unknown> = {};
   for (const k of new Set([...Object.keys(before), ...Object.keys(after)])) {
-    if (IGNORED.has(k) || same(before[k], after[k])) continue;
+    if (IGNORED.has(k) || skip.has(k) || same(before[k], after[k])) continue;
     b[k] = before[k] ?? null;
     a[k] = after[k] ?? null;
   }
@@ -91,7 +104,7 @@ export function restoreChanges(later: Commit[], current: (id: string) => Entity 
     for (const diff of [...commit.changes].reverse()) {
       const now = state.get(diff.id) ?? current(diff.id);
       if (!now) continue;
-      state.set(diff.id, diff.before === null ? { ...now, deleted: true } : applyFields(now, diff.before));
+      state.set(diff.id, diff.before === null ? { ...now, deleted: true } : withGeometry(applyFields(now, diff.before), now));
     }
   }
   return [...state].flatMap(([id, after]) => {
@@ -117,9 +130,18 @@ export function revertChanges(commit: Commit, current: (id: string) => Entity | 
       skipped++;
       continue;
     }
-    changes.push({ id: diff.id, before: now, after: diff.before === null ? { ...now, deleted: true } : applyFields(now, diff.before) });
+    changes.push({ id: diff.id, before: now, after: diff.before === null ? { ...now, deleted: true } : withGeometry(applyFields(now, diff.before), now) });
   }
   return { changes, skipped };
+}
+
+/** A drawn segment whose points were set from the history, with lines to match (kept where unchanged). */
+function withGeometry(next: Entity, previous: Entity): Entity {
+  if (next.type !== 'segment' || next.geomType === 'imported' || previous.type !== 'segment') return next;
+  const seg = next as Segment;
+  if (!Array.isArray(seg.anchors) || !Array.isArray(seg.legs)) return next;
+  if (seg.legs.length === Math.max(0, seg.anchors.length - 1) && seg.anchors === (previous as Segment).anchors) return next;
+  return { ...seg, ...realignLegs(seg, previous as Segment) };
 }
 
 function stripMeta(e: Entity): Record<string, unknown> {

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { KEYS } from '../config/shortcuts';
   import type { Core } from '../core/core';
   import type { ToolSpec } from '../core/ui';
   import { icons } from '../lib/icons';
@@ -13,11 +14,11 @@
 
   const undoLabel = $derived(
     ($history.undoLabel ? t('toolbar.undoNamed', { label: $history.undoLabel }) : t('toolbar.undo')) +
-      ` (${shortcuts.format('mod+z')})`,
+      ` (${shortcuts.format(KEYS.undo)})`,
   );
   const redoLabel = $derived(
     ($history.redoLabel ? t('toolbar.redoNamed', { label: $history.redoLabel }) : t('toolbar.redo')) +
-      ` (${shortcuts.format('mod+shift+z')})`,
+      ` (${shortcuts.format(KEYS.redo)})`,
   );
 
   const toolLabel = (tool: ToolSpec) => (tool.shortcut ? `${tool.label} (${shortcuts.format(tool.shortcut)})` : tool.label);
@@ -31,7 +32,7 @@
   <IconButton icon={icons.undo} label={undoLabel} disabled={!$history.canUndo} onclick={() => commands.undo()} />
   <IconButton icon={icons.redo} label={redoLabel} disabled={!$history.canRedo} onclick={() => commands.redo()} />
   <hr />
-  <IconButton icon={icons.help} label={`${t('help.title')} (?)`} onclick={() => core.ui.openDialog(Cheatsheet, { core })} />
+  <IconButton icon={icons.help} label={`${t('help.title')} (${shortcuts.format(KEYS.help)})`} onclick={() => core.ui.openDialog(Cheatsheet, { core })} />
 </nav>
 
 <style>

@@ -48,3 +48,27 @@ describe('ShortcutManager.list', () => {
     expect(['escape', 'backspace', 'shift+d', '/', 'shift+?'].map((k) => m.format(k).replace('Ctrl+', ''))).toEqual(['Esc', '⌫', expect.stringMatching(/⇧\+?D/), '/', '?']);
   });
 });
+
+describe('ShortcutManager while a view is open', () => {
+  it('runs only global shortcuts', () => {
+    const m = new ShortcutManager();
+    const ran: string[] = [];
+    m.add({ keys: 'mod+d', label: 'Draw', run: () => ran.push('draw') });
+    m.add({ keys: 'mod+z', label: 'Undo', run: () => ran.push('undo'), global: true });
+    m.paused = true;
+    const key = (k: string) =>
+      m.handle({ key: k, metaKey: true, ctrlKey: true, shiftKey: false, altKey: false, defaultPrevented: false, target: null, preventDefault() {} } as unknown as KeyboardEvent);
+    key('d');
+    key('z');
+    m.paused = false;
+    key('d');
+    expect(ran).toEqual(['undo', 'draw']);
+  });
+});
+
+describe('every shortcut uses Cmd/Ctrl', () => {
+  it('has no single-key shortcuts', async () => {
+    const { KEYS } = await import('../config/shortcuts');
+    for (const keys of Object.values(KEYS)) expect(keys.startsWith('mod+')).toBe(true);
+  });
+});

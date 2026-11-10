@@ -1,3 +1,4 @@
+import { KEYS } from '../../config/shortcuts';
 import { LngLatBounds } from 'maplibre-gl';
 import { derived } from 'svelte/store';
 import { edits } from '../../core/commands';
@@ -166,8 +167,8 @@ export default defineModule({
     });
 
     const removers = [
-      ui.addTool({ id: DRAW_TOOL, label: t('zone.add'), icon: icons.zone, shortcut: 'a', order: 35, active: drawing, run: toggle }),
-      shortcuts.add({ keys: 'a', label: t('zone.add'), run: toggle }),
+      ui.addTool({ id: DRAW_TOOL, label: t('zone.add'), icon: icons.zone, shortcut: KEYS.addZone, order: 35, active: drawing, run: toggle }),
+      shortcuts.add({ keys: KEYS.addZone, label: t('zone.add'), run: toggle }),
       ui.addCardRenderer('zone', { component: ZoneCard, props: { ctx, reroute, focus } }),
       ui.addCardSection({ id: 'zones.segment', component: SegmentZones, props: { ctx, rerouteSegment }, types: ['segment'], order: 2 }),
       ui.addPanelSection({ id: 'zones', title: t('zone.title'), component: ZonesSection, props: { ctx, focus }, order: 16 }),

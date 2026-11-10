@@ -2,7 +2,7 @@
 
 ## What was built
 
-- **Draw tool** (toolbar, or `D`): click the map to add points; the segment between two points is routed by BRouter. `Esc` or `D` finishes.
+- **Draw tool** (toolbar, or `Cmd+D`): click the map to add points; the segment between two points is routed by BRouter. `Esc` or `Cmd+D` finishes.
   - With a segment selected, new points extend that segment.
   - With a stage selected (or nothing selected), the first two clicks start a new segment in that stage (or the last stage).
   - Points snap to the start or end of any segment within 10 px, so consecutive segments join up.

@@ -6,6 +6,7 @@ import {
   editableGeometry,
   eraseRange,
   mergeGeometry,
+  replaceRange,
   reverseGeometry,
   segmentLength,
   sliceLine,
@@ -135,5 +136,29 @@ describe('segment edits', () => {
     const c = copyGeometry(s);
     expect(c.legs).toBe(s.legs);
     expect(c.anchors.map((a) => a.id)).not.toEqual(s.anchors.map((a) => a.id));
+  });
+});
+
+describe('following another segment', () => {
+  it('replaces a stretch with a path, joined to the rest', () => {
+    const a = seg([0, 1, 2], 'imported');
+    const total = segmentLength(a);
+    // A detour north of the middle stretch.
+    const path: Coord[] = [[0.5, 45], [0.75, 45.2], [1.25, 45.2], [1.5, 45]];
+    const out = replaceRange(a, total / 4, (total * 3) / 4, path)!;
+    expect(lngs(out)[0]).toBe(0);
+    expect(lngs(out).at(-1)).toBe(2);
+    const coords = out.legs.flatMap((l) => decodeLine(l.line));
+    expect(coords.some((c) => c[1] > 45.1)).toBe(true);
+    expect(out.stats.lengthM).toBeGreaterThan(a.stats.lengthM);
+  });
+
+  it('replaces from the start or to the end too', () => {
+    const a = seg([0, 2], 'manual');
+    const total = segmentLength(a);
+    const head = replaceRange(a, 0, total / 2, [[0, 45.1], [1, 45.1]])!;
+    expect(lngs(head)[0]).toBe(0);
+    expect(head.anchors[0]!.lngLat[1]).toBe(45.1);
+    expect(replaceRange(a, 0, total, [[0, 45]])).toBeNull();
   });
 });

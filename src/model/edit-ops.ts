@@ -114,6 +114,21 @@ export function eraseRange(seg: Geom, fromM: number, toM: number): { head: Segme
   return { head, tail };
 }
 
+/**
+ * The segment with the part between two distances replaced by `path` (e.g. that stretch of
+ * another segment's line), joined to the rest by short legs where they don't touch.
+ */
+export function replaceRange(seg: Geom, fromM: number, toM: number, path: Coord[]): SegmentGeometry | null {
+  const pts = dedupe(path);
+  if (pts.length < 2) return null;
+  const { head, tail } = eraseRange(seg, fromM, toM);
+  const ends = [pts[0]!, pts.at(-1)!].map((c): Anchor => ({ id: newId(), lngLat: [c[0], c[1]] }));
+  let out: Geom = { anchors: ends, legs: [{ line: encodeLine(pts) }], geomType: seg.geomType };
+  if (head) out = { ...mergeGeometry({ ...head, geomType: seg.geomType }, out), geomType: seg.geomType };
+  if (tail) out = { ...mergeGeometry(out, { ...tail, geomType: seg.geomType }), geomType: seg.geomType };
+  return geometry(out.anchors, out.legs);
+}
+
 /** `b` appended to `a`; joined by a new leg (in `a`'s geometry type) unless they already touch. */
 export function mergeGeometry(a: Geom, b: Geom): SegmentGeometry {
   const aEnd = a.anchors.at(-1)?.lngLat;

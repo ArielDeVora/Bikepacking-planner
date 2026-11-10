@@ -7,6 +7,8 @@ export interface RemoteHistory {
   insert(commits: Commit[]): Promise<void>;
   /** Commits older than `before` (all when null), newest first. */
   list(tripId: string, before: number | null, limit: number): Promise<Commit[]>;
+  /** Deletes the trip's commits older than `keepDays` (owners only); returns how many. */
+  prune(tripId: string, keepDays: number): Promise<number>;
 }
 
 /** Thrown by a RemoteHistory when the server has no history table yet. */
@@ -63,6 +65,15 @@ export class HistoryLog {
     } finally {
       this.#uploading = false;
     }
+  }
+
+  /** Deletes the shared history older than `keepDays` on the server. */
+  async prune(keepDays: number): Promise<number> {
+    const remote = this.remote();
+    if (!remote) return 0;
+    const n = await remote.prune(this.tripId(), keepDays);
+    this.#changed.update((v) => v + 1);
+    return n;
   }
 
   /**
