@@ -24,21 +24,19 @@ describe('route geometry and calendar rows', () => {
     expect(line.pointAt(999)).toEqual([4, 45]);
   });
 
-  it('splits a bike segment by the countries it crosses', () => {
-    const segments = [seg('a', [[5, 45], [15, 45]], 800)];
+  it('keeps one row per segment, with the countries it crosses in order', () => {
+    const segments = [seg('a', [[5, 45], [15, 45]], 800), seg('b', [[15, 45], [16, 45]], 80)];
     const rows = planRows(segments, new RouteLine(segments), countries);
-    expect(rows.map((r) => [r.country?.code, Math.round(r.fromKm), Math.round(r.toKm)])).toEqual([
-      ['AA', 0, 400],
-      ['BB', 400, 800],
+    expect(rows.map((r) => [r.key, r.countries.map((c) => c.code)])).toEqual([
+      ['a', ['AA', 'BB']],
+      ['b', ['BB']],
     ]);
-    expect(rows[0]!.mid![0]).toBeCloseTo(7.5, 0);
+    expect(rows[0]!.mid![0]).toBeCloseTo(10, 0);
   });
 
-  it('keeps a motorised journey in one row, with the country it arrives in', () => {
+  it('gives a motorised journey the countries it leaves from and arrives in', () => {
     const segments = [seg('t', [[5, 45], [15, 45]], 800, 'train')];
-    const rows = planRows(segments, new RouteLine(segments), countries);
-    expect(rows).toHaveLength(1);
-    expect(rows[0]!.country?.code).toBe('BB');
+    expect(planRows(segments, new RouteLine(segments), countries)[0]!.countries.map((c) => c.code)).toEqual(['AA', 'BB']);
   });
 
   it('has one row per segment without country outlines', () => {

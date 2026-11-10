@@ -64,101 +64,74 @@ export class RouteLine {
   }
 }
 
-/** A row of the calendar: a segment, or the part of it in one country. */
+/** A row of the calendar: one segment, in route order. */
 export interface PlanRow {
   key: string;
-  /** Which stretch of the segment (see `Segment.planParts`); '' for the whole segment. */
-  part: string;
   segmentId: string;
   stageId: string;
   name: string;
   mode: TravelMode;
-  country: { code: string; name: string } | null;
+  /** The countries it crosses, in order (crossings shorter than 15 km left out). */
+  countries: { code: string; name: string }[];
   fromKm: number;
   toKm: number;
-  /** Where its season is judged: the middle of the part. */
+  /** Where its season is judged: the middle of the segment. */
   mid: LngLat | null;
 }
 
 const MOTORISED = new Set<TravelMode>(['train', 'bus', 'boat', 'plane', 'car']);
-/** Countries crossed for less than this are folded into their neighbours. */
+/** Countries crossed for less than this aren't listed. */
 const MIN_KM = 15;
 
-/**
- * One row per segment and country it crosses (bike and walk segments), or per segment (others,
- * with the country they arrive in). Without country outlines, one row per segment.
- */
+/** One row per segment, in the route's order, with the countries it crosses (once outlines are loaded). */
 export function planRows(segments: Segment[], line: RouteLine, countries: CountryIndex | null): PlanRow[] {
   const rows: PlanRow[] = [];
   for (const seg of segments) {
     const range = line.ranges.get(seg.id);
     if (!range) continue;
-    const base = { segmentId: seg.id, stageId: seg.stageId, name: seg.name, mode: seg.mode };
-    const whole = (country: PlanRow['country']) => {
-      const part = country ? `${country.code}#0` : '';
-      rows.push({ ...base, key: part ? `${seg.id}:${part}` : seg.id, part, country, fromKm: range.from, toKm: range.to, mid: line.pointAt((range.from + range.to) / 2) });
-    };
-
-    if (!countries) {
-      whole(null);
-      continue;
-    }
-    if (MOTORISED.has(seg.mode)) {
-      const end = line.pointAt(range.to);
-      const c = end ? countries.at(end) : null;
-      whole(c ? { code: c.code, name: c.name } : null);
-      continue;
-    }
-
-    // Runs of samples in the same country; at sea, the run carries on.
-    const runs: { country: PlanRow['country']; from: number; to: number }[] = [];
-    for (const s of line.segmentSamples(seg.id, 5)) {
-      const c = countries.at(s.p);
-      const last = runs.at(-1);
-      if (!c) {
-        if (last) last.to = s.km;
-        continue;
-      }
-      if (last && last.country?.code === c.code) last.to = s.km;
-      else {
-        if (last) last.to = s.km;
-        runs.push({ country: { code: c.code, name: c.name }, from: last ? s.km : range.from, to: s.km });
-      }
-    }
-    // Short crossings join the run before them (or after, at the start).
-    const merged: typeof runs = [];
-    for (const run of runs) {
-      const prev = merged.at(-1);
-      if (prev && run.to - run.from < MIN_KM) prev.to = run.to;
-      else if (prev && prev.country?.code === run.country?.code) prev.to = run.to;
-      else merged.push({ ...run });
-    }
-    if (merged.length > 1 && merged[0]!.to - merged[0]!.from < MIN_KM) {
-      merged[1]!.from = merged[0]!.from;
-      merged.shift();
-    }
-    if (!merged.length) {
-      whole(null);
-      continue;
-    }
-    merged[0]!.from = range.from;
-    merged.at(-1)!.to = range.to;
-    const seen = new Map<string, number>();
-    merged.forEach((run) => {
-      const code = run.country?.code ?? '';
-      const n = seen.get(code) ?? 0;
-      seen.set(code, n + 1);
-      const part = `${code}#${n}`;
-      rows.push({
-        ...base,
-        key: `${seg.id}:${part}`,
-        part,
-        country: run.country,
-        fromKm: run.from,
-        toKm: run.to,
-        mid: line.pointAt((run.from + run.to) / 2),
-      });
+    rows.push({
+      key: seg.id,
+      segmentId: seg.id,
+      stageId: seg.stageId,
+      name: seg.name,
+      mode: seg.mode,
+      countries: countries ? crossed(seg, line, countries, range) : [],
+      fromKm: range.from,
+      toKm: range.to,
+      mid: line.pointAt((range.from + range.to) / 2),
     });
   }
   return rows;
+}
+
+type Country = { code: string; name: string };
+
+function crossed(seg: Segment, line: RouteLine, countries: CountryIndex, range: { from: number; to: number }): Country[] {
+  const at = (km: number) => {
+    const p = line.pointAt(km);
+    const c = p ? countries.at(p) : null;
+    return c ? { code: c.code, name: c.name } : null;
+  };
+  // Trains, planes…: where they leave from and arrive.
+  if (MOTORISED.has(seg.mode)) return unique([at(range.from), at(range.to)].filter((c): c is Country => !!c));
+  // Runs of samples in the same country; at sea, the run carries on.
+  const runs: { country: Country; from: number; to: number }[] = [];
+  for (const s of line.segmentSamples(seg.id, 5)) {
+    const c = countries.at(s.p);
+    const last = runs.at(-1);
+    if (!c) {
+      if (last) last.to = s.km;
+    } else if (last && last.country.code === c.code) last.to = s.km;
+    else {
+      if (last) last.to = s.km;
+      runs.push({ country: { code: c.code, name: c.name }, from: last ? s.km : range.from, to: s.km });
+    }
+  }
+  const long = runs.filter((r) => r.to - r.from >= MIN_KM);
+  return unique((long.length ? long : runs).map((r) => r.country));
+}
+
+function unique(list: Country[]): Country[] {
+  const seen = new Set<string>();
+  return list.filter((c) => !seen.has(c.code) && seen.add(c.code));
 }

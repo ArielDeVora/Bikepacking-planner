@@ -8,7 +8,6 @@
     label: string;
     sub?: string;
     flag?: string;
-    country?: { code: string; name: string };
     color?: string;
     segmentId?: string;
     /** Season rating per column (null: unknown). */

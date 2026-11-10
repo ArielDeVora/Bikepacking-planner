@@ -12,9 +12,9 @@ export interface Release {
 export const RELEASES: Release[] = [
   {
     id: '2026-11-17',
-    title: 'Plan each line of the calendar',
+    title: 'Plan each segment of the calendar',
     items: [
-      'Each line of the planning calendar (a segment’s stretch in one country) can have its own start date, km/day or number of days: click it, or drag its bar to move it and its right end to change its days.',
+      'The planning calendar has one line per segment, in the route’s order, with the flags of the countries it crosses. Each can have its own start date, km/day or number of days: click it, or drag its bar to move it and its right end to change its days.',
       'The names column of the calendar can be resized by dragging its edge.',
     ],
   },
