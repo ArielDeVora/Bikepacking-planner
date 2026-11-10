@@ -91,6 +91,7 @@ export class EditTools {
     const near = this.#nearest(seg, e);
     if (!near) return;
     const { store, commands, t, ui, selection } = this.ctx;
+    ui.claim(e.originalEvent);
     const names = { label: '', name: (n: string) => n };
 
     if (tool === SPLIT_TOOL) {

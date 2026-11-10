@@ -8,7 +8,7 @@ import { RouteEditor } from './editor';
 import Legend from './Legend.svelte';
 import { RouteRenderer } from './render';
 import { brouter } from './routing/brouter';
-import type { RoutingError } from './routing/provider';
+import { defaultProfile, type RoutingError } from './routing/provider';
 import { RoutingQueue } from './routing/queue';
 import { createReconciler } from './routing/reconcile';
 import SegmentCard from './SegmentCard.svelte';
@@ -50,12 +50,19 @@ export default defineModule({
 
     const renderer = new RouteRenderer(map, ctx.layers, store, ctx.visibility);
     renderer.install();
+    const offWidth = ctx.prefs.watch('routeWidth', (w) => renderer.setWidthScale(w));
 
     const lastMode = {
       get: () => settings.get<TravelMode>('lastMode', 'bike'),
       set: (mode: TravelMode) => settings.set('lastMode', mode),
     };
-    const editor = new RouteEditor(ctx, renderer, lastMode.get);
+    // New bike segments use the profile chosen in Settings (stored only when it isn't the default).
+    const profileFor = (mode: TravelMode) => {
+      const wanted = mode === 'bike' ? ctx.prefs.current.bikeProfile : null;
+      const known = wanted && brouter.profiles[mode]?.some((p) => p.id === wanted);
+      return known && wanted !== defaultProfile(brouter, mode) ? wanted : undefined;
+    };
+    const editor = new RouteEditor(ctx, renderer, lastMode.get, profileFor);
     const detach = editor.attach();
 
     /** Highlights the segments of everything selected (segments, groups, stages). */
@@ -145,6 +152,7 @@ export default defineModule({
     const removeLegend = ui.addWidget({ id: 'routes.legend', component: Legend, props: { t, visibleModes } });
 
     return () => {
+      offWidth();
       detach();
       offStore();
       offSelection();

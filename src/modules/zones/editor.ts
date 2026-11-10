@@ -96,7 +96,10 @@ export class ZoneEditor {
       const first = this.#draft[0];
       if (first && this.#draft.length >= 3) {
         const p = map.project(first);
-        if (Math.hypot(p.x - e.point.x, p.y - e.point.y) <= CLOSE_PX) return this.finish();
+        if (Math.hypot(p.x - e.point.x, p.y - e.point.y) <= CLOSE_PX) {
+          ui.claim(e.originalEvent);
+          return this.finish();
+        }
       }
       this.#draft.push(ll(e));
       this.refresh();

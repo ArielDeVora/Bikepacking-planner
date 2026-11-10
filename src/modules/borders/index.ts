@@ -139,6 +139,12 @@ export default defineModule({
     );
     removers.push(ui.addPointLayer('border-crossings'), ui.addPointLayer('border-detected'));
     removers.push(
+      ctx.prefs.watch('placeSize', (s) => {
+        for (const id of ['border-detected', 'border-crossings']) map.setLayoutProperty(id, 'icon-size', s);
+        map.setLayoutProperty('border-detected-label', 'text-offset', [0, 1.3 * s]);
+      }),
+    );
+    removers.push(
       layers.registerOverlay({
         id: 'border-crossings',
         label: t('border.crossingsOverlay'),

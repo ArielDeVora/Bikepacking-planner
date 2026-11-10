@@ -17,6 +17,8 @@ export interface NewSegment {
   /** With no stage given: the route whose last stage to add to (or a new stage in it). */
   routeId?: string;
   mode: TravelMode;
+  /** Routing profile; the mode's default when unset. */
+  profile?: string;
   points: LngLat[];
   label: string;
   segmentName: (n: number) => string;
@@ -54,6 +56,7 @@ export function createSegment(store: TripStore, opts: NewSegment): { command: Co
       name: opts.segmentName(stageSegments(store, stageId).length + 1),
       notes: '',
       mode: opts.mode,
+      ...(opts.profile ? { profile: opts.profile } : {}),
       geomType,
       stats: { lengthM: 0, ascentM: 0, descentM: 0 },
       ...geometry,

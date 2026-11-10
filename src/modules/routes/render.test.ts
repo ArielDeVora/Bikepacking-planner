@@ -33,4 +33,9 @@ describe('route styles', () => {
     expect(legFeatures(seg(), '#fff')[0]!.properties).toMatchObject({ width: 4, dash: 'mode' });
     expect(legFeatures(seg({ lineWidth: 7, dash: 'dotted' }), '#fff')[0]!.properties).toMatchObject({ width: 7, dash: 'dotted' });
   });
+
+  it('scales every width by the route thickness preference', () => {
+    expect(legFeatures(seg(), '#fff', 1.5)[0]!.properties.width).toBe(6);
+    expect(legFeatures(seg({ lineWidth: 2 }), '#fff', 2)[0]!.properties.width).toBe(4);
+  });
 });

@@ -2,7 +2,7 @@
 
 ## What was built
 
-- **Our places (POIs)**: press `P` (or the pin button) and click the map. Each place has a category (sight, camp spot, water, food, bike shop, accommodation, visa/admin, border, other) with its own icon and colour, a status (idea, must-see, booked, skip), notes and links. Must-see places get a gold ring, booked ones a green ring, skipped ones are faded. Drag a selected place to move it. `Delete` removes it. Comments work on places too.
+- **Our places (POIs)**: press `P` (or the pin button) and click the map. Each place has a category (sight, nature & landscape, camp spot, water, food, bike shop, accommodation, visa/admin, border, other) with its own icon and colour, a status (idea, must-see, booked, skip), notes and links. Must-see places get a gold ring, booked ones a green ring, skipped ones are faded. Drag a selected place to move it. `Delete` removes it. Comments work on places too.
 - **Place card** (for our places, search results and OSM features): opening hours, phone, website and address when OSM has them, coordinates (click to copy), elevation, distance from the route (nearest segment), and links to Google Maps, OpenStreetMap, Wikipedia/Wikidata (when tagged), and Amap/Baidu for places in China (with the WGS84 flag, so the position isn't shifted).
 - **Places list** in the side panel, filterable by status; click to select and fly there.
 - **Search** box at the top of the map (`/` to focus): places worldwide via Photon, biased to the map's centre, or coordinates (`41.69, 44.80`, latitude first). Choosing a result shows its card; **Add to trip** turns it into one of our places, keeping its OSM reference.

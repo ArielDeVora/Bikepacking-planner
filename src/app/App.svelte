@@ -5,6 +5,7 @@
   import IconButton from '../lib/ui/IconButton.svelte';
   import Cheatsheet from './Cheatsheet.svelte';
   import InfoCard from './InfoCard.svelte';
+  import SettingsDialog from './SettingsDialog.svelte';
   import { startOnboarding, watchForUpdates } from './onboarding';
   import Toasts from './Toasts.svelte';
   import Toolbar from './Toolbar.svelte';
@@ -27,6 +28,8 @@
   const status = $derived(core.status);
 
   $effect(() => core.shortcuts.add({ keys: 'shift+?', label: t('help.open'), run: () => core.ui.openDialog(Cheatsheet, { core }) }));
+  const openSettings = () => core.ui.openDialog(SettingsDialog, { core });
+  $effect(() => core.shortcuts.add({ keys: 'mod+,', label: t('settings.title'), run: openSettings }));
 
   let onboarded = false;
   $effect(() => {
@@ -106,6 +109,7 @@
       label={t('toolbar.theme')}
       onclick={() => theme.toggle()}
     />
+    <IconButton icon={icons.settings} label={`${t('settings.title')} (${core.shortcuts.format('mod+,')})`} onclick={openSettings} />
     <IconButton icon={icons.panel} label={t('toolbar.panel')} onclick={togglePanel} />
   </header>
   {#if paneOpen && paneSections.length}

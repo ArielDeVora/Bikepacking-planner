@@ -47,6 +47,7 @@ export class RouteEditor {
     private ctx: ModuleContext,
     private renderer: RouteRenderer,
     private defaultMode: () => TravelMode,
+    private profileFor: (mode: TravelMode) => string | undefined = () => undefined,
   ) {
     this.drawing = derived(ctx.ui.tool, (tool) => tool === DRAW_TOOL);
   }
@@ -128,12 +129,14 @@ export class RouteEditor {
       selectedEntity?.type === 'stage' ? selectedEntity.id : selectedEntity?.type === 'segment' || selectedEntity?.type === 'group' ? selectedEntity.stageId : undefined;
     const groupId = selectedEntity?.type === 'group' ? selectedEntity.id : selectedEntity?.type === 'segment' ? selectedEntity.groupId : undefined;
     const routeId = selectedEntity?.type === 'route' ? selectedEntity.id : undefined;
+    const mode = this.defaultMode();
     const { command, segmentId } = createSegment(store, {
       tripId: this.ctx.tripId,
       stageId,
       groupId,
       routeId,
-      mode: this.defaultMode(),
+      mode,
+      profile: this.profileFor(mode),
       points: [this.#start, lngLat],
       label: t('cmd.drawSegment'),
       segmentName: (n) => t('routes.segmentName', { n }),

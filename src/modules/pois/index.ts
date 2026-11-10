@@ -5,6 +5,7 @@ import { edits } from '../../core/commands';
 import { defineModule } from '../../core/module';
 import { icons } from '../../lib/icons';
 import { addRoundIcon } from '../../lib/map-icons';
+import { placeNameField } from '../../lib/map-prefs';
 import { createPoiCommand } from '../../lib/places/poi';
 import type { LngLat, Poi } from '../../model/types';
 import PlacesSection from './PlacesSection.svelte';
@@ -17,7 +18,7 @@ const CLICK_PX = 3;
 export default defineModule({
   id: 'pois',
   setup(ctx) {
-    const { map, store, layers, ui, selection, commands, shortcuts, t } = ctx;
+    const { map, store, layers, ui, selection, commands, shortcuts, prefs, t } = ctx;
 
     for (const cat of POI_CATEGORY_ORDER) addRoundIcon(map, `poi-${cat}`, POI_CATEGORIES[cat].icon, POI_CATEGORIES[cat].color);
 
@@ -70,6 +71,13 @@ export default defineModule({
       },
       'poi',
     );
+    // Size and labels from the Settings window.
+    const offSize = prefs.watch('placeSize', (s) => {
+      map.setLayoutProperty('pois', 'icon-size', ['case', ['==', ['get', 'status'], 'mustSee'], 1.1 * s, s]);
+      map.setLayoutProperty('pois', 'text-offset', [0, 1.4 * s]);
+      map.setPaintProperty('pois-ring', 'circle-radius', ['case', ['get', 'selected'], 18 * s, 16 * s]);
+    });
+    const offNames = prefs.watch('placeNames', (names) => map.setLayoutProperty('pois', 'text-field', placeNameField(names)));
     const removePointLayer = ui.addPointLayer('pois');
     const removeOverlay = layers.registerOverlay({ id: 'pois', label: t('poi.overlay'), layerIds: ['pois', 'pois-ring'], visible: true, order: 10, group: 'trip' });
 
@@ -101,6 +109,8 @@ export default defineModule({
 
     const onClick = (e: MapMouseEvent) => {
       if (get(ui.tool) !== ADD_TOOL) return;
+      // The click ends the tool; claim it so other map click handlers don't take it too.
+      ui.claim(e.originalEvent);
       const { command, id } = createPoiCommand(
         { tripId: ctx.tripId, userId: ctx.user.id, lngLat: [e.lngLat.lng, e.lngLat.lat], name: t('poi.newName'), category: 'other' },
         t('cmd.addPoi'),
@@ -168,6 +178,8 @@ export default defineModule({
     return () => {
       offStore();
       offSelection();
+      offSize();
+      offNames();
       removeOverlay();
       removePointLayer();
       removeTool();

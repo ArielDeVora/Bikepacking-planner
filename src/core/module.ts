@@ -7,6 +7,7 @@ import type { Cloud } from './cloud/cloud';
 import type { CommandStack } from './commands';
 import type { t } from './i18n';
 import type { LayerManager } from './layers';
+import type { PreferenceStore } from './preferences';
 import type { Selection } from './selection';
 import type { Settings } from './settings';
 import type { ShortcutManager } from './shortcuts';
@@ -25,6 +26,8 @@ export interface ModuleContext {
   readonly shortcuts: ShortcutManager;
   /** Preferences namespaced to this module. */
   readonly settings: Settings;
+  /** App-wide preferences (the Settings window). */
+  readonly prefs: PreferenceStore;
   readonly user: { id: string };
   /** Sign-in, sharing and sync. */
   readonly cloud: Cloud;

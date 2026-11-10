@@ -10,11 +10,12 @@ let commands: CommandStack;
 const profileOf = (s: { mode: string; profile?: string }) =>
   s.profile ?? ({ bike: 'trekking', walk: 'hiking-mountain' } as Record<string, string>)[s.mode];
 
-function draw(stageId?: string) {
+function draw(stageId?: string, profile?: string) {
   const { command, segmentId } = createSegment(store, {
     tripId: 'trip-1',
     stageId,
     mode: 'bike',
+    profile,
     points: [
       [0, 0],
       [1, 0],
@@ -42,6 +43,11 @@ describe('routes actions', () => {
     commands.undo();
     expect(store.list('stage')).toHaveLength(0);
     expect(store.list('segment')).toHaveLength(0);
+  });
+
+  it('gives a new segment the chosen profile, else none (the mode default)', () => {
+    expect(draw(undefined, 'gravel').profile).toBe('gravel');
+    expect('profile' in draw()).toBe(false);
   });
 
   it('appends to the last stage, or the given one', () => {

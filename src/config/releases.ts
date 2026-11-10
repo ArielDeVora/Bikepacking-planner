@@ -11,6 +11,15 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    id: '2026-11-11',
+    title: 'Settings, and a place type for nature',
+    items: [
+      'A Settings window (the sliders button at the top of the side panel, or ⌘,): size of places on the map, when to show their names, route line thickness, the routing profile for new bike segments, theme (light, dark or match the system) and the What’s new window.',
+      'A new place category, Nature & landscape (green mountain), for peaks, waterfalls, viewpoints and parks. Search results and map places like these get it automatically.',
+      'Camp spots are now brown, so they don’t look like nature spots.',
+    ],
+  },
+  {
     id: '2026-11-10d',
     title: 'Usual weather by week',
     items: [

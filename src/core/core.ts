@@ -7,6 +7,7 @@ import { keyBetween } from '../model/order';
 import type { Entity, Stage, Trip } from '../model/types';
 import { EventBus, type Events } from './bus';
 import { createCloud } from './cloud/cloud';
+import { createPreferences } from './preferences';
 import { CommandStack } from './commands';
 import { HistoryLog } from './history/log';
 import { HistoryRecorder } from './history/recorder';
@@ -111,6 +112,7 @@ export function createCore(container: HTMLElement) {
   const ui = new UiRegistry();
   const shortcuts = new ShortcutManager();
   const theme = createTheme(settings);
+  const prefs = createPreferences(createSettings('prefs'));
   const visibility = new Visibility(settings, () => tripId);
 
   window.addEventListener('keydown', shortcuts.handle);
@@ -235,6 +237,7 @@ export function createCore(container: HTMLElement) {
           trips,
           visibility,
           history,
+          prefs,
           t,
           settings: createSettings(mod.id),
           get tripId() {
@@ -267,6 +270,7 @@ export function createCore(container: HTMLElement) {
     ui,
     shortcuts,
     theme,
+    prefs,
     user,
     cloud,
     trips,

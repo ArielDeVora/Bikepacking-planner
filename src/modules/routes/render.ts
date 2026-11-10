@@ -52,7 +52,8 @@ export function routeColor(store: TripStore, seg: Segment): string {
   return segmentColor(seg, stage, group, route);
 }
 
-export function legFeatures(seg: Segment, color: string): LineFeature[] {
+/** Line features of a segment's legs; `widthScale` is the "Route line thickness" preference. */
+export function legFeatures(seg: Segment, color: string, widthScale = 1): LineFeature[] {
   return seg.legs.map((leg, i) => ({
     type: 'Feature',
     properties: {
@@ -60,7 +61,7 @@ export function legFeatures(seg: Segment, color: string): LineFeature[] {
       leg: i,
       mode: seg.mode,
       color,
-      width: seg.lineWidth ?? MODES[seg.mode].style.width,
+      width: (seg.lineWidth ?? MODES[seg.mode].style.width) * widthScale,
       dash: seg.dash ?? 'mode',
       ...(leg.status ? { status: leg.status } : {}),
     },
@@ -113,6 +114,7 @@ export class RouteRenderer {
   #dirtyActive = true;
   #frame = 0;
   #cache = new WeakMap<Segment, { color: string; features: LineFeature[] }>();
+  #widthScale = 1;
   /** Background line layers and their normal opacity, faded while something is selected. */
   #dimmable = new Map<string, number>();
 
@@ -341,6 +343,13 @@ export class RouteRenderer {
     this.#schedule();
   }
 
+  setWidthScale(scale: number): void {
+    if (scale === this.#widthScale) return;
+    this.#widthScale = scale;
+    this.#cache = new WeakMap();
+    this.invalidateAll();
+  }
+
   invalidateAll(): void {
     this.#dirtyBg = this.#dirtyActive = true;
     this.#schedule();
@@ -358,7 +367,7 @@ export class RouteRenderer {
     const color = routeColor(this.store, seg);
     const hit = this.#cache.get(seg);
     if (hit && hit.color === color) return hit.features;
-    const features = legFeatures(seg, color);
+    const features = legFeatures(seg, color, this.#widthScale);
     this.#cache.set(seg, { color, features });
     return features;
   }

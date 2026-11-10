@@ -26,13 +26,14 @@ export const openWhatsNew = (core: Core, releases: Release[] = RELEASES.slice(0,
 
 export const openGuide = (core: Core) => core.ui.openDialog(Guide, { core });
 
-/** Once the app is ready: the guide on a first visit, What's new after an update. */
+/** Once the app is ready: the guide on a first visit, What's new after an update (unless turned off in Settings). */
 export function startOnboarding(core: Core): void {
   const seen = prefs.get<string | null>('seenRelease', null);
   if (seen === (RELEASES[0]?.id ?? null) || get(core.ui.dialog)) return;
   const pending = pendingReleases(RELEASES, seen, !core.firstVisit);
-  if (pending.length) openWhatsNew(core, pending);
-  else if (seen === null) openGuide(core);
+  if (pending.length) {
+    if (core.prefs.current.whatsNew) openWhatsNew(core, pending);
+  } else if (seen === null) openGuide(core);
   markSeen();
 }
 

@@ -119,6 +119,7 @@ export interface Segment extends BaseEntity {
 
 export type PoiCategory =
   | 'sight'
+  | 'nature'
   | 'camp'
   | 'water'
   | 'food'

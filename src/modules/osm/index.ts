@@ -51,6 +51,10 @@ export default defineModule({
       return layers.registerOverlay({ id, label: t(`osm.cat.${cat.id}` as 'osm.cat.water'), layerIds: [id], visible: false, order: 50 + i, group: 'osm' });
     });
 
+    const offSize = ctx.prefs.watch('osmPlaceSize', (s) => {
+      for (const id of layerIds) map.setLayoutProperty(id, 'icon-size', s);
+    });
+
     const visible = derived(layers.overlays, (list) =>
       OSM_CATEGORIES.filter((c) => list.find((o) => o.spec.id === `osm-${c.id}`)?.visible).map((c) => c.id),
     );
@@ -175,6 +179,7 @@ export default defineModule({
 
     return () => {
       clearTimeout(timer);
+      offSize();
       map.off('moveend', loadView);
       map.off('zoomend', onZoom);
       map.off('click', onBaseClick);
