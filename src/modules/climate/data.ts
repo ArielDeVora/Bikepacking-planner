@@ -46,6 +46,34 @@ export async function yearAt(lng: number, lat: number): Promise<ClimateYear | nu
   return ppt.every((v) => v === null) && tmax.every((v) => v === null) ? null : { tmax, tmin, ppt };
 }
 
+export interface ClimateValues {
+  tmax: number;
+  tmin: number;
+  ppt: number;
+}
+
+/**
+ * Loads every month of every variable once, then answers lookups at once: the usual weather at
+ * a place on a day of the year (0–364), or null at sea.
+ */
+export async function climateSampler(): Promise<(lng: number, lat: number, day: number) => ClimateValues | null> {
+  const vars: ClimateVar[] = ['tmax', 'tmin', 'ppt'];
+  const grids = await Promise.all(vars.map((v) => Promise.all(Array.from({ length: 12 }, (_, m) => loadMonth(v, m)))));
+  return (lng, lat, day) => {
+    const i = cellIndex(lng, lat);
+    if (i === null) return null;
+    const { a, b, w } = blendFor(day);
+    const out: number[] = [];
+    for (let k = 0; k < vars.length; k++) {
+      const va = decodeByte(vars[k]!, grids[k]![a]![i]!);
+      const vb = decodeByte(vars[k]!, grids[k]![b]![i]!);
+      if (va === null || vb === null) return null;
+      out.push(va + (vb - va) * w);
+    }
+    return { tmax: out[0]!, tmin: out[1]!, ppt: Math.max(0, out[2]!) };
+  };
+}
+
 // Drawing ---------------------------------------------------------------------------------------
 
 /** The map covers ±85.0511° in Web Mercator: a square. */

@@ -29,6 +29,7 @@
 <style>
   .toasts {
     position: absolute;
+    z-index: 30;
     bottom: 40px;
     left: 50%;
     transform: translateX(-50%);

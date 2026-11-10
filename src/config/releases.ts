@@ -11,6 +11,15 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    id: '2026-11-15',
+    title: 'Planning: when we’ll be where',
+    items: [
+      'A planning view (calendar button at the top of the side panel): a calendar from March 2027 to April 2028 with every segment, split by country, and bars showing when we’ll be there.',
+      'The background shows how good the season is: your own season table near the places you rated, climate averages elsewhere.',
+      'Set the start date, daily distance, rest days and climbing effort per route; planned dates become fixed dates; drag across the dates to add rest periods.',
+    ],
+  },
+  {
     id: '2026-11-14',
     title: 'Drag places and categories into order',
     items: [

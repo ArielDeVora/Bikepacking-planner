@@ -71,8 +71,19 @@ function registry<T extends { id: string; order?: number }>() {
   };
 }
 
+/** A full-screen page of the app (e.g. planning), opened from the panel header or its address (#id). */
+export interface ViewSpec {
+  id: string;
+  label: string;
+  icon: string;
+  component: AnyComponent;
+  props?: Record<string, unknown>;
+  order?: number;
+}
+
 export class UiRegistry {
   readonly tools = registry<ToolSpec>();
+  readonly views = registry<ViewSpec>();
   readonly panelSections = registry<PanelSectionSpec>();
   readonly widgets = registry<WidgetSpec>();
   readonly cardSections = registry<CardSectionSpec>();
@@ -151,6 +162,10 @@ export class UiRegistry {
 
   addPanelSection(spec: PanelSectionSpec) {
     return this.panelSections.add(spec);
+  }
+
+  addView(spec: ViewSpec) {
+    return this.views.add(spec);
   }
 
   addWidget(spec: WidgetSpec) {

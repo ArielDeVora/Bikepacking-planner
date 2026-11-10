@@ -83,10 +83,14 @@ export class ShortcutManager {
     return [...byLabel].map(([label, keys]) => ({ label, keys }));
   }
 
+  /** While a full-screen view is open, only shortcuts with Cmd/Ctrl (undo, redo…) apply. */
+  paused = false;
+
   handle = (e: KeyboardEvent): void => {
     if (e.defaultPrevented || isEditable(e.target)) return;
     for (let i = this.#shortcuts.length - 1; i >= 0; i--) {
       const { combo, shortcut } = this.#shortcuts[i]!;
+      if (this.paused && !combo.mod) continue;
       if (matches(combo, e, this.#isMac)) {
         e.preventDefault();
         shortcut.run(e);

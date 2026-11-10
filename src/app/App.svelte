@@ -23,6 +23,9 @@
     if ($dialog && e.key === 'Escape') {
       e.stopPropagation();
       core.ui.closeDialog();
+    } else if (activeView && e.key === 'Escape' && !(e.target as HTMLElement).closest?.('input, select, textarea')) {
+      e.stopPropagation();
+      closeView();
     }
   }
   const theme = $derived(core.theme);
@@ -46,6 +49,27 @@
   function togglePanel() {
     panelOpen = !panelOpen;
     prefs.set('panelOpen', panelOpen);
+  }
+
+  // Full-screen views (planning…), opened from the header or their address (#id).
+  const views = $derived(core.ui.views);
+  let hash = $state(location.hash);
+  $effect(() => {
+    const update = () => (hash = location.hash);
+    window.addEventListener('hashchange', update);
+    return () => window.removeEventListener('hashchange', update);
+  });
+  const activeView = $derived($views.find((v) => hash === `#${v.id}`));
+  $effect(() => {
+    core.shortcuts.paused = !!activeView;
+    document.documentElement.classList.toggle('in-view', !!activeView);
+  });
+  function openView(id: string) {
+    location.hash = id;
+  }
+  function closeView() {
+    history.pushState(null, '', location.pathname + location.search);
+    hash = '';
   }
 
   // Map pane: base map and overlays, dropping down from the panel header (button or O).
@@ -104,6 +128,9 @@
   ></div>
   <header>
     <h1>{t('app.title')}</h1>
+    {#each $views as view (view.id)}
+      <IconButton icon={view.icon} label={view.label} onclick={() => openView(view.id)} />
+    {/each}
     <IconButton icon={icons.layers} label={t('layers.pane')} active={paneOpen} onclick={togglePane} />
     <IconButton
       icon={$theme === 'dark' ? icons.sun : icons.moon}
@@ -162,6 +189,13 @@
 </div>
 <InfoCard {core} />
 <Toasts {core} offset={bottomHeight} />
+
+{#if activeView}
+  {@const View = activeView.component}
+  <div class="view" role="main" aria-label={activeView.label}>
+    <SafeSection message={t('app.partFailed')}><View {...activeView.props} close={closeView} /></SafeSection>
+  </div>
+{/if}
 
 {#if $dialog}
   {@const Dialog = $dialog.component}
@@ -350,9 +384,18 @@
     pointer-events: auto;
   }
 
+  .view {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    overflow: hidden;
+    background: var(--bg-sunken);
+  }
+
   .backdrop {
     position: absolute;
     inset: 0;
+    z-index: 20;
     display: grid;
     place-items: center;
     padding: var(--gap);

@@ -8,6 +8,7 @@ import type { Entity, Stage, Trip } from '../model/types';
 import { EventBus, type Events } from './bus';
 import { createCloud } from './cloud/cloud';
 import { createPreferences } from './preferences';
+import { syncTabs } from './tabs';
 import { CommandStack } from './commands';
 import { HistoryLog } from './history/log';
 import { HistoryRecorder } from './history/recorder';
@@ -210,6 +211,7 @@ export function createCore(container: HTMLElement) {
       window.addEventListener('pagehide', () => void saver.flush());
     }
     visibility.load();
+    syncTabs(store, () => tripId);
     bus.emit('trip:loaded', { tripId });
   }
 

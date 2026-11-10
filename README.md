@@ -25,6 +25,7 @@ Press **?** (or the **?** button at the bottom of the toolbar) for a cheatsheet 
 - **Routes**: keep several versions of the trip (another group's plan, your own variant) side by side. Add one with the route button in the side panel, drag stages into it, duplicate it to try a variant, show only one on the map, and compare their distances under Stats.
 - **Side panel**: Cmd/Ctrl+click or Shift+click to select several segments, then fuse them (they're put end to end, turned round where needed), put them in order, move or delete them. Drag segments to reorder them, move them to another stage, or drop one onto another to fuse them; drag stages to reorder them. **Groups**: select segments and press **G** (or Group in the card) to group them within their stage; drop segments onto a group to put them in it. The eye hides a segment, group or stage from the map; the arrow collapses a stage or group. Drag the panel's right edge to make it wider, and the details card's left or bottom edge to resize it. The selection glows yellow on the map.
 - **Travel advice** (side panel) and the **Travel advisory levels** overlay: official UK and US advice for the countries on the trip. Avoid zones can be switched to information-only **risk zones**.
+- **Planning** (calendar button at the top of the side panel): when we'll be where, day by day, on a calendar from March 2027 to April 2028 with how good the season is (the team's own table near the places they rated, climate averages elsewhere); start date, daily distance, rest days, rest periods and fixed dates.
 - **Settings** (sliders button at the top of the side panel, or **Cmd/Ctrl+,**): size of places on the map, when to show their names, route line thickness, the routing profile for new bike segments, theme, and the What's new window. Saved in your browser only.
 - With a segment selected: **S** split, **X** erase a part (or drag across the profile and click Erase), **R** reverse, **Shift+D** duplicate, **M** merge with the next segment. The card also moves it to another stage, and makes imported tracks editable. **Esc** leaves any tool.
 
@@ -120,6 +121,7 @@ Free Supabase projects pause after a week with little activity. The **Keep Supab
 - [History](docs/11-history.md): every change, who made it, and restoring the trip to an earlier point.
 - [Climate](docs/12-climate.md): usual temperature and rain by week (TerraClimate).
 - [Settings](docs/14-settings.md): the Settings window, and the nature place category.
+- [Planning](docs/15-planning.md): schedule, calendar with season heatmap, rest periods.
 - [Spec](docs/SPEC.md)
 
 ## Credits

@@ -1,6 +1,6 @@
 export type LngLat = [lng: number, lat: number];
 
-export type EntityType = 'trip' | 'route' | 'stage' | 'group' | 'segment' | 'poi' | 'poiFolder' | 'vote' | 'zone' | 'borderCrossing' | 'comment';
+export type EntityType = 'trip' | 'route' | 'stage' | 'group' | 'segment' | 'poi' | 'poiFolder' | 'vote' | 'restPeriod' | 'zone' | 'borderCrossing' | 'comment';
 
 export interface BaseEntity {
   id: string;
@@ -20,6 +20,8 @@ export interface Trip extends BaseEntity {
   categoryReplacements?: Record<string, string>;
   /** Display order of the place categories (ids); unlisted ones follow in their default order. */
   categoryOrder?: string[];
+  /** How the days are worked out for the stages outside routes (see the planning view). */
+  schedule?: Partial<ScheduleSettings>;
 }
 
 export interface Stage extends BaseEntity {
@@ -49,6 +51,8 @@ export interface Route extends BaseEntity {
   /** Where the route comes from (a group, a website…), and a link. */
   source?: string;
   sourceUrl?: string;
+  /** How its days are worked out (see the planning view). */
+  schedule?: Partial<ScheduleSettings>;
 }
 
 /**
@@ -119,6 +123,8 @@ export interface Segment extends BaseEntity {
   /** Line pattern, overriding the travel mode's. */
   dash?: LineDash;
   plannedDate?: string;
+  /** Days a train, bus, boat, plane or car journey takes in the plan (default 1). */
+  transportDays?: number;
 }
 
 export type PoiCategory =
@@ -157,6 +163,29 @@ export interface Poi extends BaseEntity {
   folderId?: string;
   /** Position in its category's folder, once someone dragged it there (else sorted by name). */
   order?: string;
+}
+
+/** How the days of a route are worked out (the planning view). */
+export interface ScheduleSettings {
+  /** First day, YYYY-MM-DD. */
+  startDate: string;
+  /** Distance ridden on a day by bike, and on foot. */
+  kmPerDay: number;
+  walkKmPerDay: number;
+  /** A rest day after this many days of riding (0: none). */
+  restEvery: number;
+  /** Kilometres added to the day's effort for each 100 m of climbing. */
+  climbKm: number;
+}
+
+/** Days off on the calendar (a visa wait, a holiday): no riding from `from` to `to`, inclusive. */
+export interface RestPeriod extends BaseEntity {
+  type: 'restPeriod';
+  /** The route it applies to; none for the stages outside routes. */
+  routeId?: string;
+  from: string;
+  to: string;
+  name: string;
 }
 
 /** What someone thinks of a place: not for me, yes, GOATED; 0 once taken back. */
@@ -215,7 +244,7 @@ export interface Comment extends BaseEntity {
   createdAt: number;
 }
 
-export type Entity = Trip | Route | Stage | Group | Segment | Poi | PoiFolder | Vote | Zone | BorderCrossing | Comment;
+export type Entity = Trip | Route | Stage | Group | Segment | Poi | PoiFolder | Vote | RestPeriod | Zone | BorderCrossing | Comment;
 export type EntityOf<T extends EntityType> = Extract<Entity, { type: T }>;
 
 /** An entity before it has been stamped by the command system. */
