@@ -4,11 +4,12 @@ import { POI_CATEGORIES, POI_CATEGORY_ORDER } from '../../config/pois';
 import { edits } from '../../core/commands';
 import { defineModule } from '../../core/module';
 import { icons } from '../../lib/icons';
-import { addRoundIcon, setRoundIcon } from '../../lib/map-icons';
+import { addCrownIcon, addRoundIcon, setRoundIcon } from '../../lib/map-icons';
 import { placeNameField } from '../../lib/map-prefs';
 import { authorOf } from '../../lib/places/authors';
 import { categoryPlaces, categoryVisibilityId, customCategories, iconPath, legacyFolderChanges, resolveCategory } from '../../lib/places/categories';
 import { createPoiCommand } from '../../lib/places/poi';
+import { approvals, CROWN_APPROVALS, votesByPlace } from '../../lib/places/votes';
 import type { LngLat, Poi } from '../../model/types';
 import CategoryCard from './CategoryCard.svelte';
 import PlacesSection from './PlacesSection.svelte';
@@ -24,6 +25,8 @@ const isStatus = (s: string): ExpressionSpecification => ['==', ['get', 'status'
 const iconSize = (s: number): ExpressionSpecification => ['case', isStatus('goated'), 1.25 * s, isStatus('mustSee'), 1.1 * s, s];
 const ringRadius = (s: number): ExpressionSpecification => ['case', isStatus('goated'), 20 * s, ['get', 'selected'], 18 * s, 16 * s];
 const GLOW_RADIUS = 28;
+/** The crown sits on top of the icon (26 px, larger for must-see and GOATED), overlapping its rim a little. */
+const CROWN_OFFSET: ExpressionSpecification = ['case', isStatus('goated'), ['literal', [0, -13]], isStatus('mustSee'), ['literal', [0, -11]], ['literal', [0, -10]]];
 
 export default defineModule({
   id: 'pois',
@@ -127,8 +130,34 @@ export default defineModule({
       map.setPaintProperty('pois-author', 'circle-radius', 4.5 * s);
       map.setPaintProperty('pois-author', 'circle-translate', [9 * s, -9 * s]);
     });
+    // A crown on places enough people approve of.
+    addCrownIcon(map, 'poi-crown');
+    layers.addLayer(
+      {
+        id: 'pois-crown',
+        type: 'symbol',
+        source: SOURCE,
+        filter: ['get', 'crowned'],
+        layout: {
+          'icon-image': 'poi-crown',
+          'icon-anchor': 'bottom',
+          'icon-offset': CROWN_OFFSET,
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true,
+        },
+      },
+      'poi',
+    );
+    const offCrownSize = prefs.watch('placeSize', (s) => map.setLayoutProperty('pois-crown', 'icon-size', s));
     const removePointLayer = ui.addPointLayer('pois');
-    const removeOverlay = layers.registerOverlay({ id: 'pois', label: t('poi.overlay'), layerIds: ['pois', 'pois-ring', 'pois-glow', 'pois-author'], visible: true, order: 10, group: 'trip' });
+    const removeOverlay = layers.registerOverlay({
+      id: 'pois',
+      label: t('poi.overlay'),
+      layerIds: ['pois', 'pois-ring', 'pois-glow', 'pois-author', 'pois-crown'],
+      visible: true,
+      order: 10,
+      group: 'trip',
+    });
 
     // Rendering
     let dragging: { id: string; lngLat: LngLat } | null = null;
@@ -138,6 +167,7 @@ export default defineModule({
       const sel = new Set(selection.current);
       const authors = get(ctx.cloud.shared) && prefs.current.placeAuthors;
       const hidden = get(ctx.visibility.hidden);
+      const votes = votesByPlace(store);
       // Places of a hidden category are left off the map; those of a selected custom category are highlighted.
       const features: GeoJSON.Feature[] = [];
       for (const p of store.list('poi')) {
@@ -151,6 +181,7 @@ export default defineModule({
           status: p.status,
           name: p.name,
           selected: sel.has(p.id) || sel.has(category),
+          crowned: approvals(votes.get(p.id) ?? []) >= CROWN_APPROVALS,
           ...(authors ? { author: authorOf(ctx.cloud, t, p.createdBy).color } : {}),
         },
         geometry: { type: 'Point', coordinates: dragging?.id === p.id ? dragging.lngLat : p.lngLat },
@@ -178,7 +209,7 @@ export default defineModule({
     const offStore = store.onChange(({ ids }) => {
       const types = new Set(ids.map((id) => store.getRaw(id)?.type));
       if (types.has('poiFolder')) syncCustomIcons();
-      if (types.has('poi') || types.has('poiFolder')) schedule();
+      if (types.has('poi') || types.has('poiFolder') || types.has('vote') || types.has('trip')) schedule();
       upgrade(ids);
     });
     const offSelection = ctx.bus.on('selection:changed', schedule);
@@ -281,6 +312,7 @@ export default defineModule({
       offSize();
       offNames();
       offAuthorSize();
+      offCrownSize();
       offAuthors();
       offHidden();
       offPeople.forEach((off) => off());

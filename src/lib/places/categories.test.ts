@@ -13,8 +13,11 @@ import {
   deleteCategoryCommand,
   iconPath,
   legacyFolderChanges,
+  replaceCategoriesCommand,
+  replacements,
   resolveCategory,
   setCategoryCommand,
+  suggestReplacement,
   takeJustCreated,
 } from './categories';
 
@@ -110,5 +113,51 @@ describe('place categories', () => {
   it('falls back to the default icon for unknown icon keys', () => {
     expect(iconPath('nope')).toBe(POI_ICONS.star);
     expect(iconPath('tent')).toBe(POI_ICONS.tent);
+  });
+
+  it('replaces built-in categories by the trip’s own, moving their places and hiding them', () => {
+    const campsite = create('CAMPSITE');
+    const other = create('OTHER');
+    commands.run(replaceCategoriesCommand(store, { camp: campsite, other, water: null }, 'replace')!);
+    expect(replacements(store)).toEqual({ camp: campsite, other });
+    expect(store.get('a', 'poi')!.category).toBe(campsite);
+    expect(store.get('c', 'poi')!.category).toBe('water');
+    const ids = allCategories(store, t).map((c) => c.id);
+    expect(ids).not.toContain('camp');
+    expect(ids).not.toContain('other');
+    expect(ids).toContain('water');
+    // Places added later with a replaced category, or left in a deleted one, show in the replacement.
+    store.apply([poi('new', { category: 'camp' }), poi('lost', { category: 'gone' })], 'load');
+    expect(resolveCategory(store, 'camp')).toBe(campsite);
+    expect(resolveCategory(store, 'gone')).toBe(other);
+    expect(categoryPlaces(store, campsite).map((p) => p.id).sort()).toEqual(['a', 'b', 'new']);
+    // Keeping it again brings it back; places stay where they are.
+    commands.run(replaceCategoriesCommand(store, { camp: null }, 'keep')!);
+    expect(replacements(store)).toEqual({ other });
+    expect(store.get('a', 'poi')!.category).toBe(campsite);
+    expect(replaceCategoriesCommand(store, { camp: null }, 'keep')).toBeNull();
+  });
+
+  it('survives replacements that point at each other or at deleted categories', () => {
+    commands.run(replaceCategoriesCommand(store, { sight: 'nature', nature: 'sight' }, 'loop')!);
+    expect(resolveCategory(store, 'sight')).toBe('other');
+    const id = create('Temp');
+    commands.run(replaceCategoriesCommand(store, { water: id }, 'replace')!);
+    commands.run(deleteCategoryCommand(store, id, 'delete'));
+    expect(resolveCategory(store, 'water')).toBe('other');
+  });
+
+  it('suggests one of the trip’s categories with a matching name', () => {
+    const custom = ['SIGHTS', 'LANDSCAPE', 'ACCOMODATION', 'REPAIR SHOP', 'FOOD/CAFE', 'OTHER', 'CAMPSITE'].map((name) => ({ id: name, name }));
+    const suggest = (key: string) => suggestReplacement(t(key as 'poi.cat.sight'), custom);
+    expect(suggest('poi.cat.sight')).toBe('SIGHTS');
+    expect(suggest('poi.cat.nature')).toBe('LANDSCAPE');
+    expect(suggest('poi.cat.camp')).toBe('CAMPSITE');
+    expect(suggest('poi.cat.accommodation')).toBe('ACCOMODATION');
+    expect(suggest('poi.cat.bikeShop')).toBe('REPAIR SHOP');
+    expect(suggest('poi.cat.food')).toBe('FOOD/CAFE');
+    expect(suggest('poi.cat.other')).toBe('OTHER');
+    expect(suggest('poi.cat.water')).toBeNull();
+    expect(suggest('poi.cat.border')).toBeNull();
   });
 });

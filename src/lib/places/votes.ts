@@ -41,6 +41,14 @@ export function votesByPlace(store: TripStore): Map<string, Vote[]> {
   return map;
 }
 
+/** Places at least this many people approve of (I'm in or GOATED) wear a crown. */
+export const CROWN_APPROVALS = 3;
+
+/** How many people approve of a place. */
+export function approvals(votes: readonly Vote[]): number {
+  return new Set(votes.filter((v) => v.value > 0).map((v) => v.userId)).size;
+}
+
 export interface Tally {
   /** GOATED counts 2, yes 1, not for me −1. */
   score: number;

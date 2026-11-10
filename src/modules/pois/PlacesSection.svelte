@@ -14,8 +14,9 @@
     setCategoryCommand,
     type CategoryInfo,
   } from '../../lib/places/categories';
-  import { tally, votesByPlace, VOTES, type Tally } from '../../lib/places/votes';
+  import { approvals, CROWN_APPROVALS, tally, votesByPlace, VOTES, type Tally } from '../../lib/places/votes';
   import Icon from '../../lib/ui/Icon.svelte';
+  import CategoriesDialog from './CategoriesDialog.svelte';
   import IconButton from '../../lib/ui/IconButton.svelte';
   import type { Poi, PoiStatus } from '../../model/types';
 
@@ -48,6 +49,8 @@
     category: CategoryInfo;
     author: Author;
     votes: Tally;
+    /** People who approve of it (I'm in or GOATED). */
+    approvals: number;
   }
 
   // Every category: built-in ones first, then custom ones (each is a folder in the list).
@@ -68,6 +71,7 @@
       category: byId.get(poi.category) ?? other,
       author: authorOf(ctx.cloud, t, poi.createdBy),
       votes: tally(votes.get(poi.id) ?? []),
+      approvals: approvals(votes.get(poi.id) ?? []),
     }));
   });
   const authors = $derived(distinctAuthors(all.map((x) => x.author)));
@@ -213,6 +217,7 @@
     {t('poi.byCountry')}
   </label>
   <span class="spacer"></span>
+  <IconButton icon={icons.tag} label={t('category.manage')} size={16} onclick={() => ctx.ui.openDialog(CategoriesDialog, { ctx })} />
   <IconButton icon={icons.folderPlus} label={t('category.new')} size={16} onclick={newCategory} />
 </div>
 <p class="muted small hint">{t('poi.addHint')}</p>
@@ -230,7 +235,10 @@
   >
     <button type="button" onclick={() => focus(poi.id)}>
       <span class="icon" style:background={item.category.color}><Icon d={item.category.icon} size={11} /></span>
-      <span class="label">{poi.name || t('poi.untitled')}</span>
+      <span class="label">
+        {#if item.approvals >= CROWN_APPROVALS}<span class="crown" title={t('vote.crowned', { n: item.approvals })}>👑</span>{/if}
+        {poi.name || t('poi.untitled')}
+      </span>
       {#if poi.status !== 'idea'}<span class="tag {poi.status}">{t(`poi.status.${poi.status}`)}</span>{/if}
       {#if item.votes.counts[2] || item.votes.counts[1] || item.votes.counts[-1]}
         <span class="votes" title={t('vote.summary', { n: item.votes.counts[2] + item.votes.counts[1] + item.votes.counts[-1], score: item.votes.score })}>
@@ -297,6 +305,9 @@
           {#if category.custom}
             {@const id = category.id}
             <IconButton icon={icons.trash} label={`${t('category.delete')}. ${t('category.deleteHint')}`} size={14} onclick={() => deleteCategory(id)} />
+          {:else}
+            {@const id = category.id}
+            <IconButton icon={icons.trash} label={t('category.remove')} size={14} onclick={() => ctx.ui.openDialog(CategoriesDialog, { ctx, focusOn: id })} />
           {/if}
         </span>
       {/if}
@@ -364,6 +375,11 @@
 
   .spacer {
     flex: 1;
+  }
+
+  .head :global(.icon-btn) {
+    width: 28px;
+    height: 28px;
   }
 
   .check {
@@ -619,6 +635,11 @@
 
   .tag.skip {
     color: var(--fg-muted);
+  }
+
+  .crown {
+    margin-right: 3px;
+    font-size: 12px;
   }
 
   .author {

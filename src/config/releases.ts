@@ -11,6 +11,14 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    id: '2026-11-13b',
+    title: 'Crowns, and replacing built-in categories',
+    items: [
+      'A place at least three people approve of (👍 I’m in or 🐐 GOATED) wears a little gold crown, on the map and in the Places list.',
+      'Made your own categories that double the built-in ones? Replace the built-in ones with yours (tag button in Places). Their places move over, and they disappear from the list and the category picker.',
+    ],
+  },
+  {
     id: '2026-11-13',
     title: 'Categories are folders',
     items: [

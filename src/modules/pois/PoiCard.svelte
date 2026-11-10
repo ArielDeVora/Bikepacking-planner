@@ -5,7 +5,7 @@
   import { icons } from '../../lib/icons';
   import { authorOf } from '../../lib/places/authors';
   import { allCategories, createCategoryCommand, customCategories, resolveCategory } from '../../lib/places/categories';
-  import { tally, voteCommand, VOTES } from '../../lib/places/votes';
+  import { approvals, CROWN_APPROVALS, tally, voteCommand, VOTES } from '../../lib/places/votes';
   import PlaceInfo from '../../lib/places/PlaceInfo.svelte';
   import Icon from '../../lib/ui/Icon.svelte';
   import IconButton from '../../lib/ui/IconButton.svelte';
@@ -56,6 +56,7 @@
   });
   const myVote = $derived(votes.find((v) => v.userId === ctx.user.id)?.value ?? votes.find((v) => ctx.cloud.isMine(v.userId))?.value ?? 0);
   const counts = $derived(tally(votes).counts);
+  const approved = $derived(approvals(votes));
   const voters = $derived.by(() => {
     void $members;
     const emoji = (value: VoteValue) => VOTES.find((o) => o.value === value)?.emoji ?? '';
@@ -169,6 +170,9 @@
         </button>
       {/each}
     </div>
+    {#if approved >= CROWN_APPROVALS}
+      <p class="crowned"><span aria-hidden="true">👑</span> {t('vote.crowned', { n: approved })}</p>
+    {/if}
     {#if voters.length}
       <ul class="voters">
         {#each voters as v (v.id)}
@@ -256,6 +260,13 @@
     font-size: 11px;
     font-weight: 600;
     text-align: center;
+  }
+
+  .crowned {
+    margin: 6px 0 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: #b8860b;
   }
 
   .voters {

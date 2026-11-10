@@ -3,7 +3,7 @@ import { CommandStack } from '../../core/commands';
 import { TripStore } from '../../core/store';
 import type { Poi, VoteValue } from '../../model/types';
 import { trip, TRIP_ID } from '../../test/fixtures';
-import { tally, voteCommand, voteId, votesByPlace } from './votes';
+import { approvals, CROWN_APPROVALS, tally, voteCommand, voteId, votesByPlace } from './votes';
 
 let store: TripStore;
 let commands: CommandStack;
@@ -69,6 +69,18 @@ describe('votes', () => {
     vote('p1', 'my-browser-id', 1);
     vote('p1', 'me', 2, (id) => id === 'me' || id === 'my-browser-id');
     expect(values('p1')).toEqual([['me', 2]]);
+  });
+
+  it('counts approvals (I’m in or GOATED) for the crown, at three people', () => {
+    expect(CROWN_APPROVALS).toBe(3);
+    vote('p1', 'a', 2);
+    vote('p1', 'b', 1);
+    vote('p1', 'c', -1);
+    expect(approvals(votesByPlace(store).get('p1')!)).toBe(2);
+    vote('p1', 'c', 1);
+    expect(approvals(votesByPlace(store).get('p1')!)).toBe(3);
+    vote('p1', 'a', 0);
+    expect(approvals(votesByPlace(store).get('p1')!)).toBe(2);
   });
 
   it('tallies: GOATED 2, yes 1, not for me −1', () => {

@@ -41,3 +41,30 @@ function roundIcon(path: string, color: string, size: number, filled: boolean): 
   g.stroke(new Path2D(path));
   return g.getImageData(0, 0, px, px);
 }
+
+/** A small gold crown, drawn with its bottom edge at the bottom of the image. */
+export function addCrownIcon(map: MapLibreMap, id: string, size = 18): void {
+  if (map.hasImage(id)) return;
+  const ratio = 2;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size * ratio;
+  const g = canvas.getContext('2d')!;
+  g.scale((size * ratio) / 24, (size * ratio) / 24);
+  const crown = new Path2D('M3 20 2 8l5.5 4.5L12 4l4.5 8.5L22 8l-1 12z');
+  g.lineJoin = 'round';
+  g.lineWidth = 3.5;
+  g.strokeStyle = '#ffffff';
+  g.stroke(crown);
+  g.fillStyle = '#fcc419';
+  g.fill(crown);
+  g.lineWidth = 1.6;
+  g.strokeStyle = '#a05a00';
+  g.stroke(crown);
+  for (const [x, y] of [[2, 8], [12, 4], [22, 8]] as const) {
+    g.beginPath();
+    g.arc(x, y, 1.6, 0, Math.PI * 2);
+    g.fillStyle = '#f59f00';
+    g.fill();
+  }
+  map.addImage(id, g.getImageData(0, 0, size * ratio, size * ratio), { pixelRatio: ratio });
+}

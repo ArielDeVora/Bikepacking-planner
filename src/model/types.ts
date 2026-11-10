@@ -16,6 +16,8 @@ export interface Trip extends BaseEntity {
   name: string;
   ownerId: string;
   startDate?: string;
+  /** Built-in place categories this trip doesn't use, each replaced by one of its own (custom) categories. */
+  categoryReplacements?: Record<string, string>;
 }
 
 export interface Stage extends BaseEntity {

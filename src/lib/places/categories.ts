@@ -4,7 +4,7 @@ import type { t as translate } from '../../core/i18n';
 import type { TripStore } from '../../core/store';
 import { newId } from '../../model/ids';
 import { keyBetween } from '../../model/order';
-import type { Poi, PoiCategory, PoiFolder } from '../../model/types';
+import type { Poi, PoiCategory, PoiFolder, Trip } from '../../model/types';
 
 /**
  * Place categories: the built-in ones (config/pois.ts) and custom ones (`PoiFolder` entities,
@@ -31,9 +31,26 @@ export function customCategories(store: TripStore): PoiFolder[] {
   return store.list('poiFolder').sort((a, b) => (a.order < b.order ? -1 : a.order > b.order ? 1 : a.name.localeCompare(b.name)));
 }
 
-/** The category a place shows as: its own, or "other" if that custom category was deleted. */
+/** Built-in categories the trip replaced by one of its own: built-in id → category id. */
+export function replacements(store: TripStore): Record<string, string> {
+  return store.list('trip')[0]?.categoryReplacements ?? {};
+}
+
+/**
+ * The category a place shows as: its own, the one that replaced it (a built-in category the trip
+ * doesn't use), or "other" if it was deleted.
+ */
 export function resolveCategory(store: TripStore, id: string): string {
-  return isBuiltIn(id) || store.get(id, 'poiFolder') ? id : 'other';
+  const replaced = replacements(store);
+  const seen = new Set<string>();
+  let current = id;
+  while (!seen.has(current)) {
+    seen.add(current);
+    if (replaced[current]) current = replaced[current]!;
+    else if (isBuiltIn(current) || store.get(current, 'poiFolder')) return current;
+    else current = 'other';
+  }
+  return 'other';
 }
 
 export function iconPath(key: string | undefined): string {
@@ -57,9 +74,53 @@ export function categoryInfo(store: TripStore, t: typeof translate, id: string):
   };
 }
 
-/** Every category, built-in ones first, then custom ones in the order they were made. */
+/** Every category the trip uses: built-in ones it didn't replace, then custom ones in the order they were made. */
 export function allCategories(store: TripStore, t: typeof translate): CategoryInfo[] {
-  return [...POI_CATEGORY_ORDER, ...customCategories(store).map((f) => f.id)].map((id) => categoryInfo(store, t, id));
+  const replaced = replacements(store);
+  return [...POI_CATEGORY_ORDER.filter((id) => !replaced[id]), ...customCategories(store).map((f) => f.id)].map((id) => categoryInfo(store, t, id));
+}
+
+/**
+ * Sets which built-in categories are replaced, and by which category (null keeps the built-in
+ * one). Places in a newly replaced category move to its replacement; later ones (e.g. added from
+ * search with that category) show in the replacement too.
+ */
+export function replaceCategoriesCommand(store: TripStore, choices: Record<string, string | null>, label: string): Command | null {
+  const trip = store.list('trip')[0];
+  if (!trip) return null;
+  const next: Record<string, string> = { ...(trip.categoryReplacements ?? {}) };
+  for (const [builtIn, target] of Object.entries(choices)) {
+    if (!isBuiltIn(builtIn)) continue;
+    if (target && target !== builtIn) next[builtIn] = target;
+    else delete next[builtIn];
+  }
+  const before = trip.categoryReplacements ?? {};
+  const same = Object.keys(next).length === Object.keys(before).length && Object.entries(next).every(([k, v]) => before[k] === v);
+  if (same) return null;
+  const changes: Change[] = [edits.update<Trip>(store, trip.id, { categoryReplacements: Object.keys(next).length ? next : undefined })];
+  for (const p of store.list('poi', (p) => !!next[p.category] && !before[p.category])) {
+    changes.push(edits.update<Poi>(store, p.id, { category: next[p.category]! }));
+  }
+  return { label, changes };
+}
+
+const words = (s: string) =>
+  s
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[^a-z\s]/g, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length >= 4);
+
+/**
+ * One of the trip's own categories that looks like the same thing as a built-in one (by name:
+ * "Sights" for Sight, "Campsite" for Camp spot, "Repair shop" for Bike shop), if any.
+ */
+export function suggestReplacement(builtInName: string, custom: { id: string; name: string }[]): string | null {
+  const mine = words(builtInName).map((w) => w.slice(0, 4));
+  if (!mine.length) return null;
+  const match = custom.find((c) => words(c.name).some((w) => mine.includes(w.slice(0, 4))));
+  return match?.id ?? null;
 }
 
 /** Id under which a category is hidden from the map (with the eye in the Places list). */
