@@ -11,6 +11,17 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    id: '2026-11-11b',
+    title: 'Folders for places, and who added which',
+    items: [
+      'Folders in the Places list: create one with the folder button, drag places onto it (or pick a folder in the place card). Fold them open and closed, hide a folder’s places from the map with the eye, rename or colour a folder in its card.',
+      'On shared trips, each place shows a dot in the colour of the person who added it, on the map and in the Places list. The place card says who added it too.',
+      'Places can be filtered by who added them, next to the status filter.',
+      'Tick “By country” in Places to group them by country.',
+      'What’s new now shows every update you missed since your last visit, and earlier ones are a click away.',
+    ],
+  },
+  {
     id: '2026-11-11',
     title: 'Settings, and a place type for nature',
     items: [

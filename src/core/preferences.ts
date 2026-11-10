@@ -10,6 +10,8 @@ export interface Preferences {
   /** Size of OpenStreetMap places (overlays) on the map. */
   osmPlaceSize: number;
   placeNames: PlaceNames;
+  /** On shared trips, a dot in the colour of whoever added each place. */
+  placeAuthors: boolean;
   /** Multiplies the width of every route line. */
   routeWidth: number;
   /** Routing profile for new bike segments; null for the routing service's default. */
@@ -22,6 +24,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   placeSize: 1,
   osmPlaceSize: 1,
   placeNames: 'zoomed',
+  placeAuthors: true,
   routeWidth: 1,
   bikeProfile: null,
   whatsNew: true,

@@ -6,23 +6,24 @@ import Guide from './Guide.svelte';
 import WhatsNew from './WhatsNew.svelte';
 
 const prefs = createSettings('onboarding');
-/** How many releases the What's new window shows at most. */
-const MAX_SHOWN = 4;
+/** How many releases the What's new window shows when opened by hand (the rest are behind a link). */
+const RECENT = 3;
 const CHECK_EVERY_MS = 30 * 60_000;
 
 /**
- * Releases to show: those newer than the last one seen. Someone who used the app before this
- * window existed (nothing seen yet) gets the latest release only; a first visit gets none.
+ * Releases to show: every one newer than the last one seen. Someone who used the app before this
+ * window existed (nothing seen yet) gets them all; a first visit gets none.
  */
 export function pendingReleases(releases: Release[], seen: string | null, returning: boolean): Release[] {
-  if (seen === null) return returning ? releases.slice(0, 1) : [];
-  return releases.filter((r) => r.id > seen).slice(0, MAX_SHOWN);
+  if (seen === null) return returning ? releases : [];
+  return releases.filter((r) => r.id > seen);
 }
 
 export const markSeen = () => prefs.set('seenRelease', RELEASES[0]?.id ?? null);
 
-export const openWhatsNew = (core: Core, releases: Release[] = RELEASES.slice(0, MAX_SHOWN)) =>
-  core.ui.openDialog(WhatsNew, { core, releases });
+/** `unseen`: the releases missed since the last visit; none when opened by hand (the latest few are shown). */
+export const openWhatsNew = (core: Core, unseen: Release[] = []) =>
+  core.ui.openDialog(WhatsNew, { core, releases: unseen.length ? unseen : RELEASES.slice(0, RECENT), unseen: unseen.length, all: RELEASES });
 
 export const openGuide = (core: Core) => core.ui.openDialog(Guide, { core });
 

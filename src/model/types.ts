@@ -1,6 +1,6 @@
 export type LngLat = [lng: number, lat: number];
 
-export type EntityType = 'trip' | 'route' | 'stage' | 'group' | 'segment' | 'poi' | 'zone' | 'borderCrossing' | 'comment';
+export type EntityType = 'trip' | 'route' | 'stage' | 'group' | 'segment' | 'poi' | 'poiFolder' | 'zone' | 'borderCrossing' | 'comment';
 
 export interface BaseEntity {
   id: string;
@@ -148,6 +148,17 @@ export interface Poi extends BaseEntity {
   status: PoiStatus;
   createdBy: string;
   osm?: OsmRef;
+  /** Folder in the Places list; none (or a deleted folder) means loose. */
+  folderId?: string;
+}
+
+/** A folder of places in the Places list. */
+export interface PoiFolder extends BaseEntity {
+  type: 'poiFolder';
+  name: string;
+  order: string;
+  /** Colour of the folder icon. */
+  color?: string;
 }
 
 export interface Zone extends BaseEntity {
@@ -184,7 +195,7 @@ export interface Comment extends BaseEntity {
   createdAt: number;
 }
 
-export type Entity = Trip | Route | Stage | Group | Segment | Poi | Zone | BorderCrossing | Comment;
+export type Entity = Trip | Route | Stage | Group | Segment | Poi | PoiFolder | Zone | BorderCrossing | Comment;
 export type EntityOf<T extends EntityType> = Extract<Entity, { type: T }>;
 
 /** An entity before it has been stamped by the command system. */

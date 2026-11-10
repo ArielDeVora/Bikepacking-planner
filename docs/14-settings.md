@@ -7,6 +7,7 @@ The Settings window opens from the sliders button at the top of the side panel, 
 | Size of your places | 100 % | Your places and border crossings on the map (60–180 %). |
 | Size of OpenStreetMap places | 100 % | The OSM overlays from the map pane (60–180 %). |
 | Names of your places | When zoomed in | Always, from zoom 11, or never. |
+| Show who added each place | On | On shared trips, a dot in the colour of whoever added each place. |
 | Route line thickness | 100 % | Scales every route line, including widths set on a segment (50–250 %). |
 | Routing profile for new bike segments | Trekking | Profile given to bike segments you draw from now on. Existing segments keep theirs, so a change never re-routes anything (or anyone else's view of it). |
 | Theme | Match system | Light, dark, or follow the system. The sun/moon button still switches between light and dark. |

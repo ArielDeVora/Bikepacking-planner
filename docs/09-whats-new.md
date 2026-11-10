@@ -2,9 +2,9 @@
 
 ## What people see
 
-- **After an update**: the first time someone opens the planner after a new release, a **What's new** window lists what changed since their last visit (at most the four latest releases). **Show me around** opens the guide; **Got it** closes it. It only shows once per release.
+- **After an update**: the first time someone opens the planner after a new release, a **What's new** window lists every release since their last visit (all of them for someone who used the planner before the window existed), with earlier releases behind an **Earlier updates** link. It can be turned off in Settings. **Show me around** opens the guide; **Got it** closes it. It only shows once per release.
 - **First visit**: the **guide** opens instead, a short walk through the planner in nine steps (Next / Back, the arrow keys, or the dots; Skip closes it).
-- **Any time**: the `?` cheatsheet has **What's new** and **Guide** links.
+- **Any time**: the `?` cheatsheet has **What's new** (the latest three releases, and the rest behind **Earlier updates**) and **Guide** links.
 - **New version online while the planner is open**: the tab checks every 30 minutes (and when you come back to it) whether a newer build has been deployed, and shows a notice with **Reload**. Reloading then shows What's new.
 
 ## Releasing something

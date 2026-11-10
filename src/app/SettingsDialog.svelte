@@ -60,6 +60,13 @@
         {/each}
       </span>
     </div>
+    <label class="row check">
+      <input type="checkbox" checked={$prefs.placeAuthors} onchange={(e) => set('placeAuthors', e.currentTarget.checked)} />
+      <span class="text">
+        <span>{t('settings.placeAuthors')}</span>
+        <span class="hint">{t('settings.placeAuthorsHint')}</span>
+      </span>
+    </label>
   </section>
 
   <section>

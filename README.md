@@ -15,7 +15,7 @@ Press **?** (or the **?** button at the bottom of the toolbar) for a cheatsheet 
 - **Sharing** (side panel): sign in, share the trip, invite friends, switch between trips. Comments are at the bottom of each stage or segment card.
 - **Import**: drop GPX, KML, TCX or GeoJSON files on the page (many at once), check the preview, pick the stage. **Export** the trip, a stage or a segment as GPX, or the whole trip as a JSON backup (drop it back in to restore it as a new trip).
 - **E** opens the elevation profile for the selected segment, its stage, or the whole trip. The **Stats** section shows km and climb by travel mode.
-- **P** adds a place (POI) on the map; the **Places** section lists them. **/** focuses the search box (places or coordinates). OSM overlays (water, bike shops, campsites…) are in the **Map** section.
+- **P** adds a place (POI) on the map; the **Places** section lists them, in folders if you like (drag places onto a folder), filtered by status or by who added them, or grouped by country. **/** focuses the search box (places or coordinates). OSM overlays (water, bike shops, campsites…) are in the **Map** section.
 - Google Maps lists: export them with Google Takeout (CSV) or Google My Maps (KML) and drop the file in; re-import a newer export to add what's new. See [docs/06](docs/06-pois-search-osm.md#google-maps-lists).
 - Click shops, restaurants and sights on the base map (from zoom 15) for details (opening hours, phone, website, Wikipedia) and **Add to trip**.
 - **A** draws an avoid zone (no-go zones are routed around). **Border crossings** in the side panel lists where the trip changes country; add notes (status, link, last verified) to each.

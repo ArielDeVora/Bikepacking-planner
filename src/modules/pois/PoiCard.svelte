@@ -3,6 +3,8 @@
   import { edits } from '../../core/commands';
   import type { ModuleContext } from '../../core/module';
   import { icons } from '../../lib/icons';
+  import { authorOf } from '../../lib/places/authors';
+  import { createFolderCommand, folderOf, moveToFolderCommand, sortedFolders } from '../../lib/places/folders';
   import PlaceInfo from '../../lib/places/PlaceInfo.svelte';
   import Icon from '../../lib/ui/Icon.svelte';
   import IconButton from '../../lib/ui/IconButton.svelte';
@@ -16,6 +18,38 @@
     void $store;
     return store.get(id, 'poi');
   });
+
+  const shared = $derived(ctx.cloud.shared);
+  const members = $derived(ctx.cloud.members);
+  const author = $derived.by(() => {
+    void $members;
+    return poi ? authorOf(ctx.cloud, t, poi.createdBy) : null;
+  });
+
+  const folders = $derived.by(() => {
+    void $store;
+    return sortedFolders(store);
+  });
+  const folderId = $derived.by(() => {
+    void $store;
+    return poi ? (folderOf(store, poi)?.id ?? '') : '';
+  });
+  const NEW_FOLDER = '__new';
+
+  function pickFolder(value: string) {
+    if (value === NEW_FOLDER) {
+      const { command } = createFolderCommand(store, {
+        tripId: ctx.tripId,
+        name: t('folder.defaultName', { n: folders.length + 1 }),
+        label: t('cmd.addFolder'),
+        poiIds: [id],
+      });
+      commands.run(command);
+      return;
+    }
+    const cmd = moveToFolderCommand(store, [id], value || null, t('cmd.moveToFolder'));
+    if (cmd) commands.run(cmd);
+  }
 
   let newLink = $state('');
 
@@ -45,6 +79,13 @@
 </script>
 
 {#if poi}
+  {#if $shared && author}
+    <p class="added">
+      <span class="dot" style:background={author.color}></span>
+      {t('poi.addedBy', { name: author.key === 'me' ? t('collab.you') : author.name })}
+    </p>
+  {/if}
+
   <label class="field">
     <span>{t('poi.name')}</span>
     <input type="text" value={poi.name} oninput={(e) => patch({ name: e.currentTarget.value }, 'name')} onblur={() => commands.seal()} />
@@ -79,6 +120,17 @@
   </div>
 
   <label class="field">
+    <span>{t('folder.label')}</span>
+    <select value={folderId} onchange={(e) => pickFolder(e.currentTarget.value)}>
+      <option value="">{t('folder.none')}</option>
+      {#each folders as f (f.id)}
+        <option value={f.id}>{f.name || t('poi.untitled')}</option>
+      {/each}
+      <option value={NEW_FOLDER}>{t('folder.newFrom')}</option>
+    </select>
+  </label>
+
+  <label class="field">
     <span>{t('poi.notes')}</span>
     <textarea value={poi.notes} oninput={(e) => patch({ notes: e.currentTarget.value }, 'notes')} onblur={() => commands.seal()}></textarea>
   </label>
@@ -107,6 +159,21 @@
 {/if}
 
 <style>
+  .added {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0 0 8px;
+    font-size: 12px;
+    color: var(--fg-muted);
+  }
+
+  .dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+  }
+
   .cats {
     display: flex;
     flex-wrap: wrap;

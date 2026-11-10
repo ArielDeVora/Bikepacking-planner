@@ -1,4 +1,4 @@
-import type { GeoJSONSource, MapLayerMouseEvent, MapMouseEvent } from 'maplibre-gl';
+import { LngLatBounds, type GeoJSONSource, type MapLayerMouseEvent, type MapMouseEvent } from 'maplibre-gl';
 import { derived, get } from 'svelte/store';
 import { POI_CATEGORIES, POI_CATEGORY_ORDER } from '../../config/pois';
 import { edits } from '../../core/commands';
@@ -6,9 +6,12 @@ import { defineModule } from '../../core/module';
 import { icons } from '../../lib/icons';
 import { addRoundIcon } from '../../lib/map-icons';
 import { placeNameField } from '../../lib/map-prefs';
+import { authorOf } from '../../lib/places/authors';
+import { folderOf, folderPlaces } from '../../lib/places/folders';
 import { createPoiCommand } from '../../lib/places/poi';
 import type { LngLat, Poi } from '../../model/types';
 import PlacesSection from './PlacesSection.svelte';
+import FolderCard from './FolderCard.svelte';
 import PoiCard from './PoiCard.svelte';
 
 const SOURCE = 'pois';
@@ -78,8 +81,31 @@ export default defineModule({
       map.setPaintProperty('pois-ring', 'circle-radius', ['case', ['get', 'selected'], 18 * s, 16 * s]);
     });
     const offNames = prefs.watch('placeNames', (names) => map.setLayoutProperty('pois', 'text-field', placeNameField(names)));
+    // Who added each place: a dot in their colour, on shared trips.
+    layers.addLayer(
+      {
+        id: 'pois-author',
+        type: 'circle',
+        source: SOURCE,
+        filter: ['has', 'author'],
+        paint: {
+          'circle-radius': 4.5,
+          'circle-color': ['get', 'author'],
+          'circle-stroke-width': 1.5,
+          'circle-stroke-color': '#ffffff',
+          'circle-translate': [9, -9],
+          'circle-opacity': ['case', ['==', ['get', 'status'], 'skip'], 0.45, 1],
+          'circle-stroke-opacity': ['case', ['==', ['get', 'status'], 'skip'], 0.45, 1],
+        },
+      },
+      'poi',
+    );
+    const offAuthorSize = prefs.watch('placeSize', (s) => {
+      map.setPaintProperty('pois-author', 'circle-radius', 4.5 * s);
+      map.setPaintProperty('pois-author', 'circle-translate', [9 * s, -9 * s]);
+    });
     const removePointLayer = ui.addPointLayer('pois');
-    const removeOverlay = layers.registerOverlay({ id: 'pois', label: t('poi.overlay'), layerIds: ['pois', 'pois-ring'], visible: true, order: 10, group: 'trip' });
+    const removeOverlay = layers.registerOverlay({ id: 'pois', label: t('poi.overlay'), layerIds: ['pois', 'pois-ring', 'pois-author'], visible: true, order: 10, group: 'trip' });
 
     // Rendering
     let dragging: { id: string; lngLat: LngLat } | null = null;
@@ -87,9 +113,20 @@ export default defineModule({
     const render = () => {
       frame = 0;
       const sel = new Set(selection.current);
-      const features: GeoJSON.Feature[] = store.list('poi').map((p) => ({
+      const authors = get(ctx.cloud.shared) && prefs.current.placeAuthors;
+      const hidden = get(ctx.visibility.hidden);
+      // Places in a hidden folder are left off the map; those in a selected folder are highlighted.
+      const shown = store.list('poi').filter((p) => !(p.folderId && hidden.has(p.folderId) && folderOf(store, p)));
+      const features: GeoJSON.Feature[] = shown.map((p) => ({
         type: 'Feature',
-        properties: { id: p.id, category: p.category, status: p.status, name: p.name, selected: sel.has(p.id) },
+        properties: {
+          id: p.id,
+          category: p.category,
+          status: p.status,
+          name: p.name,
+          selected: sel.has(p.id) || (!!p.folderId && sel.has(p.folderId)),
+          ...(authors ? { author: authorOf(ctx.cloud, t, p.createdBy).color } : {}),
+        },
         geometry: { type: 'Point', coordinates: dragging?.id === p.id ? dragging.lngLat : p.lngLat },
       }));
       (map.getSource(SOURCE) as GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features });
@@ -98,9 +135,12 @@ export default defineModule({
       if (!frame) frame = requestAnimationFrame(render);
     };
     const offStore = store.onChange(({ ids }) => {
-      if (ids.some((id) => store.getRaw(id)?.type === 'poi')) schedule();
+      if (ids.some((id) => store.getRaw(id)?.type === 'poi' || store.getRaw(id)?.type === 'poiFolder')) schedule();
     });
     const offSelection = ctx.bus.on('selection:changed', schedule);
+    const offPeople = [ctx.cloud.shared, ctx.cloud.members, ctx.cloud.profile].map((s) => s.subscribe(schedule));
+    const offAuthors = prefs.watch('placeAuthors', schedule);
+    const offHidden = ctx.visibility.hidden.subscribe(schedule);
     schedule();
 
     // Adding, selecting and dragging
@@ -172,14 +212,32 @@ export default defineModule({
 
     const removeTool = ui.addTool({ id: ADD_TOOL, label: t('poi.add'), icon: icons.pin, shortcut: 'p', order: 30, active: tool, run: toggleAdd });
     const removeShortcut = shortcuts.add({ keys: 'p', label: t('poi.add'), run: toggleAdd });
+    /** Selects a folder and brings its places into view if some are off screen. */
+    const focusFolder = (id: string) => {
+      selection.set([id]);
+      const places = folderPlaces(store, id);
+      if (!places.length) return;
+      const bounds = new LngLatBounds();
+      for (const p of places) bounds.extend(p.lngLat);
+      const view = map.getBounds();
+      if (view.contains(bounds.getSouthWest()) && view.contains(bounds.getNorthEast())) return;
+      map.fitBounds(bounds, { padding: { top: 60, bottom: 60, left: 380, right: 340 }, maxZoom: 13 });
+    };
+
     const removeCard = ui.addCardRenderer('poi', { component: PoiCard, props: { ctx } });
-    const removeSection = ui.addPanelSection({ id: 'pois', title: t('poi.title'), component: PlacesSection, props: { ctx, focus }, order: 15 });
+    const removeFolderCard = ui.addCardRenderer('poiFolder', { component: FolderCard, props: { ctx } });
+    const removeSection = ui.addPanelSection({ id: 'pois', title: t('poi.title'), component: PlacesSection, props: { ctx, focus, focusFolder }, order: 15 });
 
     return () => {
       offStore();
       offSelection();
       offSize();
       offNames();
+      offAuthorSize();
+      offAuthors();
+      offHidden();
+      offPeople.forEach((off) => off());
+      removeFolderCard();
       removeOverlay();
       removePointLayer();
       removeTool();

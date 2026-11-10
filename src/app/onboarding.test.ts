@@ -14,12 +14,13 @@ describe("what's new", () => {
     expect(pendingReleases(releases, '2026-12-01', true)).toEqual([]);
   });
 
-  it('shows only the latest to earlier users, and nothing on a first visit', () => {
-    expect(pendingReleases(releases, null, true).map((x) => x.id)).toEqual(['2026-12-01']);
+  it('shows them all to earlier users who never saw the window, and nothing on a first visit', () => {
+    expect(pendingReleases(releases, null, true)).toEqual(releases);
     expect(pendingReleases(releases, null, false)).toEqual([]);
   });
 
-  it('shows at most four', () => {
-    expect(pendingReleases([...releases, r('2026-10-01')], '2000-01-01', true)).toHaveLength(4);
+  it('shows every missed release, however many', () => {
+    const many = [...releases, r('2026-10-01'), r('2026-09-01')];
+    expect(pendingReleases(many, '2000-01-01', true)).toHaveLength(6);
   });
 });
