@@ -77,7 +77,33 @@ export function categoryInfo(store: TripStore, t: typeof translate, id: string):
 /** Every category the trip uses: built-in ones it didn't replace, then custom ones in the order they were made. */
 export function allCategories(store: TripStore, t: typeof translate): CategoryInfo[] {
   const replaced = replacements(store);
-  return [...POI_CATEGORY_ORDER.filter((id) => !replaced[id]), ...customCategories(store).map((f) => f.id)].map((id) => categoryInfo(store, t, id));
+  const ids = [...POI_CATEGORY_ORDER.filter((id) => !replaced[id]), ...customCategories(store).map((f) => f.id)];
+  // The trip's chosen order first; categories it doesn't list yet keep their default place after.
+  const chosen = store.list('trip')[0]?.categoryOrder ?? [];
+  const rank = (id: string) => {
+    const i = chosen.indexOf(id);
+    return i < 0 ? chosen.length + ids.indexOf(id) : i;
+  };
+  return ids.sort((a, b) => rank(a) - rank(b)).map((id) => categoryInfo(store, t, id));
+}
+
+/** Moves a category before or after another in the display order (shared by everyone on the trip). */
+export function moveCategoryCommand(
+  store: TripStore,
+  t: typeof translate,
+  id: string,
+  nextTo: { id: string; where: 'before' | 'after' },
+  label: string,
+): Command | null {
+  const trip = store.list('trip')[0];
+  if (!trip || id === nextTo.id) return null;
+  const order = allCategories(store, t).map((c) => c.id);
+  const rest = order.filter((c) => c !== id);
+  const at = rest.indexOf(nextTo.id);
+  if (at < 0 || !order.includes(id)) return null;
+  rest.splice(at + (nextTo.where === 'after' ? 1 : 0), 0, id);
+  if (rest.every((c, i) => c === order[i])) return null;
+  return { label, changes: [edits.update<Trip>(store, trip.id, { categoryOrder: rest })] };
 }
 
 /**

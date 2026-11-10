@@ -14,6 +14,7 @@ import {
   deleteCategoryCommand,
   iconPath,
   legacyFolderChanges,
+  moveCategoryCommand,
   movePlacesCommand,
   replaceCategoriesCommand,
   replacements,
@@ -215,5 +216,21 @@ describe('place categories', () => {
       expect(ids.indexOf('z')).toBe(ids.indexOf('x') + 1);
       expect(new Set(store.list('poi', (p) => p.category === 'nature').map((p) => p.order)).size).toBe(3);
     });
+  });
+
+  it('orders the category folders as the trip chooses, new ones after', () => {
+    const mine = create('Hot springs');
+    const ids = () => allCategories(store, t).map((c) => c.id);
+    commands.run(moveCategoryCommand(store, t, mine, { id: 'sight', where: 'before' }, 'move')!);
+    expect(ids().slice(0, 2)).toEqual([mine, 'sight']);
+    commands.run(moveCategoryCommand(store, t, 'other', { id: mine, where: 'after' }, 'move')!);
+    expect(ids().slice(0, 3)).toEqual([mine, 'other', 'sight']);
+    expect(moveCategoryCommand(store, t, 'other', { id: mine, where: 'after' }, 'move')).toBeNull();
+    const later = create('Later');
+    expect(ids().at(-1)).toBe(later);
+    commands.undo();
+    commands.undo();
+    commands.undo();
+    expect(ids().slice(0, 2)).toEqual(['sight', 'nature']);
   });
 });

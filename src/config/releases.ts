@@ -12,8 +12,11 @@ export interface Release {
 export const RELEASES: Release[] = [
   {
     id: '2026-11-14',
-    title: 'Drag places into order',
-    items: ['Drag places in the Places list like segments: a line shows where they’ll go, before or after another place, in the same category or another one. The order is kept for everyone.'],
+    title: 'Drag places and categories into order',
+    items: [
+      'Drag places in the Places list like segments: a line shows where they’ll go, before or after another place, in the same category or another one. The order is kept for everyone.',
+      'Drag a category’s row to change the order of the categories, in the list and in the category picker.',
+    ],
   },
   {
     id: '2026-11-13b',

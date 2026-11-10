@@ -18,6 +18,8 @@ export interface Trip extends BaseEntity {
   startDate?: string;
   /** Built-in place categories this trip doesn't use, each replaced by one of its own (custom) categories. */
   categoryReplacements?: Record<string, string>;
+  /** Display order of the place categories (ids); unlisted ones follow in their default order. */
+  categoryOrder?: string[];
 }
 
 export interface Stage extends BaseEntity {

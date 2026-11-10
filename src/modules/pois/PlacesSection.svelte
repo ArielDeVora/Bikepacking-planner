@@ -13,6 +13,7 @@
     createCategoryCommand,
     customCategories,
     deleteCategoryCommand,
+    moveCategoryCommand,
     movePlacesCommand,
     resolveCategory,
     type CategoryInfo,
@@ -195,6 +196,36 @@
     dropTarget = { id, where: onPlace ? (e.clientY - r.top < r.height / 2 ? 'before' : 'after') : 'into' };
   }
 
+  // Categories are dragged by their row, to change the order of the folders.
+  let draggingCategory = $state<string | null>(null);
+
+  function categoryDragStart(e: DragEvent, id: string) {
+    draggingCategory = id;
+    e.dataTransfer?.setData('text/plain', id);
+    if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+  }
+
+  function categoryDragOver(e: DragEvent, id: string) {
+    if (!draggingCategory) return dragOver(e, id, false);
+    if (draggingCategory === id) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    dropTarget = { id, where: e.clientY - r.top < r.height / 2 ? 'before' : 'after' };
+  }
+
+  function categoryDrop(e: DragEvent, id: string) {
+    if (!draggingCategory) return drop(e, id);
+    e.preventDefault();
+    e.stopPropagation();
+    const moved = draggingCategory;
+    const to = dropTarget;
+    endDrag();
+    if (!to || to.where === 'into') return;
+    const cmd = moveCategoryCommand(store, t, moved, { id: to.id, where: to.where }, t('cmd.moveCategory'));
+    if (cmd) commands.run(cmd);
+  }
+
   function dragLeave(id: string) {
     if (dropTarget?.id === id) dropTarget = null;
   }
@@ -215,6 +246,7 @@
 
   function endDrag() {
     dragging = null;
+    draggingCategory = null;
     dropTarget = null;
   }
 </script>
@@ -289,14 +321,21 @@
       class="row"
       class:selected={!!category?.custom && $selected.includes(category.id)}
       class:hidden={off}
-      class:drop-into={!!category && dropTarget?.id === key}
+      class:drop-into={!!category && dropTarget?.id === key && dropTarget.where === 'into'}
+      class:drop-before={!!category && dropTarget?.id === key && dropTarget.where === 'before'}
+      class:drop-after={!!category && dropTarget?.id === key && dropTarget.where === 'after'}
+      class:dragged={!!category && draggingCategory === category.id}
+      draggable={!!category && !byCountry}
+      title={category && !byCountry ? t('category.dragRow') : undefined}
+      ondragstart={category && !byCountry ? (e) => categoryDragStart(e, category.id) : undefined}
+      ondragend={category ? endDrag : undefined}
       role="treeitem"
       aria-selected={!!category?.custom && $selected.includes(category.id)}
       aria-expanded={!closed}
       tabindex="-1"
-      ondragover={category ? (e) => dragOver(e, key, false) : undefined}
+      ondragover={category ? (e) => categoryDragOver(e, key) : undefined}
       ondragleave={category ? () => dragLeave(key) : undefined}
-      ondrop={category ? (e) => drop(e, category.id) : undefined}
+      ondrop={category ? (e) => categoryDrop(e, category.id) : undefined}
     >
       <button
         type="button"
@@ -448,6 +487,22 @@
 
   .row.selected {
     background: var(--accent-soft);
+  }
+
+  .row.drop-before {
+    box-shadow: inset 0 2px 0 var(--accent);
+  }
+
+  .row.drop-after {
+    box-shadow: inset 0 -2px 0 var(--accent);
+  }
+
+  .row.dragged {
+    opacity: 0.45;
+  }
+
+  .row[draggable='true'] {
+    cursor: grab;
   }
 
   .row.drop-into {
