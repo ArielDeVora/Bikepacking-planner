@@ -1,3 +1,4 @@
+import { ancestorIds } from '../../lib/tree';
 import type { MapMouseEvent, PointLike } from 'maplibre-gl';
 import { derived, get, type Readable } from 'svelte/store';
 import { edits } from '../../core/commands';
@@ -62,7 +63,7 @@ export class RouteEditor {
     const seg = id ? this.ctx.store.get(id, 'segment') : undefined;
     if (!seg || seg.geomType === 'imported') return undefined;
     // Hidden from the map: nothing to edit there.
-    return this.ctx.visibility.segmentHidden(seg) ? undefined : seg;
+    return this.ctx.visibility.anyHidden(ancestorIds(this.ctx.store, seg)) ? undefined : seg;
   }
 
   attach(): () => void {
@@ -126,10 +127,12 @@ export class RouteEditor {
     const stageId =
       selectedEntity?.type === 'stage' ? selectedEntity.id : selectedEntity?.type === 'segment' || selectedEntity?.type === 'group' ? selectedEntity.stageId : undefined;
     const groupId = selectedEntity?.type === 'group' ? selectedEntity.id : selectedEntity?.type === 'segment' ? selectedEntity.groupId : undefined;
+    const routeId = selectedEntity?.type === 'route' ? selectedEntity.id : undefined;
     const { command, segmentId } = createSegment(store, {
       tripId: this.ctx.tripId,
       stageId,
       groupId,
+      routeId,
       mode: this.defaultMode(),
       points: [this.#start, lngLat],
       label: t('cmd.drawSegment'),

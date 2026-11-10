@@ -2,9 +2,9 @@ import { STAGE_COLORS } from '../../config/modes';
 import { edits, type Change, type Command } from '../../core/commands';
 import type { TripStore } from '../../core/store';
 import { newId } from '../../model/ids';
-import { compareOrder, keyBetween } from '../../model/order';
+import { keyBetween } from '../../model/order';
 import { distance } from '../../lib/geo/geo';
-import { stageChildren } from '../../lib/tree';
+import { routeStages, sortedStages, stageChildren, tripChildren } from '../../lib/tree';
 import { importedGeometry } from '../../model/segment';
 import type { Poi, Segment, Stage, TravelMode, Zone } from '../../model/types';
 import type { ParsedFile, ParsedWaypoint } from './parse';
@@ -21,6 +21,8 @@ export interface ImportOptions {
   userId: string;
   target: ImportTarget;
   defaultStageId?: string;
+  /** Route that new stages go into. */
+  routeId?: string;
   mode: TravelMode;
   waypoints: boolean;
   /** Import polygons as zones of this kind, or not at all. */
@@ -56,8 +58,9 @@ const baseName = (file: string) => file.replace(/\.[^.]+$/, '');
 
 export function buildImport(store: TripStore, files: ParsedFile[], opts: ImportOptions): ImportResult {
   const changes: Change[] = [];
-  const stages = store.list('stage').sort(compareOrder);
-  let lastStageOrder = stages.at(-1)?.order ?? null;
+  const stages = sortedStages(store);
+  const route = opts.routeId ? store.get(opts.routeId, 'route') : undefined;
+  let lastStageOrder = (route ? routeStages(store, route.id) : tripChildren(store)).at(-1)?.order ?? null;
   const lastSegmentOrder = new Map<string, string | null>();
   const segmentIds: string[] = [];
   const newStages: string[] = [];
@@ -75,6 +78,7 @@ export function buildImport(store: TripStore, files: ParsedFile[], opts: ImportO
         id,
         type: 'stage',
         tripId: opts.tripId,
+        ...(route ? { routeId: route.id } : {}),
         order: lastStageOrder,
         name,
         notes: '',

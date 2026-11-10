@@ -3,7 +3,7 @@ import { defineModule } from '../../core/module';
 import { makeBackup, restoreBackup } from './backup';
 import DropHint from './DropHint.svelte';
 import ExportLink from './ExportLink.svelte';
-import { groupGpx, segmentGpx, stageGpx, tripGpx } from './export';
+import { groupGpx, routeGpx, segmentGpx, stageGpx, tripGpx } from './export';
 import { download, safeFileName } from './gpx';
 import ImportDialog from './ImportDialog.svelte';
 import IoSection from './IoSection.svelte';
@@ -105,6 +105,13 @@ export default defineModule({
       types: ['stage'],
       order: 5,
     });
+    const removeRouteExport = ui.addCardSection({
+      id: 'io.route',
+      component: ExportLink,
+      props: { ctx, exportGpx: (id: string) => save(routeGpx(store, id)) },
+      types: ['route'],
+      order: 5,
+    });
     const removeGroupExport = ui.addCardSection({
       id: 'io.group',
       component: ExportLink,
@@ -155,6 +162,7 @@ export default defineModule({
       removeSection();
       removeStageExport();
       removeGroupExport();
+      removeRouteExport();
       removeSegmentExport();
       window.removeEventListener('dragenter', onEnter);
       window.removeEventListener('dragleave', onLeave);

@@ -6,7 +6,8 @@
   import { lineStyleOf } from '../../lib/ui/line-style';
   import { MODES } from '../../config/modes';
   import { arrangeAction, fuseAction, groupSegmentsAction } from '../../lib/segment-actions';
-  import { sortedStages } from '../../lib/tree';
+  import { sortedStages, stageLabel } from '../../lib/tree';
+  import { makeRouteCommand } from '../../lib/route-edits';
   import type { Segment } from '../../model/types';
 
   let { ids, ctx }: { ids: string[]; ctx: ModuleContext } = $props();
@@ -20,6 +21,15 @@
     return ids.map((id) => store.get(id)).filter((e) => !!e);
   });
   const segments = $derived.by(() => inTripOrder(store, items.filter((e) => e.type === 'segment')));
+  const selectedStages = $derived(items.filter((e) => e.type === 'stage'));
+
+  function makeRoute() {
+    const n = store.list('route').length + 1;
+    const res = makeRouteCommand(store, selectedStages, t('route.defaultName', { n }), t('cmd.makeRoute'));
+    if (!res) return;
+    commands.run(res.command);
+    selection.set([res.routeId]);
+  }
   const deletable = $derived(items.filter((e) => DELETABLE.has(e.type)));
   const stages = $derived.by(() => {
     void $store;
@@ -54,6 +64,9 @@
   {#if segments.length}
     <button type="button" class="btn" onclick={() => groupSegmentsAction(ctx, segments)} title={t('multi.groupHint')}>{t('multi.group')}</button>
   {/if}
+  {#if selectedStages.length}
+    <button type="button" class="btn" onclick={makeRoute} title={t('multi.makeRouteHint')}>{t('multi.makeRoute')}</button>
+  {/if}
   {#if deletable.length}
     <button type="button" class="btn danger" onclick={() => commands.run({ label: t('tree.delete'), changes: removeChanges(store, deletable.map((e) => e.id)) })}>
       {t('multi.delete', { n: deletable.length })}
@@ -67,7 +80,7 @@
     <select value="" onchange={(e) => e.currentTarget.value && moveTo(e.currentTarget.value)}>
       <option value="" disabled>{t('multi.chooseStage')}</option>
       {#each stages as st (st.id)}
-        <option value={st.id}>{st.name}</option>
+        <option value={st.id}>{stageLabel(store, st)}</option>
       {/each}
     </select>
   </label>

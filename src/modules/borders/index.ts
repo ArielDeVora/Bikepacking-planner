@@ -213,7 +213,7 @@ export default defineModule({
         renderAnnotations();
         renderDetected(get(crossings).crossings);
       }
-      if (index && (types.has('segment') || types.has('stage') || types.has('group'))) {
+      if (index && (types.has('segment') || types.has('stage') || types.has('group') || types.has('route'))) {
         clearTimeout(timer);
         timer = setTimeout(() => void compute(), RECOMPUTE_MS);
       }

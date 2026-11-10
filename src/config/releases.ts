@@ -11,6 +11,15 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    id: '2026-11-10b',
+    title: 'Routes: several versions of the trip',
+    items: [
+      'Keep several routes in one trip (another group’s plan, your own variant), each with its own stages. Add one with the route button at the top of the side panel, then drag stages onto it.',
+      'Duplicate a route to try a variant without touching the original, and give each route its own colour.',
+      'The target button on a route shows only that route on the map. Stats compares the routes side by side.',
+    ],
+  },
+  {
     id: '2026-11-10',
     title: 'Clearer selection and smarter fusing',
     items: [

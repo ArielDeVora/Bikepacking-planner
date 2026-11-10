@@ -3,7 +3,7 @@
   import { icons } from '../../lib/icons';
   import { nextSegment } from '../../lib/segment-edits';
   import Icon from '../../lib/ui/Icon.svelte';
-  import { compareOrder } from '../../model/order';
+  import { sortedStages, stageLabel } from '../../lib/tree';
   import type { EditActions } from './index';
 
   let { id, ctx, actions }: { id: string; ctx: ModuleContext; actions: EditActions } = $props();
@@ -17,7 +17,7 @@
   });
   const stages = $derived.by(() => {
     void $store;
-    return store.list('stage').sort(compareOrder);
+    return sortedStages(store);
   });
   const hasNext = $derived.by(() => {
     void $store;
@@ -62,7 +62,7 @@
       <span>{t('edit.stage')}</span>
       <select value={seg.stageId} onchange={(e) => actions.moveTo(id, e.currentTarget.value)}>
         {#each stages as st (st.id)}
-          <option value={st.id}>{st.name}</option>
+          <option value={st.id}>{stageLabel(store, st)}</option>
         {/each}
       </select>
     </label>

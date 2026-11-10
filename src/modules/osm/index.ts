@@ -171,7 +171,7 @@ export default defineModule({
     map.on('mousemove', onBaseHover);
 
     const removeWidget = ui.addWidget({ id: 'osm.status', component: OsmStatus, props: { t, status }, order: 20 });
-    const removeStage = ui.addCardSection({ id: 'osm.stage', component: StageOsm, props: { ctx, loadAlong }, types: ['stage', 'group'], order: 6 });
+    const removeStage = ui.addCardSection({ id: 'osm.stage', component: StageOsm, props: { ctx, loadAlong }, types: ['route', 'stage', 'group'], order: 6 });
 
     return () => {
       clearTimeout(timer);

@@ -5,11 +5,11 @@
   import IconButton from '../../lib/ui/IconButton.svelte';
   import { eraseCommand } from '../../lib/segment-edits';
   import { sliceLine } from '../../model/edit-ops';
-  import { groupSegments, stageSegments as allStageSegments, tripSegments } from '../../lib/tree';
+  import { groupSegments, routeOf, routeSegments, stageSegments as allStageSegments, tripSegments } from '../../lib/tree';
   import type { Segment } from '../../model/types';
   import { buildProfile, eleAt, GRADE_LEGEND, gradeAt, gradeColor, positionAt, type Profile } from './profile';
 
-  type Scope = 'segment' | 'stage' | 'trip';
+  type Scope = 'segment' | 'stage' | 'route' | 'trip';
 
   let {
     ctx,
@@ -51,9 +51,23 @@
   });
   const pickedStage = $derived(picked.length && picked.every((s) => s.stageId === picked[0]!.stageId) ? picked[0]!.stageId : null);
   // With a segment selected, the profile shows its stage with the segment highlighted.
-  const scopes = $derived<Scope[]>(
-    picked.length === 1 ? ['stage', 'segment', 'trip'] : pickedStage ? ['stage', 'trip'] : picked.length ? ['trip'] : selected?.type === 'stage' ? ['stage', 'trip'] : ['trip'],
-  );
+  /** The route of what's selected, when all of it is in one route. */
+  const pickedRoute = $derived.by(() => {
+    void $store;
+    const routes = new Set($ids.map((id) => routeOf(store, id)?.id ?? null));
+    return routes.size === 1 ? ([...routes][0] ?? null) : null;
+  });
+  const scopes = $derived.by<Scope[]>(() => {
+    const base: Scope[] =
+      selected?.type === 'route'
+        ? []
+        : picked.length === 1
+          ? ['stage', 'segment']
+          : pickedStage || selected?.type === 'stage'
+            ? ['stage']
+            : [];
+    return [...base, ...(pickedRoute ? (['route'] as const) : []), 'trip'];
+  });
   const scope = $derived(chosen && scopes.includes(chosen) ? chosen : scopes[0]!);
 
   // Back to the default view whenever the selection changes.
@@ -74,6 +88,9 @@
     if (scope === 'segment' && picked.length === 1) return { title: picked[0]!.name, segments: [picked[0]!] };
     const stageId = selected?.type === 'stage' ? selected.id : pickedStage;
     if (scope === 'stage' && stageId) return { title: store.get(stageId, 'stage')?.name ?? '', segments: stageSegments(stageId) };
+    if (scope === 'route' && pickedRoute) {
+      return { title: store.get(pickedRoute, 'route')?.name ?? '', segments: routeSegments(store, pickedRoute).filter(ground) };
+    }
     return { title: store.get(ctx.tripId, 'trip')?.name ?? '', segments: tripSegments(store).filter(ground) };
   });
 

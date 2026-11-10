@@ -5,7 +5,7 @@
   import type { ModuleContext } from '../../core/module';
   import { lineLength } from '../../lib/geo/geo';
   import { Photon } from '../../lib/photon';
-  import { compareOrder } from '../../model/order';
+  import { routeOf, routeStages, sortedStages, stageLabel } from '../../lib/tree';
   import type { TravelMode } from '../../model/types';
   import { buildImport, type ImportTarget } from './importer';
   import type { ParsedFile, ParsedWaypoint } from './parse';
@@ -21,10 +21,12 @@
   } = $props();
   const { t, store, ui, commands, selection, map } = $derived(ctx);
 
-  const stages = $derived(store.list('stage').sort(compareOrder));
+  const stages = $derived(sortedStages(store));
+  const selectedRoute = $derived(routeOf(store, selection.current[0]));
   const defaultStageId = $derived.by(() => {
     const id = selection.current[0];
     const e = id ? store.get(id) : undefined;
+    if (e?.type === 'route') return routeStages(store, e.id).at(-1)?.id;
     return e?.type === 'stage' ? e.id : e?.type === 'segment' || e?.type === 'group' ? e.stageId : undefined;
   });
 
@@ -107,6 +109,7 @@
       userId: ctx.user.id,
       target,
       defaultStageId,
+      routeId: selectedRoute?.id,
       mode,
       waypoints: withWaypoints,
       areas: areasAs || null,
@@ -199,7 +202,7 @@
       <option value="auto">{t('io.targetAuto', { stage: autoStageName })}</option>
       <option value="perFile">{t('io.targetPerFile')}</option>
       {#each stages as st (st.id)}
-        <option value={st.id}>{st.name}</option>
+        <option value={st.id}>{stageLabel(store, st)}</option>
       {/each}
     </select>
   </label>

@@ -27,7 +27,7 @@ export interface ModuleContext {
   /** Sign-in, sharing and sync. */
   readonly cloud: Cloud;
   readonly trips: TripManager;
-  /** Stages and segments hidden from the map (per browser). */
+  /** Routes, stages, groups and segments hidden from the map (per browser). */
   readonly visibility: Visibility;
   readonly tripId: string;
   readonly t: typeof t;

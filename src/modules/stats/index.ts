@@ -12,7 +12,7 @@ export default defineModule({
       props: { ctx },
       order: 20,
     });
-    const removeCard = ctx.ui.addCardSection({ id: 'stats.stage', component: StageStats, props: { ctx }, types: ['stage', 'group'], order: 3 });
+    const removeCard = ctx.ui.addCardSection({ id: 'stats.stage', component: StageStats, props: { ctx }, types: ['route', 'stage', 'group'], order: 3 });
     return () => {
       removeSection();
       removeCard();

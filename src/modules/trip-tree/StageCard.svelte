@@ -3,7 +3,8 @@
   import type { ModuleContext } from '../../core/module';
   import type { Stage } from '../../model/types';
   import { arrangeAction } from '../../lib/segment-actions';
-  import { stageSegments } from '../../lib/tree';
+  import { sortedRoutes, stageSegments } from '../../lib/tree';
+  import { moveTopCommand } from '../../lib/route-edits';
 
   let { id, ctx }: { id: string; ctx: ModuleContext } = $props();
   const { t, commands } = $derived(ctx);
@@ -13,6 +14,16 @@
     void $store;
     return store.get(id, 'stage');
   });
+
+  const routes = $derived.by(() => {
+    void $store;
+    return sortedRoutes(store);
+  });
+
+  function moveToRoute(routeId: string) {
+    const cmd = moveTopCommand(store, [id], routeId || undefined, null, t('cmd.moveStage'));
+    if (cmd) commands.run(cmd);
+  }
 
   type Field = 'name' | 'notes' | 'plannedDate' | 'color';
 
@@ -41,6 +52,17 @@
       <input type="color" value={stage.color ?? '#d9480f'} onchange={(e) => edit('color', e.currentTarget.value)} />
     </label>
   </div>
+  {#if routes.length}
+    <label class="field">
+      <span>{t('stage.route')}</span>
+      <select value={stage.routeId && routes.some((r) => r.id === stage.routeId) ? stage.routeId : ''} onchange={(e) => moveToRoute(e.currentTarget.value)}>
+        <option value="">{t('stage.noRoute')}</option>
+        {#each routes as r (r.id)}
+          <option value={r.id}>{r.name}</option>
+        {/each}
+      </select>
+    </label>
+  {/if}
   <label class="field">
     <span>{t('stage.notes')}</span>
     <textarea value={stage.notes} oninput={(e) => edit('notes', e.currentTarget.value)} onblur={() => commands.seal()}></textarea>

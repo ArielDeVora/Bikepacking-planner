@@ -1,6 +1,6 @@
 import type { TripStore } from '../../core/store';
 import { distanceToLine } from '../../lib/geo/geo';
-import { groupSegments, stageSegments, tripSegments } from '../../lib/tree';
+import { groupSegments, routeSegments, stageSegments, tripSegments } from '../../lib/tree';
 import { segmentCoords } from '../../model/segment';
 import type { Segment, Stage } from '../../model/types';
 import { toGpx, type GpxTrack, type GpxWaypoint } from './gpx';
@@ -36,6 +36,12 @@ export function stageGpx(store: TripStore, stageId: string): { name: string; xml
   const stage = store.get(stageId, 'stage');
   const name = stage?.name ?? 'Stage';
   const tracks = stageSegments(store, stageId).map((seg) => track(seg, stage));
+  return { name, xml: toGpx(name, tracks, waypoints(store, tracks)) };
+}
+
+export function routeGpx(store: TripStore, routeId: string): { name: string; xml: string } {
+  const name = store.get(routeId, 'route')?.name ?? 'Route';
+  const tracks = routeSegments(store, routeId).map((seg) => track(seg, store.get(seg.stageId, 'stage')));
   return { name, xml: toGpx(name, tracks, waypoints(store, tracks)) };
 }
 

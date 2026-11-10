@@ -1,11 +1,12 @@
-import { MODES, STAGE_COLORS } from '../../config/modes';
+import { MODES } from '../../config/modes';
 import { edits, type Change, type Command } from '../../core/commands';
 import type { TripStore } from '../../core/store';
 import { newId } from '../../model/ids';
-import { groupSegments, sortedStages, stageChildren, stageSegments } from '../../lib/tree';
+import { addStageCommand } from '../../lib/route-edits';
+import { groupSegments, routeStages, sortedStages, stageChildren, stageSegments } from '../../lib/tree';
 import { keyBetween } from '../../model/order';
 import { insertAnchor, rebuildLegs, retryFailedLegs } from '../../model/segment';
-import type { LngLat, Segment, Stage, TravelMode } from '../../model/types';
+import type { LngLat, Segment, TravelMode } from '../../model/types';
 
 export interface NewSegment {
   tripId: string;
@@ -13,6 +14,8 @@ export interface NewSegment {
   stageId?: string;
   /** Group of that stage to add to, at its end. */
   groupId?: string;
+  /** With no stage given: the route whose last stage to add to (or a new stage in it). */
+  routeId?: string;
   mode: TravelMode;
   points: LngLat[];
   label: string;
@@ -22,22 +25,14 @@ export interface NewSegment {
 
 export function createSegment(store: TripStore, opts: NewSegment): { command: Command; segmentId: string } {
   const changes: Change[] = [];
+  const route = !opts.stageId && opts.routeId ? store.get(opts.routeId, 'route') : undefined;
   let stage = opts.stageId ? store.get(opts.stageId, 'stage') : undefined;
-  if (!stage) stage = sortedStages(store).at(-1);
+  if (!stage) stage = route ? routeStages(store, route.id).at(-1) : sortedStages(store).at(-1);
   let stageId = stage?.id;
   if (!stageId) {
-    stageId = newId();
-    changes.push(
-      edits.create<Stage>({
-        id: stageId,
-        type: 'stage',
-        tripId: opts.tripId,
-        order: keyBetween(null, null),
-        name: opts.stageName,
-        notes: '',
-        color: STAGE_COLORS[0],
-      }),
-    );
+    const created = addStageCommand(store, opts.tripId, opts.stageName, opts.label, route?.id).changes[0]!;
+    stageId = created.id;
+    changes.push(created);
   }
 
   const group = opts.groupId ? store.get(opts.groupId, 'group') : undefined;

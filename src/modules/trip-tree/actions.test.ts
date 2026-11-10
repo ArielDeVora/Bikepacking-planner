@@ -3,7 +3,9 @@ import { CommandStack } from '../../core/commands';
 import { TripStore } from '../../core/store';
 import type { Segment } from '../../model/types';
 import { stage, trip, TRIP_ID } from '../../test/fixtures';
-import { addStage, deleteStage, moveStagesCommand, sortedStages } from './actions';
+import { addStageCommand, moveTopCommand } from '../../lib/route-edits';
+import { sortedStages } from '../../lib/tree';
+import { deleteStage } from './actions';
 
 let store: TripStore;
 let commands: CommandStack;
@@ -18,15 +20,15 @@ beforeEach(() => {
 
 describe('trip-tree actions', () => {
   it('appends a stage at the end', () => {
-    const cmd = addStage(store, TRIP_ID, 'New', 'add');
+    const cmd = addStageCommand(store, TRIP_ID, 'New', 'add');
     commands.run(cmd);
     expect(names().at(-1)).toBe(cmd.changes[0]!.id);
   });
 
   it('moves several stages at once', () => {
-    commands.run(moveStagesCommand(store, ['c', 'a'], 'b', 'move')!);
+    commands.run(moveTopCommand(store, ['c', 'a'], undefined, 'b', 'move')!);
     expect(names()).toEqual(['c', 'a', 'b']);
-    commands.run(moveStagesCommand(store, ['c'], null, 'move')!);
+    commands.run(moveTopCommand(store, ['c'], undefined, null, 'move')!);
     expect(names()).toEqual(['a', 'b', 'c']);
   });
 

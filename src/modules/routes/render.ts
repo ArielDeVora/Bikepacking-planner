@@ -3,8 +3,9 @@ import { LEG_STATUS_STYLES, LINE_DASHES, MODE_ORDER, MODES, type LineStyle } fro
 import type { LayerManager } from '../../core/layers';
 import type { TripStore } from '../../core/store';
 import type { Visibility } from '../../core/visibility';
+import { ancestorIds } from '../../lib/tree';
 import { legCoords } from '../../model/segment';
-import type { Group, Segment, Stage } from '../../model/types';
+import type { Group, Route, Segment, Stage } from '../../model/types';
 
 type LineFeature = GeoJSON.Feature<GeoJSON.LineString, LegProps>;
 
@@ -35,14 +36,21 @@ const HIGHLIGHT = '#fcc419';
 const DIMMED = 0.35;
 const EMPTY: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
 
-/** The segment's own colour, else its group's or stage's (bike and walk only), else its mode's. */
-export function segmentColor(seg: Segment, stage: Stage | undefined, group?: Group): string {
+/**
+ * The segment's own colour, else (bike and walk only) its group's, its route's or its stage's,
+ * else its mode's.
+ */
+export function segmentColor(seg: Segment, stage: Stage | undefined, group?: Group, route?: Route): string {
   const mode = MODES[seg.mode];
-  return seg.color ?? (mode.stageColor ? (group?.color ?? stage?.color) : undefined) ?? mode.style.color;
+  return seg.color ?? (mode.stageColor ? (group?.color ?? route?.color ?? stage?.color) : undefined) ?? mode.style.color;
 }
 
-export const routeColor = (store: TripStore, seg: Segment): string =>
-  segmentColor(seg, store.get(seg.stageId, 'stage'), seg.groupId ? store.get(seg.groupId, 'group') : undefined);
+export function routeColor(store: TripStore, seg: Segment): string {
+  const stage = store.get(seg.stageId, 'stage');
+  const group = seg.groupId ? store.get(seg.groupId, 'group') : undefined;
+  const route = stage?.routeId ? store.get(stage.routeId, 'route') : undefined;
+  return segmentColor(seg, stage, group, route);
+}
 
 export function legFeatures(seg: Segment, color: string): LineFeature[] {
   return seg.legs.map((leg, i) => ({
@@ -120,7 +128,7 @@ export class RouteRenderer {
     private visibility: Visibility,
   ) {}
 
-  #shown = (s: Segment) => !this.visibility.segmentHidden(s);
+  #shown = (s: Segment) => !this.visibility.anyHidden(ancestorIds(this.store, s));
 
   install(): void {
     if (!this.map.hasImage(PLANE_ICON)) this.map.addImage(PLANE_ICON, planeImage(), { pixelRatio: 2 });
@@ -324,7 +332,7 @@ export class RouteRenderer {
     for (const id of ids) {
       const e = this.store.getRaw(id);
       if (!e) continue;
-      if (e.type === 'stage' || e.type === 'group') this.#dirtyBg = this.#dirtyActive = true;
+      if (e.type === 'route' || e.type === 'stage' || e.type === 'group') this.#dirtyBg = this.#dirtyActive = true;
       else if (e.type === 'segment') {
         if (id === this.#activeId) this.#dirtyActive = true;
         else this.#dirtyBg = true;

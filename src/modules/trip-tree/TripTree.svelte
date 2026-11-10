@@ -8,10 +8,24 @@
   import IconButton from '../../lib/ui/IconButton.svelte';
   import { deleteGroupCommand, inTripOrder, moveIntoCommand, ungroupCommand, type Container } from '../../lib/segment-edits';
   import { fuseAction } from '../../lib/segment-actions';
-  import { groupSegments, inGroup, siblingsOf, stageChildren, type StageChild } from '../../lib/tree';
-  import type { Entity, Group, Segment, Trip } from '../../model/types';
+  import {
+    groupSegments,
+    inGroup,
+    inRoute,
+    routeOf,
+    routeStages,
+    siblingsOf,
+    sortedStages,
+    stageChildren,
+    stageSiblings,
+    tripChildren,
+    type StageChild,
+    type TripChild,
+  } from '../../lib/tree';
+  import { addRouteCommand, addStageCommand, deleteRouteCommand, dissolveRouteCommand, moveTopCommand } from '../../lib/route-edits';
+  import type { Entity, Group, Route, Segment, Stage, Trip } from '../../model/types';
   import { untrack } from 'svelte';
-  import { addStage, deleteStage, moveStagesCommand, sortedStages } from './actions';
+  import { deleteStage } from './actions';
 
   let { ctx }: { ctx: ModuleContext } = $props();
   const { t, commands, selection } = $derived(ctx);
@@ -55,6 +69,15 @@
     void $store;
     return sortedStages(store);
   });
+  /** Routes and the stages that aren't in a route, in order. */
+  const top = $derived.by(() => {
+    void $store;
+    return tripChildren(store);
+  });
+  const stagesByRoute = $derived.by(() => {
+    void $store;
+    return new Map(top.filter((c) => c.type === 'route').map((r) => [r.id, routeStages(store, r.id)]));
+  });
 
   /** Each stage's groups and ungrouped segments, in order. */
   const childrenByStage = $derived.by(() => {
@@ -68,6 +91,7 @@
   });
   const childSegments = (c: StageChild): Segment[] => (c.type === 'group' ? (segmentsByGroup.get(c.id) ?? []) : [c]);
   const segmentsByStage = $derived(new Map(stages.map((st) => [st.id, (childrenByStage.get(st.id) ?? []).flatMap(childSegments)])));
+  const routeSegs = (id: string) => (stagesByRoute.get(id) ?? []).flatMap((st) => segmentsByStage.get(st.id) ?? []);
 
   const km = (segs: Segment[]) => {
     const m = segs.reduce((sum, s) => sum + s.stats.lengthM, 0);
@@ -91,9 +115,11 @@
 
   // Selection: click selects one, Cmd/Ctrl+click adds or removes, Shift+click selects a range.
   let anchorId: string | null = null;
-  const flat = $derived(
-    stages.flatMap((st) => [st.id, ...(childrenByStage.get(st.id) ?? []).flatMap((c) => (c.type === 'group' ? [c.id, ...childSegments(c).map((s) => s.id)] : [c.id]))]),
-  );
+  const stageFlat = (st: Stage) => [
+    st.id,
+    ...(childrenByStage.get(st.id) ?? []).flatMap((c) => (c.type === 'group' ? [c.id, ...childSegments(c).map((s) => s.id)] : [c.id])),
+  ];
+  const flat = $derived(top.flatMap((c) => (c.type === 'route' ? [c.id, ...(stagesByRoute.get(c.id) ?? []).flatMap(stageFlat)] : stageFlat(c))));
 
   function click(e: MouseEvent, id: string, segs: Segment[]) {
     const type = store.get(id)?.type;
@@ -112,9 +138,10 @@
 
   // Drag and drop. Segments: between two items to move them there, onto a segment to fuse them
   // into it, onto a group or a stage to move them to its end. Groups: between the items of a
-  // stage, or onto a stage. Stages: between other stages. Dragging a selected item drags every
-  // selected item of its kind.
-  type Kind = 'segment' | 'group' | 'stage';
+  // stage, or onto a stage. Stages: between other stages (in a route or not), or onto a route.
+  // Routes: between the routes and loose stages. Dragging a selected item drags every selected
+  // item of its kind.
+  type Kind = 'segment' | 'group' | 'stage' | 'route';
   type Where = 'before' | 'after' | 'onto' | 'into';
   let dragging = $state<string[] | null>(null);
   let dragKind: Kind = 'segment';
@@ -141,13 +168,21 @@
     startDrag(e, 'stage', $selected.includes(id) ? stages.filter((s) => $selected.includes(s.id)).map((s) => s.id) : [id]);
   }
 
+  function dragRouteStart(e: DragEvent, id: string) {
+    startDrag(e, 'route', $selected.includes(id) ? top.filter((c) => c.type === 'route' && $selected.includes(c.id)).map((c) => c.id) : [id]);
+  }
+
   function dragOver(e: DragEvent, id: string, row: Kind) {
     if (!dragging || dragging.includes(id)) return;
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const y = (e.clientY - r.top) / r.height;
     const edge: Where = y < 0.5 ? 'before' : 'after';
     let where: Where | null = null;
-    if (dragKind === 'stage') where = row === 'stage' ? edge : null;
+    if (dragKind === 'route') {
+      const stage = row === 'stage' ? store.get(id, 'stage') : undefined;
+      where = row === 'route' || (stage && !inRoute(store, stage)) ? edge : null;
+    } else if (dragKind === 'stage') where = row === 'stage' ? edge : row === 'route' ? (y < 0.3 ? 'before' : y > 0.7 ? 'after' : 'into') : null;
+    else if (row === 'route') where = null;
     else if (row === 'stage') where = 'into';
     else if (dragKind === 'group') {
       const seg = row === 'segment' ? store.get(id, 'segment') : undefined;
@@ -157,6 +192,13 @@
     e.preventDefault();
     e.stopPropagation();
     target = { id, where };
+  }
+
+  /** Moves stages or routes next to `nextTo` in `list` (the items of the route, or of the trip). */
+  function placeTop(ids: string[], routeId: string | undefined, list: TripChild[], nextTo: string, where: Where, label: string) {
+    const rest = list.filter((c) => !ids.includes(c.id));
+    const before = where === 'before' ? nextTo : (rest[rest.findIndex((c) => c.id === nextTo) + 1]?.id ?? null);
+    return moveTopCommand(store, ids, routeId, before, label);
   }
 
   /** Moves `ids` next to `nextTo` in `list` (the items of `container`). */
@@ -177,10 +219,13 @@
     const label = t(dragKind === 'group' ? 'cmd.moveGroup' : 'cmd.moveSegment');
     const onto = store.get(to.id);
     let cmd = null;
-    if (dragKind === 'stage') {
-      const rest = stages.filter((s) => !ids.includes(s.id));
-      const before = to.where === 'before' ? to.id : (rest[rest.findIndex((s) => s.id === to.id) + 1]?.id ?? null);
-      cmd = moveStagesCommand(store, ids, before, t('cmd.moveStage'));
+    if (dragKind === 'stage' || dragKind === 'route') {
+      const topLabel = t(dragKind === 'route' ? 'cmd.moveRoute' : 'cmd.moveStage');
+      if (onto?.type === 'route') {
+        cmd = to.where === 'into' ? moveTopCommand(store, ids, onto.id, null, topLabel) : placeTop(ids, undefined, tripChildren(store), onto.id, to.where, topLabel);
+      } else if (onto?.type === 'stage') {
+        cmd = placeTop(ids, inRoute(store, onto) ? onto.routeId : undefined, stageSiblings(store, onto), onto.id, to.where, topLabel);
+      }
     } else if (onto?.type === 'stage') cmd = moveIntoCommand(store, ids, { stageId: onto.id }, null, label);
     else if (onto?.type === 'group') {
       cmd =
@@ -206,10 +251,32 @@
 
   const dropClass = (id: string) => (target?.id === id ? `drop-${target.where}` : '');
 
+  /** A new stage, in the selected route if there is one. */
   function add() {
-    const cmd = addStage(store, ctx.tripId, t('tree.stageName', { n: stages.length + 1 }), t('cmd.addStage'));
+    const route = routeOf(store, selection.current[0]);
+    const cmd = addStageCommand(store, ctx.tripId, t('tree.stageName', { n: stages.length + 1 }), t('cmd.addStage'), route?.id);
     commands.run(cmd);
     selection.set([cmd.changes[0]!.id]);
+  }
+
+  function addRoute() {
+    const n = top.filter((c) => c.type === 'route').length + 1;
+    const cmd = addRouteCommand(store, ctx.tripId, t('route.defaultName', { n }), t('cmd.addRoute'));
+    commands.run(cmd);
+    selection.set([cmd.changes[0]!.id]);
+  }
+
+  /** Shows only this route on the map (or everything again, if it's already the only one shown). */
+  function solo(route: Route) {
+    const others = top.filter((c) => c.id !== route.id).map((c) => c.id);
+    const alone = !$hidden.has(route.id) && others.every((id) => $hidden.has(id));
+    ctx.visibility.set(others, !alone);
+    ctx.visibility.set([route.id], false);
+  }
+
+  function dissolve(route: Route) {
+    const cmd = dissolveRouteCommand(store, route.id, t('cmd.dissolveRoute'));
+    if (cmd) commands.run(cmd);
   }
 
   function ungroup(group: Group) {
@@ -234,18 +301,20 @@
 {/if}
 
 <div class="list-head">
-  <span class="muted">{t('tree.stages')}</span>
+  <span class="muted">{t(top.some((c) => c.type === 'route') ? 'tree.routesAndStages' : 'tree.stages')}</span>
   <span class="head-actions">
     {#if $hidden.size}
       <button type="button" class="link" onclick={() => ctx.visibility.showAll()}>{t('tree.showAll')}</button>
     {/if}
-    {#if stages.length}
-      {#if stages.every((s) => collapsed.has(s.id))}
-        <IconButton icon={icons.expand} label={t('tree.expandAll')} size={16} onclick={() => setCollapsed(stages.map((s) => s.id), false)} />
+    {#if top.length}
+      {@const all = [...top.map((c) => c.id), ...stages.map((s) => s.id)]}
+      {#if all.every((id) => collapsed.has(id))}
+        <IconButton icon={icons.expand} label={t('tree.expandAll')} size={16} onclick={() => setCollapsed(all, false)} />
       {:else}
-        <IconButton icon={icons.collapse} label={t('tree.collapseAll')} size={16} onclick={() => setCollapsed(stages.map((s) => s.id), true)} />
+        <IconButton icon={icons.collapse} label={t('tree.collapseAll')} size={16} onclick={() => setCollapsed(all, true)} />
       {/if}
     {/if}
+    <IconButton icon={icons.route} label={t('tree.addRoute')} size={16} onclick={addRoute} />
     <IconButton icon={icons.plus} label={t('tree.addStage')} size={16} onclick={add} />
   </span>
 </div>
@@ -308,125 +377,190 @@
   </li>
 {/snippet}
 
-{#if stages.length === 0}
+{#snippet stageRow(stage: Stage, parentHidden: boolean, routeColor: string | undefined)}
+  {@const segs = segmentsByStage.get(stage.id) ?? []}
+  {@const children = childrenByStage.get(stage.id) ?? []}
+  {@const stageHidden = parentHidden || $hidden.has(stage.id)}
+  <li>
+    <div
+      class="row {dropClass(stage.id)}"
+      class:selected={$selected.includes(stage.id)}
+      class:hidden={stageHidden}
+      class:dragged={dragging?.includes(stage.id)}
+      role="treeitem"
+      aria-selected={$selected.includes(stage.id)}
+      aria-expanded={!collapsed.has(stage.id)}
+      tabindex="-1"
+      draggable="true"
+      ondragstart={(e) => dragStageStart(e, stage.id)}
+      ondragover={(e) => dragOver(e, stage.id, 'stage')}
+      ondragleave={() => target?.id === stage.id && (target = null)}
+      ondrop={drop}
+      ondragend={endDrag}
+    >
+      <button
+        type="button"
+        class="chevron"
+        class:closed={collapsed.has(stage.id)}
+        disabled={!children.length}
+        aria-label={collapsed.has(stage.id) ? t('tree.expand') : t('tree.collapse')}
+        title={collapsed.has(stage.id) ? t('tree.expand') : t('tree.collapse')}
+        onclick={() => setCollapsed([stage.id], !collapsed.has(stage.id))}
+      >
+        <Icon d={icons.down} size={12} />
+      </button>
+      <button type="button" class="name" onclick={(e) => click(e, stage.id, segs)}>
+        <span class="swatch" style:background={routeColor ?? stage.color ?? 'var(--accent)'}></span>
+        <span class="label">{stage.name}</span>
+        {@render editor(stage)}
+        <span class="km muted">{km(segs)}</span>
+      </button>
+      {@render eye(stage.id, parentHidden)}
+      <span class="actions">
+        <IconButton
+          icon={icons.trash}
+          label={t('tree.delete')}
+          size={14}
+          onclick={() => commands.run(deleteStage(store, stage.id, t('cmd.deleteStage')))}
+        />
+      </span>
+    </div>
+    {#if children.length && !collapsed.has(stage.id)}
+      <ol class="segments">
+        {#each children as child (child.id)}
+          {#if child.type === 'group'}
+            {@const gsegs = segmentsByGroup.get(child.id) ?? []}
+            {@const groupHidden = $hidden.has(child.id)}
+            <li>
+              <div
+                class="row group {dropClass(child.id)}"
+                class:selected={$selected.includes(child.id)}
+                class:hidden={stageHidden || groupHidden}
+                class:dragged={dragging?.includes(child.id)}
+                role="treeitem"
+                aria-selected={$selected.includes(child.id)}
+                aria-expanded={!collapsed.has(child.id)}
+                tabindex="-1"
+                draggable="true"
+                title={t('tree.groupHint')}
+                ondragstart={(e) => dragGroupStart(e, child.id)}
+                ondragover={(e) => dragOver(e, child.id, 'group')}
+                ondragleave={() => target?.id === child.id && (target = null)}
+                ondrop={drop}
+                ondragend={endDrag}
+              >
+                <button
+                  type="button"
+                  class="chevron"
+                  class:closed={collapsed.has(child.id)}
+                  disabled={!gsegs.length}
+                  aria-label={collapsed.has(child.id) ? t('tree.expand') : t('tree.collapse')}
+                  title={collapsed.has(child.id) ? t('tree.expand') : t('tree.collapse')}
+                  onclick={() => setCollapsed([child.id], !collapsed.has(child.id))}
+                >
+                  <Icon d={icons.down} size={12} />
+                </button>
+                <button type="button" class="name" onclick={(e) => click(e, child.id, gsegs)}>
+                  <span class="folder" style:color={child.color ?? routeColor ?? stage.color ?? 'var(--accent)'}><Icon d={icons.folder} size={14} /></span>
+                  <span class="label">{child.name}</span>
+                  {@render editor(child)}
+                  <span class="km muted">{km(gsegs)}</span>
+                </button>
+                {@render eye(child.id, stageHidden)}
+                <span class="actions">
+                  <IconButton icon={icons.ungroup} label={t('tree.ungroup')} size={14} onclick={() => ungroup(child)} />
+                  <IconButton
+                    icon={icons.trash}
+                    label={t('tree.delete')}
+                    size={14}
+                    onclick={() => commands.run(deleteGroupCommand(store, child.id, t('cmd.deleteGroup')))}
+                  />
+                </span>
+              </div>
+              {#if gsegs.length && !collapsed.has(child.id)}
+                <ol class="segments">
+                  {#each gsegs as seg (seg.id)}
+                    {@render segmentRow(seg, stageHidden || groupHidden)}
+                  {/each}
+                </ol>
+              {/if}
+            </li>
+          {:else}
+            {@render segmentRow(child, stageHidden)}
+          {/if}
+        {/each}
+      </ol>
+    {/if}
+  </li>
+{/snippet}
+
+{#if top.length === 0}
   <p class="muted">{t('tree.empty')}</p>
 {:else}
   <ol>
-    {#each stages as stage (stage.id)}
-      {@const segs = segmentsByStage.get(stage.id) ?? []}
-      {@const children = childrenByStage.get(stage.id) ?? []}
-      {@const stageHidden = $hidden.has(stage.id)}
-      <li>
-        <div
-          class="row {dropClass(stage.id)}"
-          class:selected={$selected.includes(stage.id)}
-          class:hidden={stageHidden}
-          class:dragged={dragging?.includes(stage.id)}
-          role="treeitem"
-          aria-selected={$selected.includes(stage.id)}
-          aria-expanded={!collapsed.has(stage.id)}
-          tabindex="-1"
-          draggable="true"
-          ondragstart={(e) => dragStageStart(e, stage.id)}
-          ondragover={(e) => dragOver(e, stage.id, 'stage')}
-          ondragleave={() => target?.id === stage.id && (target = null)}
-          ondrop={drop}
-          ondragend={endDrag}
-        >
-          <button
-            type="button"
-            class="chevron"
-            class:closed={collapsed.has(stage.id)}
-            disabled={!children.length}
-            aria-label={collapsed.has(stage.id) ? t('tree.expand') : t('tree.collapse')}
-            title={collapsed.has(stage.id) ? t('tree.expand') : t('tree.collapse')}
-            onclick={() => setCollapsed([stage.id], !collapsed.has(stage.id))}
+    {#each top as child (child.id)}
+      {#if child.type === 'route'}
+        {@const rstages = stagesByRoute.get(child.id) ?? []}
+        {@const rsegs = routeSegs(child.id)}
+        {@const routeHidden = $hidden.has(child.id)}
+        <li>
+          <div
+            class="row route {dropClass(child.id)}"
+            class:selected={$selected.includes(child.id)}
+            class:hidden={routeHidden}
+            class:dragged={dragging?.includes(child.id)}
+            role="treeitem"
+            aria-selected={$selected.includes(child.id)}
+            aria-expanded={!collapsed.has(child.id)}
+            tabindex="-1"
+            draggable="true"
+            title={t('tree.routeHint')}
+            ondragstart={(e) => dragRouteStart(e, child.id)}
+            ondragover={(e) => dragOver(e, child.id, 'route')}
+            ondragleave={() => target?.id === child.id && (target = null)}
+            ondrop={drop}
+            ondragend={endDrag}
           >
-            <Icon d={icons.down} size={12} />
-          </button>
-          <button type="button" class="name" onclick={(e) => click(e, stage.id, segs)}>
-            <span class="swatch" style:background={stage.color ?? 'var(--accent)'}></span>
-            <span class="label">{stage.name}</span>
-            {@render editor(stage)}
-            <span class="km muted">{km(segs)}</span>
-          </button>
-          {@render eye(stage.id)}
-          <span class="actions">
-            <IconButton
-              icon={icons.trash}
-              label={t('tree.delete')}
-              size={14}
-              onclick={() => commands.run(deleteStage(store, stage.id, t('cmd.deleteStage')))}
-            />
-          </span>
-        </div>
-        {#if children.length && !collapsed.has(stage.id)}
-          <ol class="segments">
-            {#each children as child (child.id)}
-              {#if child.type === 'group'}
-                {@const gsegs = segmentsByGroup.get(child.id) ?? []}
-                {@const groupHidden = $hidden.has(child.id)}
-                <li>
-                  <div
-                    class="row group {dropClass(child.id)}"
-                    class:selected={$selected.includes(child.id)}
-                    class:hidden={stageHidden || groupHidden}
-                    class:dragged={dragging?.includes(child.id)}
-                    role="treeitem"
-                    aria-selected={$selected.includes(child.id)}
-                    aria-expanded={!collapsed.has(child.id)}
-                    tabindex="-1"
-                    draggable="true"
-                    title={t('tree.groupHint')}
-                    ondragstart={(e) => dragGroupStart(e, child.id)}
-                    ondragover={(e) => dragOver(e, child.id, 'group')}
-                    ondragleave={() => target?.id === child.id && (target = null)}
-                    ondrop={drop}
-                    ondragend={endDrag}
-                  >
-                    <button
-                      type="button"
-                      class="chevron"
-                      class:closed={collapsed.has(child.id)}
-                      disabled={!gsegs.length}
-                      aria-label={collapsed.has(child.id) ? t('tree.expand') : t('tree.collapse')}
-                      title={collapsed.has(child.id) ? t('tree.expand') : t('tree.collapse')}
-                      onclick={() => setCollapsed([child.id], !collapsed.has(child.id))}
-                    >
-                      <Icon d={icons.down} size={12} />
-                    </button>
-                    <button type="button" class="name" onclick={(e) => click(e, child.id, gsegs)}>
-                      <span class="folder" style:color={child.color ?? stage.color ?? 'var(--accent)'}><Icon d={icons.folder} size={14} /></span>
-                      <span class="label">{child.name}</span>
-                      {@render editor(child)}
-                      <span class="km muted">{km(gsegs)}</span>
-                    </button>
-                    {@render eye(child.id, stageHidden)}
-                    <span class="actions">
-                      <IconButton icon={icons.ungroup} label={t('tree.ungroup')} size={14} onclick={() => ungroup(child)} />
-                      <IconButton
-                        icon={icons.trash}
-                        label={t('tree.delete')}
-                        size={14}
-                        onclick={() => commands.run(deleteGroupCommand(store, child.id, t('cmd.deleteGroup')))}
-                      />
-                    </span>
-                  </div>
-                  {#if gsegs.length && !collapsed.has(child.id)}
-                    <ol class="segments">
-                      {#each gsegs as seg (seg.id)}
-                        {@render segmentRow(seg, stageHidden || groupHidden)}
-                      {/each}
-                    </ol>
-                  {/if}
-                </li>
-              {:else}
-                {@render segmentRow(child, stageHidden)}
-              {/if}
-            {/each}
-          </ol>
-        {/if}
-      </li>
+            <button
+              type="button"
+              class="chevron"
+              class:closed={collapsed.has(child.id)}
+              disabled={!rstages.length}
+              aria-label={collapsed.has(child.id) ? t('tree.expand') : t('tree.collapse')}
+              title={collapsed.has(child.id) ? t('tree.expand') : t('tree.collapse')}
+              onclick={() => setCollapsed([child.id], !collapsed.has(child.id))}
+            >
+              <Icon d={icons.down} size={12} />
+            </button>
+            <button type="button" class="name" onclick={(e) => click(e, child.id, rsegs)}>
+              <span class="folder" style:color={child.color ?? 'var(--fg)'}><Icon d={icons.route} size={15} /></span>
+              <span class="label">{child.name}</span>
+              {@render editor(child)}
+              <span class="km muted">{km(rsegs)}</span>
+            </button>
+            {@render eye(child.id)}
+            <span class="actions">
+              <IconButton icon={icons.focus} label={t('tree.solo')} size={14} onclick={() => solo(child)} />
+              <IconButton icon={icons.ungroup} label={t('tree.dissolveRoute')} size={14} onclick={() => dissolve(child)} />
+              <IconButton
+                icon={icons.trash}
+                label={t('tree.delete')}
+                size={14}
+                onclick={() => commands.run(deleteRouteCommand(store, child.id, t('cmd.deleteRoute')))}
+              />
+            </span>
+          </div>
+          {#if rstages.length && !collapsed.has(child.id)}
+            <ol class="stages">
+              {#each rstages as stage (stage.id)}
+                {@render stageRow(stage, routeHidden, child.color)}
+              {/each}
+            </ol>
+          {/if}
+        </li>
+      {:else}
+        {@render stageRow(child, false, undefined)}
+      {/if}
     {/each}
   </ol>
   {#if ![...segmentsByStage.values()].some((segs) => segs.length)}
@@ -577,6 +711,16 @@
 
   .segments {
     margin: 0 0 4px 14px;
+  }
+
+  .stages {
+    margin: 0 0 4px 12px;
+    padding-left: 4px;
+    border-left: 1px solid var(--border);
+  }
+
+  .row.route > .name {
+    font-weight: 600;
   }
 
   .segments .name {

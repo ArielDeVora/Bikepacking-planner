@@ -1,6 +1,6 @@
 export type LngLat = [lng: number, lat: number];
 
-export type EntityType = 'trip' | 'stage' | 'group' | 'segment' | 'poi' | 'zone' | 'borderCrossing' | 'comment';
+export type EntityType = 'trip' | 'route' | 'stage' | 'group' | 'segment' | 'poi' | 'zone' | 'borderCrossing' | 'comment';
 
 export interface BaseEntity {
   id: string;
@@ -20,11 +20,31 @@ export interface Trip extends BaseEntity {
 
 export interface Stage extends BaseEntity {
   type: 'stage';
+  /** The route it belongs to (none: directly in the trip). */
+  routeId?: string;
+  /** Order among its route's stages, or among the trip's routes and loose stages. */
   order: string;
   name: string;
   notes: string;
   color?: string;
   plannedDate?: string;
+}
+
+/**
+ * A route: one way of doing the trip (a plan from one source, a variant), made of stages. The
+ * trip's routes and its stages that aren't in a route share one order; a route's stages are
+ * ordered among themselves.
+ */
+export interface Route extends BaseEntity {
+  type: 'route';
+  order: string;
+  name: string;
+  notes: string;
+  /** Colour for its bike and walk segments, instead of the stages' colours. */
+  color?: string;
+  /** Where the route comes from (a group, a website…), and a link. */
+  source?: string;
+  sourceUrl?: string;
 }
 
 /**
@@ -163,7 +183,7 @@ export interface Comment extends BaseEntity {
   createdAt: number;
 }
 
-export type Entity = Trip | Stage | Group | Segment | Poi | Zone | BorderCrossing | Comment;
+export type Entity = Trip | Route | Stage | Group | Segment | Poi | Zone | BorderCrossing | Comment;
 export type EntityOf<T extends EntityType> = Extract<Entity, { type: T }>;
 
 /** An entity before it has been stamped by the command system. */
