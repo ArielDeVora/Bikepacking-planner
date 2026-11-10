@@ -9,10 +9,12 @@ import {
   allCategories,
   categoryInfo,
   categoryPlaces,
+  comparePlaces,
   createCategoryCommand,
   deleteCategoryCommand,
   iconPath,
   legacyFolderChanges,
+  movePlacesCommand,
   replaceCategoriesCommand,
   replacements,
   resolveCategory,
@@ -159,5 +161,59 @@ describe('place categories', () => {
     expect(suggest('poi.cat.other')).toBe('OTHER');
     expect(suggest('poi.cat.water')).toBeNull();
     expect(suggest('poi.cat.border')).toBeNull();
+  });
+
+  describe('dragging places', () => {
+    const listed = (category: string) => categoryPlaces(store, category).sort(comparePlaces).map((p) => p.id);
+    const move = (ids: string[], category: string, nextTo: { id: string; where: 'before' | 'after' } | null) => {
+      const cmd = movePlacesCommand(store, ids, category, nextTo, 'move');
+      if (cmd) commands.run(cmd);
+      return cmd;
+    };
+
+    beforeEach(() => {
+      store.apply([poi('zebra'), poi('apple'), poi('mango')], 'load');
+    });
+
+    it('lists by name until someone puts places in order', () => {
+      expect(listed('camp')).toEqual(['a', 'apple', 'b', 'mango', 'zebra']);
+    });
+
+    it('puts a place before or after another, keeping the rest in their shown order', () => {
+      move(['zebra'], 'camp', { id: 'apple', where: 'before' });
+      expect(listed('camp')).toEqual(['a', 'zebra', 'apple', 'b', 'mango']);
+      move(['a'], 'camp', { id: 'mango', where: 'after' });
+      expect(listed('camp')).toEqual(['zebra', 'apple', 'b', 'mango', 'a']);
+    });
+
+    it('only gives new positions to the moved places once the folder is ordered', () => {
+      move(['zebra'], 'camp', { id: 'a', where: 'before' });
+      const cmd = move(['b'], 'camp', { id: 'zebra', where: 'after' })!;
+      expect(cmd.changes.map((c) => c.id)).toEqual(['b']);
+      expect(listed('camp')).toEqual(['zebra', 'b', 'a', 'apple', 'mango']);
+    });
+
+    it('moves places into another category at a position, or at the end of its folder', () => {
+      move(['a', 'b'], 'water', { id: 'c', where: 'before' });
+      expect(listed('water')).toEqual(['a', 'b', 'c']);
+      move(['mango'], 'water', null);
+      expect(listed('water')).toEqual(['a', 'b', 'c', 'mango']);
+      expect(listed('camp')).toEqual(['apple', 'zebra']);
+      commands.undo();
+      expect(listed('camp')).toEqual(['apple', 'mango', 'zebra']);
+    });
+
+    it('does nothing when dropped where it already is', () => {
+      move(['a'], 'camp', { id: 'apple', where: 'before' });
+      expect(move(['a'], 'camp', { id: 'apple', where: 'before' })).toBeNull();
+    });
+
+    it('renumbers when two places share a position (after simultaneous moves)', () => {
+      store.apply([poi('x', { category: 'nature', order: 'a1' }), poi('y', { category: 'nature', order: 'a1' }), poi('z', { category: 'nature' })], 'load');
+      move(['z'], 'nature', { id: 'x', where: 'after' });
+      const ids = listed('nature');
+      expect(ids.indexOf('z')).toBe(ids.indexOf('x') + 1);
+      expect(new Set(store.list('poi', (p) => p.category === 'nature').map((p) => p.order)).size).toBe(3);
+    });
   });
 });

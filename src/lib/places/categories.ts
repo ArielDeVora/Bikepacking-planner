@@ -189,3 +189,52 @@ export function legacyFolderChanges(store: TripStore, pois: Poi[]): Change[] {
       return edits.update<Poi>(store, p.id, folder ? { category: folder.id, folderId: undefined } : { folderId: undefined });
     });
 }
+
+/** List order in a folder: places put in position by hand first (by their order), then the rest by name. */
+export function comparePlaces(a: Poi, b: Poi): number {
+  if (a.order && b.order) return a.order < b.order ? -1 : a.order > b.order ? 1 : 0;
+  if (a.order) return -1;
+  if (b.order) return 1;
+  return a.name.localeCompare(b.name);
+}
+
+/**
+ * Moves places into a category's folder, before or after one of its places (or at its end), in
+ * the order they're listed. Only the moved places get new positions, unless the folder had none
+ * yet: then every place in it gets one, keeping the order it was shown in.
+ */
+export function movePlacesCommand(
+  store: TripStore,
+  poiIds: string[],
+  categoryId: string,
+  nextTo: { id: string; where: 'before' | 'after' } | null,
+  label: string,
+): Command | null {
+  const ids = new Set(poiIds);
+  const moving = store.list('poi', (p) => ids.has(p.id)).sort(comparePlaces);
+  if (!moving.length) return null;
+  const rest = categoryPlaces(store, categoryId).filter((p) => !ids.has(p.id)).sort(comparePlaces);
+  let at = nextTo ? rest.findIndex((p) => p.id === nextTo.id) : -1;
+  at = at < 0 ? rest.length : at + (nextTo?.where === 'after' ? 1 : 0);
+  const list = [...rest.slice(0, at), ...moving, ...rest.slice(at)];
+  // Dropped where they already are.
+  const now = categoryPlaces(store, categoryId).sort(comparePlaces);
+  if (moving.every((p) => p.category === categoryId) && now.length === list.length && now.every((p, i) => p.id === list[i]!.id)) return null;
+
+  const orders = new Map<string, string>();
+  const lo0 = rest[at - 1]?.order ?? null;
+  const hi = rest[at]?.order ?? null;
+  // Two places can share a position after simultaneous moves by two people: renumber then.
+  if (rest.every((p) => p.order) && (lo0 === null || hi === null || lo0 < hi)) {
+    let lo = lo0;
+    for (const p of moving) orders.set(p.id, (lo = keyBetween(lo, hi)));
+  } else {
+    let lo: string | null = null;
+    for (const p of list) orders.set(p.id, (lo = keyBetween(lo, null)));
+  }
+
+  const changes = list
+    .filter((p) => orders.has(p.id) && (orders.get(p.id) !== p.order || (ids.has(p.id) && p.category !== categoryId)))
+    .map((p) => edits.update<Poi>(store, p.id, { order: orders.get(p.id), ...(ids.has(p.id) ? { category: categoryId } : {}) }));
+  return changes.length ? { label, changes } : null;
+}

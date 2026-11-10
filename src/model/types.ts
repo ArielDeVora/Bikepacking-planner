@@ -153,6 +153,8 @@ export interface Poi extends BaseEntity {
   osm?: OsmRef;
   /** Older data: the folder it was put in, turned into its category when loaded. */
   folderId?: string;
+  /** Position in its category's folder, once someone dragged it there (else sorted by name). */
+  order?: string;
 }
 
 /** What someone thinks of a place: not for me, yes, GOATED; 0 once taken back. */
