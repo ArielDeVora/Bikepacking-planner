@@ -2,6 +2,7 @@
   import { untrack } from 'svelte';
   import type { Core } from '../core/core';
   import type { StringKey } from '../core/i18n';
+  import { openGuide, openWhatsNew } from './onboarding';
 
   let { core }: { core: Core } = $props();
   const { t, shortcuts } = $derived(core);
@@ -20,37 +21,46 @@
   ];
 </script>
 
-<h2>{t('help.title')}</h2>
+<div class="sheet dialog-sized">
+  <h2>{t('help.title')}</h2>
 
-<div class="cols">
-  <section>
-    <h3>{t('help.keyboard')}</h3>
-    <dl>
-      {#each keys as k (k.label)}
-        <div>
-          <dt>{#each k.keys as combo, i (combo)}{#if i > 0}<span class="or"> / </span>{/if}<kbd>{shortcuts.format(combo)}</kbd>{/each}</dt>
-          <dd>{k.label}</dd>
-        </div>
+  <div class="cols">
+    <section>
+      <h3>{t('help.keyboard')}</h3>
+      <dl>
+        {#each keys as k (k.label)}
+          <div>
+            <dt>{#each k.keys as combo, i (combo)}{#if i > 0}<span class="or"> / </span>{/if}<kbd>{shortcuts.format(combo)}</kbd>{/each}</dt>
+            <dd>{k.label}</dd>
+          </div>
+        {/each}
+      </dl>
+      <p class="muted small">{t('help.keyboardNote')}</p>
+    </section>
+
+    <section>
+      {#each MOUSE as group (group.title)}
+        <h3>{t(group.title)}</h3>
+        <ul>
+          {#each group.rows as row (row)}<li>{t(row)}</li>{/each}
+        </ul>
       {/each}
-    </dl>
-    <p class="muted small">{t('help.keyboardNote')}</p>
-  </section>
+    </section>
+  </div>
 
-  <section>
-    {#each MOUSE as group (group.title)}
-      <h3>{t(group.title)}</h3>
-      <ul>
-        {#each group.rows as row (row)}<li>{t(row)}</li>{/each}
-      </ul>
-    {/each}
-  </section>
-</div>
-
-<div class="buttons">
-  <button type="button" class="btn" onclick={() => core.ui.closeDialog()}>{t('card.close')}</button>
+  <div class="buttons">
+    <button type="button" class="link" onclick={() => openWhatsNew(core)}>{t('help.whatsNew')}</button>
+    <button type="button" class="link" onclick={() => openGuide(core)}>{t('help.guide')}</button>
+    <span class="spacer"></span>
+    <button type="button" class="btn" onclick={() => core.ui.closeDialog()}>{t('card.close')}</button>
+  </div>
 </div>
 
 <style>
+  .sheet {
+    width: min(920px, calc(100vw - 72px));
+  }
+
   h2 {
     margin: 0 0 12px;
     font-size: 16px;
@@ -71,8 +81,8 @@
 
   .cols {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 20px;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+    gap: 28px;
   }
 
   dl {
@@ -127,8 +137,21 @@
 
   .buttons {
     display: flex;
-    justify-content: flex-end;
+    align-items: center;
+    gap: 14px;
     margin-top: 14px;
+  }
+
+  .spacer {
+    flex: 1;
+  }
+
+  .link {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--accent);
+    cursor: pointer;
   }
 
   .btn {

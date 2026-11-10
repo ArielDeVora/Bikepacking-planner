@@ -6,3 +6,6 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+/** Commit the running build was made from ("dev" when unknown). */
+declare const __APP_BUILD__: string;

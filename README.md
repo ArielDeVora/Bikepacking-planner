@@ -6,7 +6,7 @@ It's a static site on GitHub Pages. Everything is stored in the browser (Indexed
 
 ## Using it
 
-Press **?** (or the **?** button at the bottom of the toolbar) for a cheatsheet of every keyboard shortcut and mouse action.
+Press **?** (or the **?** button at the bottom of the toolbar) for a cheatsheet of every keyboard shortcut and mouse action, with links to a short guide and to what's new. After each release, a What's new window lists the changes once.
 
 - Press **D** (or the route button in the toolbar) and click the map to draw a segment; it snaps to roads. **Esc** finishes.
 - Click a segment to select it. Drag its points to move them, drag the line to add a point, right-click a point to delete it.
@@ -109,6 +109,7 @@ Free Supabase projects pause after a week with little activity. The **Keep Supab
 - [Milestone 6: places, search and OSM overlays](docs/06-pois-search-osm.md), including Google Maps lists.
 - [Milestone 7: avoid zones and borders](docs/07-zones-borders.md), plus base-map places and richer details.
 - [Milestone 8: risk layer, and editing from the side panel](docs/08-risk-and-editing.md), including the data source research.
+- [What's new, the guide, and update notices](docs/09-whats-new.md): how to announce a release.
 - [Spec](docs/SPEC.md)
 
 ## Credits

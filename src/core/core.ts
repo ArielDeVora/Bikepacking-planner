@@ -35,6 +35,8 @@ export function createCore(container: HTMLElement) {
   const mapSettings = createSettings('map');
 
   let localUserId = settings.get<string | null>('userId', null);
+  /** No trace of an earlier visit in this browser. */
+  const firstVisit = !localUserId;
   if (!localUserId) {
     localUserId = newId();
     settings.set('userId', localUserId);
@@ -246,6 +248,7 @@ export function createCore(container: HTMLElement) {
     visibility,
     t,
     status: { subscribe: status.subscribe } as Readable<CoreStatus>,
+    firstVisit,
     get tripId() {
       return tripId;
     },

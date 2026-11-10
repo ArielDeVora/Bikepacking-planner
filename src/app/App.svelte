@@ -5,6 +5,7 @@
   import IconButton from '../lib/ui/IconButton.svelte';
   import Cheatsheet from './Cheatsheet.svelte';
   import InfoCard from './InfoCard.svelte';
+  import { startOnboarding, watchForUpdates } from './onboarding';
   import Toasts from './Toasts.svelte';
   import Toolbar from './Toolbar.svelte';
 
@@ -26,6 +27,14 @@
   const status = $derived(core.status);
 
   $effect(() => core.shortcuts.add({ keys: 'shift+?', label: t('help.open'), run: () => core.ui.openDialog(Cheatsheet, { core }) }));
+
+  let onboarded = false;
+  $effect(() => {
+    if ($status !== 'ready' || onboarded) return;
+    onboarded = true;
+    startOnboarding(core);
+  });
+  $effect(() => watchForUpdates(core));
 
   const prefs = createSettings('app');
   let panelOpen = $state(prefs.get('panelOpen', window.innerWidth > 640));
@@ -301,6 +310,12 @@
     background: var(--bg);
     border-radius: var(--radius);
     box-shadow: var(--shadow);
+  }
+
+  /* Dialogs whose content sets its own width. */
+  .dialog:has(> :global(.dialog-sized)) {
+    width: auto;
+    max-width: 100%;
   }
 
   .loading {
