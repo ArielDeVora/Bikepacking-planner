@@ -127,6 +127,11 @@ export interface Segment extends BaseEntity {
   planDays?: number;
   /** Daily distance for this segment, instead of the plan's. */
   planKmPerDay?: number;
+  /**
+   * Planning settings for its stretch in each country (a line of the planning calendar), by
+   * country code and how many times the segment entered it before, e.g. "BA#0".
+   */
+  planParts?: Record<string, PlanPart>;
 }
 
 export type PoiCategory =
@@ -165,6 +170,15 @@ export interface Poi extends BaseEntity {
   folderId?: string;
   /** Position in its category's folder, once someone dragged it there (else sorted by name). */
   order?: string;
+}
+
+/** Planning settings for one stretch of a segment; empty fields fall back to the segment's, then the plan's. */
+export interface PlanPart {
+  /** A date it must start on. */
+  fixed?: string;
+  kmPerDay?: number;
+  /** Days it takes, whatever its length. */
+  days?: number;
 }
 
 /** How the days of a route are worked out (the planning view). */

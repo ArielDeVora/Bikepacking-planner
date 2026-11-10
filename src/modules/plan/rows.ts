@@ -67,6 +67,8 @@ export class RouteLine {
 /** A row of the calendar: a segment, or the part of it in one country. */
 export interface PlanRow {
   key: string;
+  /** Which stretch of the segment (see `Segment.planParts`); '' for the whole segment. */
+  part: string;
   segmentId: string;
   stageId: string;
   name: string;
@@ -92,8 +94,10 @@ export function planRows(segments: Segment[], line: RouteLine, countries: Countr
     const range = line.ranges.get(seg.id);
     if (!range) continue;
     const base = { segmentId: seg.id, stageId: seg.stageId, name: seg.name, mode: seg.mode };
-    const whole = (country: PlanRow['country']) =>
-      rows.push({ ...base, key: seg.id, country, fromKm: range.from, toKm: range.to, mid: line.pointAt((range.from + range.to) / 2) });
+    const whole = (country: PlanRow['country']) => {
+      const part = country ? `${country.code}#0` : '';
+      rows.push({ ...base, key: part ? `${seg.id}:${part}` : seg.id, part, country, fromKm: range.from, toKm: range.to, mid: line.pointAt((range.from + range.to) / 2) });
+    };
 
     if (!countries) {
       whole(null);
@@ -139,16 +143,22 @@ export function planRows(segments: Segment[], line: RouteLine, countries: Countr
     }
     merged[0]!.from = range.from;
     merged.at(-1)!.to = range.to;
-    merged.forEach((run, i) =>
+    const seen = new Map<string, number>();
+    merged.forEach((run) => {
+      const code = run.country?.code ?? '';
+      const n = seen.get(code) ?? 0;
+      seen.set(code, n + 1);
+      const part = `${code}#${n}`;
       rows.push({
         ...base,
-        key: merged.length > 1 ? `${seg.id}:${i}` : seg.id,
+        key: `${seg.id}:${part}`,
+        part,
         country: run.country,
         fromKm: run.from,
         toKm: run.to,
         mid: line.pointAt((run.from + run.to) / 2),
-      }),
-    );
+      });
+    });
   }
   return rows;
 }

@@ -3,7 +3,8 @@ import type { t as translate } from '../../core/i18n';
 import type { TripStore } from '../../core/store';
 import { newId } from '../../model/ids';
 import { groupSegments, inRoute, routeStages, stageSegments, tripChildren } from '../../lib/tree';
-import type { RestPeriod, Route, ScheduleSettings, Segment, Stage, Trip } from '../../model/types';
+import type { PlanPart, RestPeriod, Route, ScheduleSettings, Segment, Stage, Trip } from '../../model/types';
+import type { PlanRow } from './rows';
 import { buildSchedule, DEFAULT_SCHEDULE, type PlanSegment, type Schedule } from './schedule';
 
 /** What can be planned: a route, or the stages outside routes ('trip'). */
@@ -56,8 +57,13 @@ export function restPeriods(store: TripStore, source: string): RestPeriod[] {
   return store.list('restPeriod', (r) => r.routeId === routeId).sort((a, b) => a.from.localeCompare(b.from));
 }
 
-export function planSchedule(store: TripStore, source: string): Schedule {
-  const segments: PlanSegment[] = planSegments(store, source).map((s) => ({
+/**
+ * What the schedule works through: each line of the calendar (a segment's stretch in one country)
+ * with its own settings, else its segment's (days shared out by length), else the plan's. Without
+ * the lines yet, whole segments.
+ */
+export function planPieces(store: TripStore, segments: Segment[], rows: PlanRow[] | null): PlanSegment[] {
+  const whole = (s: Segment): PlanSegment => ({
     id: s.id,
     mode: s.mode,
     lengthM: s.stats.lengthM,
@@ -65,8 +71,52 @@ export function planSchedule(store: TripStore, source: string): Schedule {
     fixed: fixedDate(store, s),
     days: s.planDays,
     kmPerDay: s.planKmPerDay,
-  }));
-  return buildSchedule(segments, planSettings(store, source), restPeriods(store, source));
+  });
+  if (!rows) return segments.map(whole);
+  const bySegment = new Map<string, PlanRow[]>();
+  for (const r of rows) {
+    const list = bySegment.get(r.segmentId);
+    if (list) list.push(r);
+    else bySegment.set(r.segmentId, [r]);
+  }
+  return segments.flatMap((s) => {
+    const parts = bySegment.get(s.id);
+    if (!parts?.length) return [whole(s)];
+    const length = s.stats.lengthM || 1;
+    return parts.map((r, i): PlanSegment => {
+      const share = ((r.toKm - r.fromKm) * 1000) / length;
+      const own: PlanPart = s.planParts?.[r.part] ?? {};
+      return {
+        id: r.key,
+        mode: s.mode,
+        lengthM: (r.toKm - r.fromKm) * 1000,
+        ascentM: s.stats.ascentM * share,
+        fixed: own.fixed ?? (i === 0 ? fixedDate(store, s) : undefined),
+        days: own.days ?? (s.planDays !== undefined ? s.planDays * share : undefined),
+        kmPerDay: own.kmPerDay ?? s.planKmPerDay,
+      };
+    });
+  });
+}
+
+export function planSchedule(store: TripStore, source: string, rows: PlanRow[] | null = null): Schedule {
+  return buildSchedule(planPieces(store, planSegments(store, source), rows), planSettings(store, source), restPeriods(store, source));
+}
+
+/** Sets a line's own settings (undefined clears one). */
+export function setPartCommand(store: TripStore, segmentId: string, part: string, patch: PlanPart, label: string): Command | null {
+  const seg = store.get(segmentId, 'segment');
+  if (!seg) return null;
+  const next: PlanPart = { ...(seg.planParts?.[part] ?? {}), ...patch };
+  for (const k of Object.keys(next) as (keyof PlanPart)[]) if (next[k] === undefined) delete next[k];
+  const parts = { ...(seg.planParts ?? {}) };
+  if (Object.keys(next).length) parts[part] = next;
+  else delete parts[part];
+  return {
+    label,
+    changes: [edits.update<Segment>(store, seg.id, { planParts: Object.keys(parts).length ? parts : undefined })],
+    mergeKey: `part:${seg.id}:${part}:${Object.keys(patch).join(',')}`,
+  };
 }
 
 // Edits ------------------------------------------------------------------------------------------

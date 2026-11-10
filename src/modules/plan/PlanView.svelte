@@ -17,12 +17,13 @@
     planSources,
     planStages,
     restPeriods,
+    setPartCommand,
     setScheduleCommand,
   } from './plan';
   import { planRows, RouteLine } from './rows';
   import { fromDayNumber, toDayNumber } from './schedule';
   import { nearestRegion, seasonAt, seasonWeek, type Rating } from './seasons';
-  import type { ScheduleSettings, Segment } from '../../model/types';
+  import type { PlanPart, ScheduleSettings } from '../../model/types';
 
   let { ctx, close }: { ctx: ModuleContext; close: () => void } = $props();
   const { t, commands } = $derived(ctx);
@@ -48,9 +49,10 @@
     void $store;
     return source ? planSegments(store, source) : [];
   });
+  // Worked out line by line (a segment's stretch in each country) once the country outlines are in.
   const schedule = $derived.by(() => {
     void $store;
-    return source ? planSchedule(store, source) : null;
+    return source ? planSchedule(store, source, countries ? rows : null) : null;
   });
   const periods = $derived.by(() => {
     void $store;
@@ -126,6 +128,8 @@
       if (list) list.push(r);
       else rowsBySegment.set(r.segmentId, [r]);
     }
+    // Days are scheduled by line; before the lines are known, by segment (its first line).
+    const lineOf = (pieceId: string) => (rows.some((r) => r.key === pieceId) ? pieceId : (rowsBySegment.get(pieceId)?.[0]?.key ?? null));
     // Visits: which columns each row is ridden, travelled or rested in.
     const visits = new Map<string, Map<number, 'move' | 'transport' | 'rest'>>();
     const mark = (key: string, col: number, kind: 'move' | 'transport' | 'rest') => {
@@ -140,14 +144,10 @@
     for (const day of schedule.days) {
       const col = colOf(day.date);
       for (const part of day.parts) {
-        for (const r of rowsBySegment.get(part.segmentId) ?? []) {
-          const touches = part.toKm > r.fromKm + 1e-6 && part.fromKm < r.toKm - 1e-6;
-          const point = part.fromKm === part.toKm && part.fromKm >= r.fromKm && part.fromKm <= r.toKm;
-          if (touches || point) {
-            mark(r.key, col, day.kind === 'transport' ? 'transport' : 'move');
-            if (part.toKm <= r.toKm + 1e-6) current = r.key;
-          }
-        }
+        const key = lineOf(part.segmentId);
+        if (!key) continue;
+        mark(key, col, day.kind === 'transport' ? 'transport' : 'move');
+        current = key;
       }
       if (!day.parts.length && current) mark(current, col, 'rest');
       const end = day.parts.at(-1)?.toKm;
@@ -163,8 +163,8 @@
     for (const stage of stages) {
       out.push({ key: `stage:${stage.id}`, kind: 'stage', label: stage.name, color: stageColor.get(stage.id) });
       for (const seg of segments.filter((s) => s.stageId === stage.id)) {
-        const span = schedule.spans.get(seg.id);
         (rowsBySegment.get(seg.id) ?? []).forEach((r, i) => {
+          const span = schedule.spans.get(r.key) ?? (i === 0 ? schedule.spans.get(seg.id) : undefined);
           const runs: NonNullable<CalRow['bars']> = [];
           const cols = [...(visits.get(r.key)?.entries() ?? [])].sort((a, b) => a[0] - b[0]);
           for (const [col, kind] of cols) {
@@ -172,10 +172,7 @@
             if (last && last.kind === kind && last.to === col - 1) last.to = col;
             else runs.push({ from: col, to: col, kind });
           }
-          const pins =
-            i === 0 && span?.fixed
-              ? [{ col: colOf(span.fixed), late: !!span.late, title: t('plan.fixed', { date: span.fixed }) }]
-              : [];
+          const pins = span?.fixed ? [{ col: colOf(span.fixed), late: !!span.late, title: t('plan.fixed', { date: span.fixed }) }] : [];
           out.push({
             key: r.key,
             kind: 'row',
@@ -187,6 +184,7 @@
             heat: heatFor(weeklyRatings(r.mid)),
             bars: runs,
             pins,
+            rideDays: cols.filter(([, kind]) => kind !== 'rest').length,
           });
         });
       }
@@ -236,7 +234,11 @@
     if (!schedule) return [];
     return [...schedule.spans.values()]
       .filter((s) => s.late)
-      .map((s) => ({ name: store.get(s.segmentId, 'segment')?.name ?? '', n: s.late!, date: s.fixed! }));
+      .map((s) => {
+        const row = rows.find((r) => r.key === s.segmentId);
+        const name = row ? (row.country ? `${row.name} · ${row.country.name}` : row.name) : (store.get(s.segmentId, 'segment')?.name ?? '');
+        return { name, n: s.late!, date: s.fixed! };
+      });
   });
 
   const fmtDate = (iso: string | undefined) =>
@@ -299,21 +301,38 @@
   }
   let focusRest = $state<string | null>(null);
 
-  // The segment picked in the calendar, edited in the side panel.
+  // The line picked in the calendar (a segment's stretch in one country), edited in the side panel.
   let picked = $state<string | null>(null);
+  const pickedRow = $derived(rows.find((r) => r.key === picked));
   const pickedSeg = $derived.by(() => {
     void $store;
-    return picked ? store.get(picked, 'segment') : undefined;
+    return pickedRow ? store.get(pickedRow.segmentId, 'segment') : undefined;
   });
-  const pickedSpan = $derived(picked && schedule ? schedule.spans.get(picked) : undefined);
+  const pickedPart = $derived(pickedRow && pickedSeg ? (pickedSeg.planParts?.[pickedRow.part] ?? {}) : {});
+  const pickedSpan = $derived(picked && schedule ? (schedule.spans.get(picked) ?? (pickedRow ? schedule.spans.get(pickedRow.segmentId) : undefined)) : undefined);
   const spanDates = $derived.by(() => {
     if (!pickedSpan || !schedule) return null;
     const startDay = toDayNumber(schedule.start);
     return { from: fromDayNumber(startDay + pickedSpan.first), to: fromDayNumber(startDay + pickedSpan.last), days: pickedSpan.last - pickedSpan.first + 1 };
   });
-  function editSegment(patch: { plannedDate?: string; planKmPerDay?: number; planDays?: number }, field: string) {
-    if (!pickedSeg) return;
-    commands.run({ label: t('cmd.editSchedule'), changes: [edits.update<Segment>(store, pickedSeg.id, patch)], mergeKey: `plan:${pickedSeg.id}:${field}` });
+  function editLine(row: { segmentId: string; part: string } | undefined, patch: PlanPart) {
+    if (!row) return;
+    const cmd = setPartCommand(store, row.segmentId, row.part, patch, t('cmd.editSchedule'));
+    if (cmd) commands.run(cmd);
+  }
+
+  /** A bar dragged in the calendar: moved (a new fixed start), or its end pulled (a new number of days). */
+  function dragBar(row: CalRow, mode: 'move' | 'resize', delta: number) {
+    const line = rows.find((r) => r.key === row.key);
+    if (!line || !delta) return;
+    if (mode === 'move') {
+      const first = row.bars?.[0]?.from;
+      if (first === undefined) return;
+      editLine(line, { fixed: fromDayNumber(range.first + first + delta) });
+    } else {
+      editLine(line, { days: Math.max(0.5, (row.rideDays ?? 1) + delta) });
+    }
+    picked = row.key;
   }
   const optional = (v: string) => (v.trim() === '' ? undefined : Math.max(0, Number(v)) || undefined);
 
@@ -389,7 +408,8 @@
           {describe}
           onAddRest={addRest}
           selected={picked}
-          onRowClick={(row) => (picked = row.segmentId ?? null)}
+          onRowClick={(row) => (picked = row.segmentId ? row.key : null)}
+          onBarDrag={dragBar}
           onRestClick={(id) => (focusRest = id)}
         />
       </div>
@@ -409,16 +429,17 @@
           <p class="late">{t('plan.late', { name: l.name, n: l.n, date: fmtDate(l.date) })}</p>
         {/each}
 
-        {#if pickedSeg}
+        {#if pickedSeg && pickedRow}
           <section class="picked">
-            <h2>{t('plan.segment')}</h2>
-            <strong>{pickedSeg.name}</strong>
+            <h2>{t('plan.line')}</h2>
+            <strong>{pickedRow.country ? `${flag(pickedRow.country.code)} ` : ''}{pickedSeg.name}{pickedRow.country ? ` · ${pickedRow.country.name}` : ''}</strong>
+            <span class="muted small">{Math.round(pickedRow.toKm - pickedRow.fromKm)} km</span>
             {#if spanDates}
-              <span class="muted small">{fmtDate(spanDates.from)} → {fmtDate(spanDates.to)} · {t('plan.days', { n: spanDates.days })}</span>
+              <span class="small">{fmtDate(spanDates.from)} → {fmtDate(spanDates.to)} · {t('plan.days', { n: spanDates.days })}</span>
             {/if}
             <label class="field">
               <span>{t('plan.fixedDate')}</span>
-              <input type="date" value={pickedSeg.plannedDate ?? ''} onchange={(e) => editSegment({ plannedDate: e.currentTarget.value || undefined }, 'date')} />
+              <input type="date" value={pickedPart.fixed ?? ''} onchange={(e) => editLine(pickedRow, { fixed: e.currentTarget.value || undefined })} />
             </label>
             <div class="pair">
               <label class="field">
@@ -427,9 +448,9 @@
                   type="number"
                   min="5"
                   step="5"
-                  placeholder={String(pickedSeg.mode === 'walk' ? settings?.walkKmPerDay : settings?.kmPerDay)}
-                  value={pickedSeg.planKmPerDay ?? ''}
-                  onchange={(e) => editSegment({ planKmPerDay: optional(e.currentTarget.value) }, 'pace')}
+                  placeholder={String(pickedSeg.planKmPerDay ?? (pickedSeg.mode === 'walk' ? settings?.walkKmPerDay : settings?.kmPerDay))}
+                  value={pickedPart.kmPerDay ?? ''}
+                  onchange={(e) => editLine(pickedRow, { kmPerDay: optional(e.currentTarget.value) })}
                 />
               </label>
               <label class="field">
@@ -439,8 +460,8 @@
                   min="0.5"
                   step="0.5"
                   placeholder={t('plan.auto')}
-                  value={pickedSeg.planDays ?? ''}
-                  onchange={(e) => editSegment({ planDays: optional(e.currentTarget.value) }, 'days')}
+                  value={pickedPart.days ?? ''}
+                  onchange={(e) => editLine(pickedRow, { days: optional(e.currentTarget.value) })}
                 />
               </label>
             </div>

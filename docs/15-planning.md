@@ -15,7 +15,9 @@ Pick a route, or the stages outside routes, at the top. Its settings are shared 
 
 The schedule (`src/modules/plan/schedule.ts`) walks the route day by day: bike and walk segments at their daily distance plus climbing (several segments can share a day), one day per train, bus, boat, plane or car journey (`transportDays` on a segment for longer ones), a rest day every few days of riding, no riding during **rest periods**, and waiting for **fixed dates**. A segment's fixed date is its planned date, else its group's or stage's planned date when it comes first in them. When a fixed date can't be met, the side panel says how many days late.
 
-**One segment at its own pace**: click a row's name to pick its segment; the side panel then shows when it's ridden and lets you set its fixed date, **its own km/day**, or **a number of days** it takes whatever its length (1 makes a whole segment one day; 0.5 half a day). Empty fields use the plan's settings. **Show on the map** goes to it.
+**Each line at its own pace**: a line of the calendar is a segment's stretch in one country. Click its name to pick it; the side panel shows when it's ridden and lets you set its own **fixed start date**, **km/day**, or **number of days** whatever its length (1 makes the stretch one day; 0.5 half a day). Or straight on the calendar: **drag its bar** to start it on another day (that sets its fixed date), or **drag the bar's right end** for more or fewer days. Empty fields fall back to the segment's settings (a segment's number of days is shared out between its lines by length), then the plan's. They're kept on the segment (`planParts`, by country code and how many times the segment entered it, e.g. `BA#0`). **Show on the map** goes to the segment.
+
+The **names column** can be made wider or narrower by dragging its right edge (remembered in this browser).
 
 **Countries**: the side panel lists the countries in the order we reach them, with entry and exit dates and the number of days; more than 30 days is flagged, to check the visa.
 

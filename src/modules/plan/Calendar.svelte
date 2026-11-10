@@ -16,6 +16,8 @@
     /** When we're there: runs of columns, moving or resting. */
     bars?: { from: number; to: number; kind: 'move' | 'transport' | 'rest' }[];
     pins?: { col: number; late: boolean; title: string }[];
+    /** Days spent moving on this line (for resizing its bar). */
+    rideDays?: number;
   }
 
   export interface CalRest {
@@ -38,6 +40,7 @@
     onAddRest,
     onRowClick,
     onRestClick,
+    onBarDrag,
   }: {
     /** Day number (days since 1970-01-01) of the first column, and how many columns. */
     first: number;
@@ -52,9 +55,67 @@
     onAddRest: (fromCol: number, toCol: number) => void;
     onRowClick: (row: CalRow) => void;
     onRestClick: (id: string) => void;
+    /** A line's bars dragged by `delta` days: moved, or its end pulled. */
+    onBarDrag?: (row: CalRow, mode: 'move' | 'resize', delta: number) => void;
   } = $props();
 
-  const LABEL_W = 250;
+  // The names column: drag its right edge to resize it (remembered in this browser).
+  const MIN_LABEL = 140;
+  const MAX_LABEL = 600;
+  let LABEL_W = $state(readLabelWidth());
+  function readLabelWidth(): number {
+    try {
+      return Math.min(MAX_LABEL, Math.max(MIN_LABEL, Number(localStorage.getItem('bp:plan:labelWidth')) || 250));
+    } catch {
+      return 250;
+    }
+  }
+  function resizeLabels(e: PointerEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    const el = e.currentTarget as HTMLElement;
+    el.setPointerCapture(e.pointerId);
+    const startX = e.clientX;
+    const startW = LABEL_W;
+    const move = (ev: PointerEvent) => (LABEL_W = Math.round(Math.min(MAX_LABEL, Math.max(MIN_LABEL, startW + ev.clientX - startX))));
+    const up = () => {
+      el.removeEventListener('pointermove', move);
+      try {
+        localStorage.setItem('bp:plan:labelWidth', String(LABEL_W));
+      } catch {
+        /* not remembered */
+      }
+    };
+    el.addEventListener('pointermove', move);
+    el.addEventListener('pointerup', up, { once: true });
+  }
+
+  // Dragging a line's bars: from the middle to move them, from the right end of the last to resize.
+  let dragging = $state<{ key: string; mode: 'move' | 'resize'; delta: number } | null>(null);
+  function barDown(e: PointerEvent, row: CalRow, isLast: boolean) {
+    if (!onBarDrag || e.button !== 0) return;
+    e.stopPropagation();
+    const el = e.currentTarget as HTMLElement;
+    const r = el.getBoundingClientRect();
+    const mode: 'move' | 'resize' = isLast && r.right - e.clientX <= 8 ? 'resize' : 'move';
+    el.setPointerCapture(e.pointerId);
+    const startX = e.clientX;
+    dragging = { key: row.key, mode, delta: 0 };
+    tip = null;
+    const move = (ev: PointerEvent) => {
+      if (dragging) dragging = { ...dragging, delta: Math.round((ev.clientX - startX) / width) };
+    };
+    const up = () => {
+      el.removeEventListener('pointermove', move);
+      const d = dragging;
+      dragging = null;
+      if (d && d.delta) onBarDrag(row, d.mode, d.delta);
+    };
+    el.addEventListener('pointermove', move);
+    el.addEventListener('pointerup', up, { once: true });
+  }
+  const barShift = (row: CalRow) => (dragging?.key === row.key && dragging.mode === 'move' ? dragging.delta * width : 0);
+  const barGrow = (row: CalRow, isLast: boolean) => (isLast && dragging?.key === row.key && dragging.mode === 'resize' ? dragging.delta * width : 0);
   const DAY_MS = 86_400_000;
   const HEAT = ['#e06666', '#f6b26b', '#93c47d'];
 
@@ -136,7 +197,9 @@
 <div class="scroller" style:--w="{width}px" style:--label="{LABEL_W}px">
   <div class="grid" style:width="{LABEL_W + count * width}px">
     <div class="head">
-      <div class="corner"></div>
+      <div class="corner">
+        <span class="label-resize" role="separator" aria-orientation="vertical" onpointerdown={resizeLabels}></span>
+      </div>
       <div class="months">
         {#each months as m (m.from)}
           <div class="month" style:left="{m.from * width}px" style:width="{(m.to - m.from + 1) * width}px"><span>{m.label}</span></div>
@@ -164,12 +227,13 @@
 
     <div class="body">
       {#each rows as row (row.key)}
-        <div class="row {row.kind}" class:selected={!!row.segmentId && row.segmentId === selected}>
-          <button type="button" class="label" disabled={!row.segmentId} onclick={() => onRowClick(row)} title={row.label}>
+        <div class="row {row.kind}" class:selected={!!row.segmentId && row.key === selected}>
+          <button type="button" class="label" disabled={!row.segmentId} onclick={(e) => !(e.target as HTMLElement).closest('.label-resize') && onRowClick(row)} title={row.label}>
             {#if row.color}<span class="swatch" style:background={row.color}></span>{/if}
             {#if row.flag}<span class="flag">{row.flag}</span>{/if}
             <span class="name">{row.label}</span>
             {#if row.sub}<span class="sub">{row.sub}</span>{/if}
+            <span class="label-resize" role="separator" aria-orientation="vertical" onpointerdown={resizeLabels}></span>
           </button>
           <div
             class="track"
@@ -178,9 +242,23 @@
             onpointermove={(e) => hover(e, row)}
             onpointerleave={() => (tip = null)}
           >
-            {#each row.bars ?? [] as bar (bar.from)}
-              <div class="bar {bar.kind}" style:left="{bar.from * width}px" style:width="{(bar.to - bar.from + 1) * width}px"></div>
+            {#each row.bars ?? [] as bar, i (bar.from)}
+              {@const isLast = i === (row.bars?.length ?? 0) - 1}
+              <div
+                class="bar {bar.kind}"
+                class:draggable={!!onBarDrag && row.kind === 'row'}
+                class:dragging={dragging?.key === row.key}
+                role="presentation"
+                style:left="{bar.from * width + barShift(row)}px"
+                style:width="{Math.max(width / 2, (bar.to - bar.from + 1) * width + barGrow(row, isLast))}px"
+                onpointerdown={row.kind === 'row' ? (e) => barDown(e, row, isLast) : undefined}
+              ></div>
             {/each}
+            {#if dragging?.key === row.key && dragging.delta}
+              <span class="drag-note" style:left="{(row.bars?.at(-1)?.to ?? 0) * width + width + 6 + barShift(row) + barGrow(row, true)}px">
+                {dragging.delta > 0 ? '+' : ''}{dragging.delta} d
+              </span>
+            {/if}
             {#each row.pins ?? [] as pin (pin.col)}
               <span class="pin" class:late={pin.late} style:left="{pin.col * width}px" title={pin.title}>▼</span>
             {/each}
@@ -229,6 +307,20 @@
     height: 44px;
     background: var(--bg);
     border-bottom: 1px solid var(--border);
+  }
+
+  .label-resize {
+    position: absolute;
+    top: 0;
+    right: -3px;
+    bottom: 0;
+    width: 7px;
+    z-index: 5;
+    cursor: ew-resize;
+  }
+
+  .label-resize:hover {
+    background: linear-gradient(to right, transparent 3px, var(--accent) 3px, var(--accent) 4px, transparent 4px);
   }
 
   .corner {
@@ -403,6 +495,39 @@
     border-radius: 3px;
     background: #212529;
     box-shadow: 0 0 0 1px rgb(255 255 255 / 0.6);
+  }
+
+  .bar.draggable {
+    cursor: grab;
+  }
+
+  .bar.draggable::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 8px;
+    cursor: ew-resize;
+  }
+
+  .bar.dragging {
+    opacity: 0.75;
+    box-shadow: 0 0 0 2px var(--accent);
+    cursor: grabbing;
+  }
+
+  .drag-note {
+    position: absolute;
+    top: 3px;
+    padding: 0 4px;
+    border-radius: 3px;
+    background: var(--accent);
+    color: var(--accent-fg);
+    font-size: 10px;
+    font-weight: 700;
+    white-space: nowrap;
+    pointer-events: none;
   }
 
   .bar.transport {

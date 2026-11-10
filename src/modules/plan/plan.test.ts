@@ -4,7 +4,8 @@ import { t } from '../../core/i18n';
 import { TripStore } from '../../core/store';
 import type { Group, Route, Segment } from '../../model/types';
 import { stage, trip, TRIP_ID } from '../../test/fixtures';
-import { addRestPeriodCommand, fixedDate, planSchedule, planSegments, planSettings, planSources, restPeriods, setScheduleCommand, TRIP_SOURCE } from './plan';
+import { addRestPeriodCommand, fixedDate, planPieces, planSchedule, planSegments, planSettings, planSources, restPeriods, setPartCommand, setScheduleCommand, TRIP_SOURCE } from './plan';
+import type { PlanRow } from './rows';
 
 let store: TripStore;
 let commands: CommandStack;
@@ -62,5 +63,32 @@ describe('planning a route', () => {
     const s = planSchedule(store, TRIP_SOURCE);
     expect(s.spans.get('b')!.first).toBe(17); // waits for 20 April from 3 April
     expect(s.spans.get('c')!.fixed).toBe('2027-05-01');
+  });
+
+  describe('line by line', () => {
+    // Segment a (160 km) crosses two countries: 100 km in AA, then 60 km in BB.
+    const rows = (): PlanRow[] => [
+      { key: 'a:AA#0', part: 'AA#0', segmentId: 'a', stageId: 's1', name: 'a', mode: 'bike', country: { code: 'AA', name: 'AA' }, fromKm: 0, toKm: 100, mid: null },
+      { key: 'a:BB#0', part: 'BB#0', segmentId: 'a', stageId: 's1', name: 'a', mode: 'bike', country: { code: 'BB', name: 'BB' }, fromKm: 100, toKm: 160, mid: null },
+    ];
+
+    it('schedules each line, with the segment’s settings shared out by length', () => {
+      commands.run({ label: 'x', changes: [{ id: 'a', before: store.getRaw('a')!, after: { ...store.getRaw('a')!, planDays: 4 } as Segment }] });
+      const pieces = planPieces(store, [store.get('a', 'segment')!], rows());
+      expect(pieces.map((p) => [p.id, p.lengthM, p.days])).toEqual([
+        ['a:AA#0', 100_000, 2.5],
+        ['a:BB#0', 60_000, 1.5],
+      ]);
+    });
+
+    it('gives a line its own fixed date, pace or days', () => {
+      commands.run(setPartCommand(store, 'a', 'BB#0', { fixed: '2027-05-01', kmPerDay: 30 }, 'edit')!);
+      const pieces = planPieces(store, [store.get('a', 'segment')!], rows());
+      expect(pieces[1]).toMatchObject({ fixed: '2027-05-01', kmPerDay: 30 });
+      const s = planSchedule(store, TRIP_SOURCE, rows());
+      expect(s.spans.get('a:BB#0')).toMatchObject({ fixed: '2027-05-01' });
+      commands.run(setPartCommand(store, 'a', 'BB#0', { fixed: undefined, kmPerDay: undefined }, 'clear')!);
+      expect(store.get('a', 'segment')!.planParts).toBeUndefined();
+    });
   });
 });
