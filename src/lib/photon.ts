@@ -1,6 +1,8 @@
 import { poiCategoryFromTags } from '../config/pois';
 import type { LngLat, PoiCategory } from '../model/types';
 
+export { parseCoordinates } from './geo/coordinates';
+
 // Public Photon instance (komoot): fair use, so queries are debounced and cached.
 const ENDPOINT = 'https://photon.komoot.io/api/';
 
@@ -16,14 +18,6 @@ export interface SearchResult {
   category: PoiCategory;
 }
 
-/** "45.92, 6.87" or "45.92 6.87" (latitude first) as a position. */
-export function parseCoordinates(q: string): LngLat | null {
-  const m = q.trim().match(/^(-?\d{1,2}(?:\.\d+)?)\s*[,\s]\s*(-?\d{1,3}(?:\.\d+)?)$/);
-  if (!m) return null;
-  const lat = Number(m[1]);
-  const lng = Number(m[2]);
-  return Math.abs(lat) <= 90 && Math.abs(lng) <= 180 ? [lng, lat] : null;
-}
 
 export function photonUrl(q: string, near?: LngLat, limit = 7): string {
   const params = new URLSearchParams({ q, limit: String(limit), lang: 'en' });

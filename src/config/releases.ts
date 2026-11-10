@@ -11,6 +11,13 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    id: '2026-11-12',
+    title: 'Coordinates in any format',
+    items: [
+      'The search box reads coordinates the way they’re usually written: 41°41\'24"N 44°48\'00"E (as Google Maps copies them), N 41° 41.4\' E 44° 48\', 41.69N 44.8E, or plain 41.69, 44.80. It shows the position it read; press Enter to go there.',
+    ],
+  },
+  {
     id: '2026-11-11b',
     title: 'Folders for places, and who added which',
     items: [

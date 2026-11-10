@@ -29,6 +29,8 @@
   let active = $state(0);
   let open = $state(false);
   let error = $state('');
+  /** The query read as coordinates, shown as a single result to jump to. */
+  const coords = $derived(parseCoordinates(query));
   let timer: ReturnType<typeof setTimeout> | undefined;
   let ctrl: AbortController | undefined;
 
@@ -38,7 +40,12 @@
     clearTimeout(timer);
     error = '';
     const q = query.trim();
-    if (q.length < MIN_CHARS || parseCoordinates(q)) {
+    if (parseCoordinates(q)) {
+      results = [];
+      open = true;
+      return;
+    }
+    if (q.length < MIN_CHARS) {
       results = [];
       return;
     }
@@ -64,6 +71,12 @@
     choose(r);
   }
 
+  function jump(p: LngLat) {
+    open = false;
+    input.blur();
+    goTo(p);
+  }
+
   function onKey(e: KeyboardEvent) {
     if (e.key === 'ArrowDown') {
       active = Math.min(results.length - 1, active + 1);
@@ -72,11 +85,8 @@
       active = Math.max(0, active - 1);
       e.preventDefault();
     } else if (e.key === 'Enter') {
-      const coords = parseCoordinates(query);
-      if (coords) {
-        input.blur();
-        goTo(coords);
-      } else if (results[active]) pick(results[active]!);
+      if (coords) jump(coords);
+      else if (results[active]) pick(results[active]!);
       else if (query.trim().length >= MIN_CHARS) void run(query.trim());
     } else if (e.key === 'Escape') {
       open = false;
@@ -96,11 +106,20 @@
       aria-label={t('search.placeholder')}
       oninput={onInput}
       onkeydown={onKey}
-      onfocus={() => (open = results.length > 0)}
+      onfocus={() => (open = results.length > 0 || !!coords)}
       onblur={() => setTimeout(() => (open = false), 150)}
     />
   </label>
-  {#if open && results.length}
+  {#if open && coords}
+    <ul role="listbox">
+      <li role="option" aria-selected="true">
+        <button type="button" class="active" onmousedown={(e) => e.preventDefault()} onclick={() => jump(coords)}>
+          <strong>{coords[1].toFixed(5)}, {coords[0].toFixed(5)}</strong>
+          <span class="muted">{t('search.goToCoordinates')}</span>
+        </button>
+      </li>
+    </ul>
+  {:else if open && results.length}
     <ul role="listbox">
       {#each results as r, i (i)}
         <li role="option" aria-selected={i === active}>
@@ -145,8 +164,8 @@
   ul {
     position: absolute;
     top: calc(100% + 4px);
-    left: 0;
     right: 0;
+    min-width: max(100%, 260px);
     margin: 0;
     padding: 4px;
     list-style: none;

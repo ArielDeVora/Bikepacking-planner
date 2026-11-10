@@ -375,6 +375,7 @@ export const en = {
   'search.placeholder': 'Search places or coordinates (/)',
   'search.failed': 'Search is unavailable right now.',
   'search.coordinates': 'Coordinates',
+  'search.goToCoordinates': 'Go to these coordinates (Enter)',
 
   'osm.cat.bikeShop': 'OSM: bike shops & repair',
   'osm.cat.supermarket': 'OSM: food shops',
