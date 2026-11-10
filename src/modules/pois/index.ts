@@ -4,14 +4,14 @@ import { POI_CATEGORIES, POI_CATEGORY_ORDER } from '../../config/pois';
 import { edits } from '../../core/commands';
 import { defineModule } from '../../core/module';
 import { icons } from '../../lib/icons';
-import { addRoundIcon } from '../../lib/map-icons';
+import { addRoundIcon, setRoundIcon } from '../../lib/map-icons';
 import { placeNameField } from '../../lib/map-prefs';
 import { authorOf } from '../../lib/places/authors';
-import { folderOf, folderPlaces } from '../../lib/places/folders';
+import { categoryPlaces, categoryVisibilityId, customCategories, iconPath, legacyFolderChanges, resolveCategory } from '../../lib/places/categories';
 import { createPoiCommand } from '../../lib/places/poi';
 import type { LngLat, Poi } from '../../model/types';
+import CategoryCard from './CategoryCard.svelte';
 import PlacesSection from './PlacesSection.svelte';
-import FolderCard from './FolderCard.svelte';
 import PoiCard from './PoiCard.svelte';
 
 const SOURCE = 'pois';
@@ -31,6 +31,17 @@ export default defineModule({
     const { map, store, layers, ui, selection, commands, shortcuts, prefs, t } = ctx;
 
     for (const cat of POI_CATEGORY_ORDER) addRoundIcon(map, `poi-${cat}`, POI_CATEGORIES[cat].icon, POI_CATEGORIES[cat].color);
+    // Custom categories' icons, redrawn when someone changes their symbol or colour.
+    const drawn = new Map<string, string>();
+    const syncCustomIcons = () => {
+      for (const f of customCategories(store)) {
+        const look = `${f.icon}|${f.color}`;
+        if (drawn.get(f.id) === look) continue;
+        drawn.set(f.id, look);
+        setRoundIcon(map, `poi-${f.id}`, iconPath(f.icon), f.color ?? '#868e96');
+      }
+    };
+    syncCustomIcons();
 
     layers.addSource(SOURCE, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
     layers.addLayer(
@@ -127,37 +138,48 @@ export default defineModule({
       const sel = new Set(selection.current);
       const authors = get(ctx.cloud.shared) && prefs.current.placeAuthors;
       const hidden = get(ctx.visibility.hidden);
-      // Places in a hidden folder are left off the map; those in a selected folder are highlighted.
-      const shown = store.list('poi').filter((p) => !(p.folderId && hidden.has(p.folderId) && folderOf(store, p)));
-      const features: GeoJSON.Feature[] = shown.map((p) => ({
+      // Places of a hidden category are left off the map; those of a selected custom category are highlighted.
+      const features: GeoJSON.Feature[] = [];
+      for (const p of store.list('poi')) {
+        const category = resolveCategory(store, p.category);
+        if (hidden.has(categoryVisibilityId(category))) continue;
+        features.push({
         type: 'Feature',
         properties: {
           id: p.id,
-          category: p.category,
+          category,
           status: p.status,
           name: p.name,
-          selected: sel.has(p.id) || (!!p.folderId && sel.has(p.folderId)),
+          selected: sel.has(p.id) || sel.has(category),
           ...(authors ? { author: authorOf(ctx.cloud, t, p.createdBy).color } : {}),
         },
         geometry: { type: 'Point', coordinates: dragging?.id === p.id ? dragging.lngLat : p.lngLat },
-      }));
+        });
+      }
       (map.getSource(SOURCE) as GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features });
     };
     const schedule = () => {
       if (!frame) frame = requestAnimationFrame(render);
     };
-    // "Booked" is no longer a status: such places (older data, or from someone on an older
-    // version) become must-see, without an undo step.
-    const retireBooked = (ids?: string[]) => {
+    // Older data, or from someone on an older version, brought up to date without an undo step:
+    // "booked" places become must-see, and a place's folder becomes its category.
+    const upgrade = (ids?: string[]) => {
       const pois = ids ? ids.map((id) => store.get(id, 'poi')).filter((p): p is Poi => !!p) : store.list('poi');
-      const old = pois.filter((p) => (p.status as string) === 'booked');
-      if (old.length) queueMicrotask(() => commands.patch(old.filter((p) => store.get(p.id, 'poi')).map((p) => edits.update<Poi>(store, p.id, { status: 'mustSee' }))));
+      if (!pois.some((p) => (p.status as string) === 'booked' || p.folderId !== undefined)) return;
+      queueMicrotask(() => {
+        const current = pois.map((p) => store.get(p.id, 'poi')).filter((p): p is Poi => !!p);
+        commands.patch(legacyFolderChanges(store, current));
+        const booked = current.map((p) => store.get(p.id, 'poi')!).filter((p) => (p.status as string) === 'booked');
+        commands.patch(booked.map((p) => edits.update<Poi>(store, p.id, { status: 'mustSee' })));
+      });
     };
-    retireBooked();
+    upgrade();
 
     const offStore = store.onChange(({ ids }) => {
-      if (ids.some((id) => store.getRaw(id)?.type === 'poi' || store.getRaw(id)?.type === 'poiFolder')) schedule();
-      retireBooked(ids);
+      const types = new Set(ids.map((id) => store.getRaw(id)?.type));
+      if (types.has('poiFolder')) syncCustomIcons();
+      if (types.has('poi') || types.has('poiFolder')) schedule();
+      upgrade(ids);
     });
     const offSelection = ctx.bus.on('selection:changed', schedule);
     const offPeople = [ctx.cloud.shared, ctx.cloud.members, ctx.cloud.profile].map((s) => s.subscribe(schedule));
@@ -234,10 +256,13 @@ export default defineModule({
 
     const removeTool = ui.addTool({ id: ADD_TOOL, label: t('poi.add'), icon: icons.pin, shortcut: 'p', order: 30, active: tool, run: toggleAdd });
     const removeShortcut = shortcuts.add({ keys: 'p', label: t('poi.add'), run: toggleAdd });
-    /** Selects a folder and brings its places into view if some are off screen. */
-    const focusFolder = (id: string) => {
-      selection.set([id]);
-      const places = folderPlaces(store, id);
+    /**
+     * Selects a category (a custom one opens its card; a built-in one selects its places) and
+     * brings its places into view if some are off screen.
+     */
+    const focusCategory = (id: string) => {
+      const places = categoryPlaces(store, id);
+      selection.set(store.get(id, 'poiFolder') ? [id] : places.map((p) => p.id));
       if (!places.length) return;
       const bounds = new LngLatBounds();
       for (const p of places) bounds.extend(p.lngLat);
@@ -247,8 +272,8 @@ export default defineModule({
     };
 
     const removeCard = ui.addCardRenderer('poi', { component: PoiCard, props: { ctx } });
-    const removeFolderCard = ui.addCardRenderer('poiFolder', { component: FolderCard, props: { ctx } });
-    const removeSection = ui.addPanelSection({ id: 'pois', title: t('poi.title'), component: PlacesSection, props: { ctx, focus, focusFolder }, order: 15 });
+    const removeCategoryCard = ui.addCardRenderer('poiFolder', { component: CategoryCard, props: { ctx } });
+    const removeSection = ui.addPanelSection({ id: 'pois', title: t('poi.title'), component: PlacesSection, props: { ctx, focus, focusCategory }, order: 15 });
 
     return () => {
       offStore();
@@ -259,7 +284,7 @@ export default defineModule({
       offAuthors();
       offHidden();
       offPeople.forEach((off) => off());
-      removeFolderCard();
+      removeCategoryCard();
       removeOverlay();
       removePointLayer();
       removeTool();

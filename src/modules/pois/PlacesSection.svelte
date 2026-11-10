@@ -1,17 +1,25 @@
 <script lang="ts">
   import { untrack, type Snippet } from 'svelte';
-  import { POI_CATEGORIES, POI_STATUS_ORDER } from '../../config/pois';
+  import { POI_STATUS_ORDER } from '../../config/pois';
   import type { ModuleContext } from '../../core/module';
   import { loadCountries, type CountryIndex } from '../../lib/countries';
   import { icons } from '../../lib/icons';
   import { authorOf, distinctAuthors, type Author } from '../../lib/places/authors';
-  import { createFolderCommand, deleteFolderCommand, moveToFolderCommand, sortedFolders } from '../../lib/places/folders';
+  import {
+    allCategories,
+    categoryVisibilityId,
+    createCategoryCommand,
+    customCategories,
+    deleteCategoryCommand,
+    setCategoryCommand,
+    type CategoryInfo,
+  } from '../../lib/places/categories';
   import { tally, votesByPlace, VOTES, type Tally } from '../../lib/places/votes';
   import Icon from '../../lib/ui/Icon.svelte';
   import IconButton from '../../lib/ui/IconButton.svelte';
-  import type { Poi, PoiFolder, PoiStatus } from '../../model/types';
+  import type { Poi, PoiStatus } from '../../model/types';
 
-  let { ctx, focus, focusFolder }: { ctx: ModuleContext; focus: (id: string) => void; focusFolder: (id: string) => void } = $props();
+  let { ctx, focus, focusCategory }: { ctx: ModuleContext; focus: (id: string) => void; focusCategory: (id: string) => void } = $props();
   const { t, commands, selection } = $derived(ctx);
   const store = $derived(ctx.store);
   const selected = $derived(ctx.selection.ids);
@@ -21,12 +29,11 @@
   const hidden = $derived(ctx.visibility.hidden);
 
   const LIMIT = 200;
-  const LOOSE = '__loose';
   let status = $state<PoiStatus | 'all'>('all');
   let author = $state<string>('all');
   let byCountry = $state(untrack(() => ctx.settings.get('byCountry', false)));
 
-  // Collapsed folders and countries, remembered in this browser.
+  // Collapsed categories and countries, remembered in this browser.
   let collapsed = $state(new Set<string>(untrack(() => ctx.settings.get<string[]>('collapsed', []))));
   function toggle(key: string) {
     const next = new Set(collapsed);
@@ -38,16 +45,30 @@
 
   interface Item {
     poi: Poi;
+    category: CategoryInfo;
     author: Author;
     votes: Tally;
   }
+
+  // Every category: built-in ones first, then custom ones (each is a folder in the list).
+  const categories = $derived.by(() => {
+    void $store;
+    return allCategories(store, t);
+  });
 
   const all = $derived.by((): Item[] => {
     void $store;
     void $members;
     void $profile;
     const votes = votesByPlace(store);
-    return store.list('poi').map((poi) => ({ poi, author: authorOf(ctx.cloud, t, poi.createdBy), votes: tally(votes.get(poi.id) ?? []) }));
+    const byId = new Map(categories.map((c) => [c.id, c]));
+    const other = byId.get('other')!;
+    return store.list('poi').map((poi) => ({
+      poi,
+      category: byId.get(poi.category) ?? other,
+      author: authorOf(ctx.cloud, t, poi.createdBy),
+      votes: tally(votes.get(poi.id) ?? []),
+    }));
   });
   const authors = $derived(distinctAuthors(all.map((x) => x.author)));
   const showAuthors = $derived($shared || authors.length > 1);
@@ -61,21 +82,13 @@
       .sort((a, b) => a.poi.name.localeCompare(b.poi.name)),
   );
 
-  // Folders: each with its places (after filtering); places of a deleted folder are loose.
+  // Folders: built-in categories that have places, and every custom category (unless filtering hides it).
   const folders = $derived.by(() => {
-    void $store;
-    return sortedFolders(store);
-  });
-  const filed = $derived.by(() => {
-    const ids = new Set(folders.map((f) => f.id));
-    const byFolder = new Map<string, Item[]>(folders.map((f) => [f.id, []]));
-    const loose: Item[] = [];
-    for (const item of items) {
-      const id = item.poi.folderId;
-      if (id && ids.has(id)) byFolder.get(id)!.push(item);
-      else loose.push(item);
-    }
-    return { byFolder, loose };
+    const byCategory = new Map<string, Item[]>(categories.map((c) => [c.id, []]));
+    for (const item of items.slice(0, LIMIT)) byCategory.get(item.category.id)?.push(item);
+    return categories
+      .map((category) => ({ category, items: byCategory.get(category.id) ?? [] }))
+      .filter((f) => f.items.length || (f.category.custom && !filtering));
   });
 
   // Countries: outlines are loaded on demand (shared with the borders module), and each place's
@@ -130,31 +143,31 @@
     ctx.settings.set('byCountry', on);
   }
 
-  function newFolder() {
-    const { command, id } = createFolderCommand(store, {
+  /** A new custom category; its card opens to name it and choose its icon. */
+  function newCategory() {
+    const { command, id } = createCategoryCommand(store, {
       tripId: ctx.tripId,
-      name: t('folder.defaultName', { n: folders.length + 1 }),
-      label: t('cmd.addFolder'),
+      userId: ctx.user.id,
+      name: t('category.defaultName', { n: customCategories(store).length + 1 }),
+      label: t('cmd.addCategory'),
     });
     commands.run(command);
     selection.set([id]);
   }
 
-  function deleteFolder(folder: PoiFolder) {
-    commands.run(deleteFolderCommand(store, folder.id, t('cmd.deleteFolder')));
-    if (selection.current.includes(folder.id)) selection.clear();
+  function deleteCategory(id: string) {
+    commands.run(deleteCategoryCommand(store, id, t('cmd.deleteCategory')));
+    if (selection.current.includes(id)) selection.clear();
   }
 
-  // Dragging places onto a folder (or onto "Not in a folder"). A selected place takes the other
-  // selected places with it.
-  const DRAG_TYPE = 'application/x-bikepacking-places';
+  // Dragging places onto another category's folder. A selected place takes the other selected places with it.
   let dragging = $state<string[] | null>(null);
   let dropTarget = $state<string | null>(null);
 
   function dragStart(e: DragEvent, poi: Poi) {
     const sel = selection.current.filter((id) => store.get(id, 'poi'));
     dragging = sel.includes(poi.id) ? sel : [poi.id];
-    e.dataTransfer?.setData(DRAG_TYPE, JSON.stringify(dragging));
+    e.dataTransfer?.setData('text/plain', poi.name);
     if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
   }
 
@@ -165,12 +178,12 @@
     dropTarget = key;
   }
 
-  function drop(e: DragEvent, key: string) {
+  function drop(e: DragEvent, categoryId: string) {
     e.preventDefault();
     const ids = dragging;
     endDrag();
     if (!ids) return;
-    const cmd = moveToFolderCommand(store, ids, key === LOOSE ? null : key, t('cmd.moveToFolder'));
+    const cmd = setCategoryCommand(store, ids, categoryId, t('cmd.setCategory'));
     if (cmd) commands.run(cmd);
   }
 
@@ -200,7 +213,7 @@
     {t('poi.byCountry')}
   </label>
   <span class="spacer"></span>
-  <IconButton icon={icons.folderPlus} label={t('folder.new')} size={16} onclick={newFolder} />
+  <IconButton icon={icons.folderPlus} label={t('category.new')} size={16} onclick={newCategory} />
 </div>
 <p class="muted small hint">{t('poi.addHint')}</p>
 
@@ -210,13 +223,13 @@
     class="place"
     class:selected={$selected.includes(poi.id)}
     class:dragged={dragging?.includes(poi.id)}
-    draggable={folders.length > 0 && !byCountry}
-    title={folders.length > 0 && !byCountry ? t('folder.dragHint') : undefined}
+    draggable={!byCountry}
+    title={!byCountry ? t('category.dragHint') : undefined}
     ondragstart={(e) => dragStart(e, poi)}
     ondragend={endDrag}
   >
     <button type="button" onclick={() => focus(poi.id)}>
-      <span class="icon" style:background={POI_CATEGORIES[poi.category].color}><Icon d={POI_CATEGORIES[poi.category].icon} size={11} /></span>
+      <span class="icon" style:background={item.category.color}><Icon d={item.category.icon} size={11} /></span>
       <span class="label">{poi.name || t('poi.untitled')}</span>
       {#if poi.status !== 'idea'}<span class="tag {poi.status}">{t(`poi.status.${poi.status}`)}</span>{/if}
       {#if item.votes.counts[2] || item.votes.counts[1] || item.votes.counts[-1]}
@@ -234,28 +247,23 @@
 {/snippet}
 
 <!-- A collapsible row in the style of the trip tree's groups, with its places below. -->
-{#snippet groupRow(
-  key: string,
-  label: string,
-  list: Item[],
-  icon: Snippet,
-  opts: { folder?: PoiFolder; drop?: boolean; empty?: string },
-)}
+{#snippet groupRow(key: string, label: string, list: Item[], icon: Snippet, category?: CategoryInfo)}
   {@const closed = collapsed.has(key)}
-  {@const off = !!opts.folder && $hidden.has(opts.folder.id)}
+  {@const visibilityId = category ? categoryVisibilityId(category.id) : ''}
+  {@const off = !!category && $hidden.has(visibilityId)}
   <li>
     <div
       class="row"
-      class:selected={!!opts.folder && $selected.includes(opts.folder.id)}
+      class:selected={!!category?.custom && $selected.includes(category.id)}
       class:hidden={off}
-      class:drop-into={opts.drop && dropTarget === key}
+      class:drop-into={!!category && dropTarget === key}
       role="treeitem"
-      aria-selected={!!opts.folder && $selected.includes(opts.folder.id)}
+      aria-selected={!!category?.custom && $selected.includes(category.id)}
       aria-expanded={!closed}
       tabindex="-1"
-      ondragover={opts.drop ? (e) => dragOver(e, key) : undefined}
-      ondragleave={opts.drop ? () => dropTarget === key && (dropTarget = null) : undefined}
-      ondrop={opts.drop ? (e) => drop(e, key) : undefined}
+      ondragover={category ? (e) => dragOver(e, key) : undefined}
+      ondragleave={category ? () => dropTarget === key && (dropTarget = null) : undefined}
+      ondrop={category ? (e) => drop(e, category.id) : undefined}
     >
       <button
         type="button"
@@ -268,13 +276,12 @@
       >
         <Icon d={icons.down} size={12} />
       </button>
-      <button type="button" class="name" onclick={() => (opts.folder ? focusFolder(opts.folder.id) : toggle(key))}>
+      <button type="button" class="name" onclick={() => (category ? focusCategory(category.id) : toggle(key))}>
         {@render icon()}
         <span class="label">{label}</span>
         <span class="count muted">{list.length}</span>
       </button>
-      {#if opts.folder}
-        {@const folder = opts.folder}
+      {#if category}
         <button
           type="button"
           class="eye"
@@ -282,12 +289,15 @@
           title={off ? t('tree.show') : t('tree.hide')}
           aria-label={off ? t('tree.show') : t('tree.hide')}
           aria-pressed={!off}
-          onclick={() => ctx.visibility.toggle(folder.id)}
+          onclick={() => ctx.visibility.toggle(visibilityId)}
         >
           <Icon d={off ? icons.eyeOff : icons.eye} size={14} />
         </button>
         <span class="actions">
-          <IconButton icon={icons.trash} label={`${t('folder.delete')}. ${t('folder.deleteHint')}`} size={14} onclick={() => deleteFolder(folder)} />
+          {#if category.custom}
+            {@const id = category.id}
+            <IconButton icon={icons.trash} label={`${t('category.delete')}. ${t('category.deleteHint')}`} size={14} onclick={() => deleteCategory(id)} />
+          {/if}
         </span>
       {/if}
     </div>
@@ -296,8 +306,8 @@
         <ul class="children">
           {#each list as item (item.poi.id)}{@render placeRow(item)}{/each}
         </ul>
-      {:else if opts.empty}
-        <p class="muted small empty">{opts.empty}</p>
+      {:else if category?.custom}
+        <p class="muted small empty">{t('category.empty')}</p>
       {/if}
     {/if}
   </li>
@@ -310,7 +320,7 @@
         <ul>
           {#each countryGroups as g (g.key)}
             {#snippet flagIcon()}<span class="flag">{g.flag || '🏳️'}</span>{/snippet}
-            {@render groupRow(g.key, g.name, g.items, flagIcon, {})}
+            {@render groupRow(g.key, g.name, g.items, flagIcon)}
           {/each}
         </ul>
       {:else if countriesFailed}
@@ -321,27 +331,16 @@
       {:else}
         <p class="muted small">{t('poi.loadingCountries')}</p>
       {/if}
-    {:else if folders.length}
-      <ul>
-        {#each folders as folder (folder.id)}
-          {@const list = filed.byFolder.get(folder.id) ?? []}
-          {#if list.length || !filtering}
-            {#snippet folderIcon()}<span class="folder" style:color={folder.color ?? 'var(--accent)'}><Icon d={icons.folder} size={14} /></span>{/snippet}
-            {@render groupRow(folder.id, folder.name || t('poi.untitled'), list, folderIcon, { folder, drop: true, empty: t('folder.empty') })}
-          {/if}
-        {/each}
-        {#if filed.loose.length || dragging}
-          {#snippet looseIcon()}<span class="folder muted"><Icon d={icons.pin} size={14} /></span>{/snippet}
-          {@render groupRow(LOOSE, t('folder.loose'), filed.loose.slice(0, LIMIT), looseIcon, { drop: true })}
-        {/if}
-      </ul>
     {:else}
       <ul>
-        {#each items.slice(0, LIMIT) as item (item.poi.id)}{@render placeRow(item)}{/each}
+        {#each folders as f (f.category.id)}
+          {#snippet categoryIcon()}<span class="badge" style:background={f.category.color}><Icon d={f.category.icon} size={11} /></span>{/snippet}
+          {@render groupRow(f.category.id, f.category.name, f.items, categoryIcon, f.category)}
+        {/each}
       </ul>
     {/if}
   </div>
-  {#if items.length > LIMIT && (byCountry || !folders.length || filed.loose.length > LIMIT)}
+  {#if items.length > LIMIT}
     <p class="muted small">{t('poi.more', { n: items.length - LIMIT })}</p>
   {/if}
 {:else}
@@ -459,9 +458,14 @@
     white-space: nowrap;
   }
 
-  .folder {
+  .badge {
     display: grid;
     flex: none;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    color: #fff;
   }
 
   .flag {

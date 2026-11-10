@@ -1,15 +1,15 @@
 <script lang="ts">
-  import { POI_CATEGORIES, POI_CATEGORY_ORDER, POI_STATUS_ORDER } from '../../config/pois';
+  import { POI_STATUS_ORDER } from '../../config/pois';
   import { edits } from '../../core/commands';
   import type { ModuleContext } from '../../core/module';
   import { icons } from '../../lib/icons';
   import { authorOf } from '../../lib/places/authors';
-  import { createFolderCommand, folderOf, moveToFolderCommand, sortedFolders } from '../../lib/places/folders';
+  import { allCategories, createCategoryCommand, customCategories, resolveCategory } from '../../lib/places/categories';
   import { tally, voteCommand, VOTES } from '../../lib/places/votes';
   import PlaceInfo from '../../lib/places/PlaceInfo.svelte';
   import Icon from '../../lib/ui/Icon.svelte';
   import IconButton from '../../lib/ui/IconButton.svelte';
-  import type { Poi, PoiCategory, PoiStatus, VoteValue } from '../../model/types';
+  import type { Poi, PoiStatus, VoteValue } from '../../model/types';
 
   let { id, ctx }: { id: string; ctx: ModuleContext } = $props();
   const { t, commands } = $derived(ctx);
@@ -27,15 +27,27 @@
     return poi ? authorOf(ctx.cloud, t, poi.createdBy) : null;
   });
 
-  const folders = $derived.by(() => {
+  // Categories: built-in ones, then the custom ones; "+" makes a new one (and opens its card).
+  const categories = $derived.by(() => {
     void $store;
-    return sortedFolders(store);
+    return allCategories(store, t);
   });
-  const folderId = $derived.by(() => {
+  const current = $derived.by(() => {
     void $store;
-    return poi ? (folderOf(store, poi)?.id ?? '') : '';
+    return poi ? resolveCategory(store, poi.category) : 'other';
   });
-  const NEW_FOLDER = '__new';
+
+  function newCategory() {
+    const { command, id: categoryId } = createCategoryCommand(store, {
+      tripId: ctx.tripId,
+      userId: ctx.user.id,
+      name: t('category.defaultName', { n: customCategories(store).length + 1 }),
+      label: t('cmd.addCategory'),
+      poiIds: [id],
+    });
+    commands.run(command);
+    ctx.selection.set([categoryId]);
+  }
 
   // Votes: everyone's opinion, yours highlighted; clicking yours again takes it back.
   const votes = $derived.by(() => {
@@ -61,21 +73,6 @@
       label: t('cmd.vote'),
       isMine: ctx.cloud.isMine,
     });
-    if (cmd) commands.run(cmd);
-  }
-
-  function pickFolder(value: string) {
-    if (value === NEW_FOLDER) {
-      const { command } = createFolderCommand(store, {
-        tripId: ctx.tripId,
-        name: t('folder.defaultName', { n: folders.length + 1 }),
-        label: t('cmd.addFolder'),
-        poiIds: [id],
-      });
-      commands.run(command);
-      return;
-    }
-    const cmd = moveToFolderCommand(store, [id], value || null, t('cmd.moveToFolder'));
     if (cmd) commands.run(cmd);
   }
 
@@ -122,20 +119,27 @@
   <div class="field">
     <span>{t('poi.category')}</span>
     <div class="cats" role="radiogroup" aria-label={t('poi.category')}>
-      {#each POI_CATEGORY_ORDER as cat (cat)}
+      {#each categories as cat (cat.id)}
         <button
           type="button"
           class="cat"
-          class:active={poi.category === cat}
-          style:--c={POI_CATEGORIES[cat].color}
-          title={t(`poi.cat.${cat}`)}
-          aria-label={t(`poi.cat.${cat}`)}
-          onclick={() => patch({ category: cat as PoiCategory })}
+          class:custom={!!cat.custom}
+          class:active={current === cat.id}
+          role="radio"
+          aria-checked={current === cat.id}
+          style:--c={cat.color}
+          title={cat.name}
+          aria-label={cat.name}
+          onclick={() => patch({ category: cat.id })}
         >
-          <Icon d={POI_CATEGORIES[cat].icon} size={15} />
+          <Icon d={cat.icon} size={15} />
         </button>
       {/each}
+      <button type="button" class="cat add" title={t('category.new')} aria-label={t('category.new')} onclick={newCategory}>
+        <Icon d={icons.plus} size={15} />
+      </button>
     </div>
+    <span class="cat-name">{categories.find((c) => c.id === current)?.name}</span>
   </div>
 
   <div class="field">
@@ -177,17 +181,6 @@
       </ul>
     {/if}
   </div>
-
-  <label class="field">
-    <span>{t('folder.label')}</span>
-    <select value={folderId} onchange={(e) => pickFolder(e.currentTarget.value)}>
-      <option value="">{t('folder.none')}</option>
-      {#each folders as f (f.id)}
-        <option value={f.id}>{f.name || t('poi.untitled')}</option>
-      {/each}
-      <option value={NEW_FOLDER}>{t('folder.newFrom')}</option>
-    </select>
-  </label>
 
   <label class="field">
     <span>{t('poi.notes')}</span>
@@ -318,6 +311,24 @@
   .cat.active {
     background: var(--c);
     color: #fff;
+  }
+
+  .cat.add {
+    border-style: dashed;
+    border-color: var(--border);
+    color: var(--fg-muted);
+  }
+
+  .cat.add:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .cat-name {
+    display: block;
+    margin-top: 4px;
+    font-size: 12px;
+    color: var(--fg-muted);
   }
 
   .status {

@@ -11,6 +11,15 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    id: '2026-11-13',
+    title: 'Categories are folders',
+    items: [
+      'Places are grouped by category in the Places list: each category is a folder you can fold, hide from the map with the eye, or drag places into to change their category.',
+      'Make your own categories (folder button in Places, or + in a place’s category picker): pick a name, a colour and an icon from the set. Their places show that icon on the map.',
+      'Folders made earlier are now categories, with their places in them.',
+    ],
+  },
+  {
     id: '2026-11-12b',
     title: 'Vote on places, and GOATED',
     items: [

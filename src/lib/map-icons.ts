@@ -6,6 +6,17 @@ import type { Map as MapLibreMap } from 'maplibre-gl';
  */
 export function addRoundIcon(map: MapLibreMap, id: string, path: string, color: string, size = 26, filled = true): void {
   if (map.hasImage(id)) return;
+  map.addImage(id, roundIcon(path, color, size, filled), { pixelRatio: 2 });
+}
+
+/** Adds a round icon, or redraws it if it exists (e.g. after its colour or symbol changed). */
+export function setRoundIcon(map: MapLibreMap, id: string, path: string, color: string, size = 26, filled = true): void {
+  const image = roundIcon(path, color, size, filled);
+  if (map.hasImage(id)) map.updateImage(id, image);
+  else map.addImage(id, image, { pixelRatio: 2 });
+}
+
+function roundIcon(path: string, color: string, size: number, filled: boolean): ImageData {
   const ratio = 2;
   const px = size * ratio;
   const canvas = document.createElement('canvas');
@@ -28,5 +39,5 @@ export function addRoundIcon(map: MapLibreMap, id: string, path: string, color: 
   g.lineJoin = 'round';
   g.strokeStyle = filled ? '#ffffff' : color;
   g.stroke(new Path2D(path));
-  map.addImage(id, g.getImageData(0, 0, px, px), { pixelRatio: ratio });
+  return g.getImageData(0, 0, px, px);
 }

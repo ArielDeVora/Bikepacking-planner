@@ -141,14 +141,15 @@ export interface OsmRef {
 export interface Poi extends BaseEntity {
   type: 'poi';
   lngLat: LngLat;
-  category: PoiCategory;
+  /** A built-in category (`PoiCategory`) or the id of a custom one (`PoiFolder`). */
+  category: string;
   name: string;
   notes: string;
   links: string[];
   status: PoiStatus;
   createdBy: string;
   osm?: OsmRef;
-  /** Folder in the Places list; none (or a deleted folder) means loose. */
+  /** Older data: the folder it was put in, turned into its category when loaded. */
   folderId?: string;
 }
 
@@ -163,13 +164,15 @@ export interface Vote extends BaseEntity {
   value: VoteValue;
 }
 
-/** A folder of places in the Places list. */
+/** A custom category of places, with its own folder in the Places list. */
 export interface PoiFolder extends BaseEntity {
   type: 'poiFolder';
   name: string;
   order: string;
-  /** Colour of the folder icon. */
   color?: string;
+  /** Key in `POI_ICONS`, chosen by whoever made it. */
+  icon?: string;
+  createdBy?: string;
 }
 
 export interface Zone extends BaseEntity {

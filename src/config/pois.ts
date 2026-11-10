@@ -21,7 +21,35 @@ export const POI_ICONS = {
   cart: 'M3 4h2l2.5 11h11L21 7H6.5M9 20a1 1 0 1 0 0-2 1 1 0 0 0 0 2zM18 20a1 1 0 1 0 0-2 1 1 0 0 0 0 2z',
   cross: 'M9 3h6v6h6v6h-6v6H9v-6H3V9h6z',
   cash: 'M3 6h18v12H3zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 9v6M18 9v6',
+  star: 'M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z',
+  heart: 'M12 20s-7-4.4-9-9a4.5 4.5 0 0 1 9-3 4.5 4.5 0 0 1 9 3c-2 4.6-9 9-9 9z',
+  fire: 'M12 3c1 3 5 5 5 10a5 5 0 0 1-10 0c0-3 2-4 2-6 1 1 2 2 2 3 0-3 1-5 1-7z',
+  tree: 'M12 3l6 8h-3l4 6H5l4-6H6zM12 17v4',
+  waves: 'M2 9c2.5 0 2.5-2 5-2s2.5 2 5 2 2.5-2 5-2 2.5 2 5 2M2 15c2.5 0 2.5-2 5-2s2.5 2 5 2 2.5-2 5-2 2.5 2 5 2',
+  umbrella: 'M12 3a9 9 0 0 1 9 9H3a9 9 0 0 1 9-9zM12 12v7a2 2 0 0 0 4 0',
+  eye: 'M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
+  castle: 'M4 21V9h3V6h2v3h2V6h2v3h2V6h2v3h3v12zM10 21v-4h4v4',
+  temple: 'M12 2v4M10 4h4M6 21V11l6-4 6 4v10zM10 21v-5h4v5',
+  coffee: 'M4 9h12v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5zM16 10h2a2 2 0 0 1 0 4h-2M8 3v3M12 3v3',
+  beer: 'M6 4h10v16H6zM16 8h2a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2M9 8v8M13 8v8',
+  bag: 'M5 8h14l-1 13H6zM9 8V6a3 3 0 0 1 6 0v2',
+  bike: 'M6 18a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 18a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 15l4-7h5l3 7M10 8l2 7 3-7M9 6h3',
+  train: 'M6 4h12v11a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2zM6 11h12M8 21l2-4M16 21l-2-4',
+  bus: 'M5 5h14v12H5zM5 12h14M7 20v-3M17 20v-3',
+  boat: 'M3 16l2 4h14l2-4zM12 3v13M12 4l6 8h-6',
+  fuel: 'M5 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16M4 21h12M7 8h6M15 10h2l2 2v5a1.5 1.5 0 0 0 3 0V9l-3-3',
+  wifi: 'M2 9a15 15 0 0 1 20 0M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0M12 20h.01',
+  music: 'M9 18V5l11-2v13M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM20 16a3 3 0 1 1-6 0 3 3 0 0 1 6 0z',
+  info: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 16v-4M12 8h.01',
 } as const;
+
+export type PoiIconKey = keyof typeof POI_ICONS;
+
+/** Icons offered for custom categories, in picker order. */
+export const CATEGORY_ICON_KEYS = Object.keys(POI_ICONS) as PoiIconKey[];
+
+/** Colours offered to new custom categories, in turn. */
+export const CATEGORY_COLORS = ['#e64980', '#7950f2', '#1098ad', '#f08c00', '#5c940d', '#4263eb', '#ae3ec9', '#0b7285', '#d9480f', '#2b8a3e'];
 
 export const POI_CATEGORIES: Record<PoiCategory, PoiCategoryConfig> = {
   sight: { id: 'sight', color: '#7048e8', icon: POI_ICONS.camera },
