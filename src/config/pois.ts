@@ -37,7 +37,7 @@ export const POI_CATEGORIES: Record<PoiCategory, PoiCategoryConfig> = {
 };
 
 export const POI_CATEGORY_ORDER: PoiCategory[] = ['sight', 'nature', 'camp', 'water', 'food', 'bikeShop', 'accommodation', 'admin', 'border', 'other'];
-export const POI_STATUS_ORDER: PoiStatus[] = ['idea', 'mustSee', 'booked', 'skip'];
+export const POI_STATUS_ORDER: PoiStatus[] = ['idea', 'mustSee', 'goated', 'skip'];
 
 /** OpenStreetMap overlays (loaded from Overpass), each with the tags that select it. */
 export interface OsmCategory {

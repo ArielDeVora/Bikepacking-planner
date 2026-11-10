@@ -1,6 +1,6 @@
 export type LngLat = [lng: number, lat: number];
 
-export type EntityType = 'trip' | 'route' | 'stage' | 'group' | 'segment' | 'poi' | 'poiFolder' | 'zone' | 'borderCrossing' | 'comment';
+export type EntityType = 'trip' | 'route' | 'stage' | 'group' | 'segment' | 'poi' | 'poiFolder' | 'vote' | 'zone' | 'borderCrossing' | 'comment';
 
 export interface BaseEntity {
   id: string;
@@ -129,7 +129,7 @@ export type PoiCategory =
   | 'border'
   | 'other';
 
-export type PoiStatus = 'idea' | 'mustSee' | 'booked' | 'skip';
+export type PoiStatus = 'idea' | 'mustSee' | 'goated' | 'skip';
 
 export interface OsmRef {
   type: 'node' | 'way' | 'relation';
@@ -150,6 +150,17 @@ export interface Poi extends BaseEntity {
   osm?: OsmRef;
   /** Folder in the Places list; none (or a deleted folder) means loose. */
   folderId?: string;
+}
+
+/** What someone thinks of a place: not for me, yes, GOATED; 0 once taken back. */
+export type VoteValue = -1 | 0 | 1 | 2;
+
+/** One person's vote on a place. Its id is derived from both, so each person has one vote per place. */
+export interface Vote extends BaseEntity {
+  type: 'vote';
+  poiId: string;
+  userId: string;
+  value: VoteValue;
 }
 
 /** A folder of places in the Places list. */
@@ -195,7 +206,7 @@ export interface Comment extends BaseEntity {
   createdAt: number;
 }
 
-export type Entity = Trip | Route | Stage | Group | Segment | Poi | PoiFolder | Zone | BorderCrossing | Comment;
+export type Entity = Trip | Route | Stage | Group | Segment | Poi | PoiFolder | Vote | Zone | BorderCrossing | Comment;
 export type EntityOf<T extends EntityType> = Extract<Entity, { type: T }>;
 
 /** An entity before it has been stamped by the command system. */

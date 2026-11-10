@@ -11,6 +11,15 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    id: '2026-11-12b',
+    title: 'Vote on places, and GOATED',
+    items: [
+      'Vote on any place in its card: 🐐 GOATED, 👍 I’m in or 👎 Not for me. Everyone sees who voted what, and the Places list shows the counts.',
+      'A new status above must-see: GOATED. Those places are bigger on the map, with a gold glow.',
+      'The Booked status is gone; places that were booked are now must-see.',
+    ],
+  },
+  {
     id: '2026-11-12',
     title: 'Coordinates in any format',
     items: [

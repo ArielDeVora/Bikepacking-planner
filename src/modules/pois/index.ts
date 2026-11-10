@@ -1,4 +1,4 @@
-import { LngLatBounds, type GeoJSONSource, type MapLayerMouseEvent, type MapMouseEvent } from 'maplibre-gl';
+import { LngLatBounds, type ExpressionSpecification, type GeoJSONSource, type MapLayerMouseEvent, type MapMouseEvent } from 'maplibre-gl';
 import { derived, get } from 'svelte/store';
 import { POI_CATEGORIES, POI_CATEGORY_ORDER } from '../../config/pois';
 import { edits } from '../../core/commands';
@@ -18,6 +18,13 @@ const SOURCE = 'pois';
 const ADD_TOOL = 'pois.add';
 const CLICK_PX = 3;
 
+// Status styles, scaled by the "Size of your places" setting: must-see places are a bit bigger
+// with a gold ring; GOATED ones bigger still, with a thicker ring and a gold glow.
+const isStatus = (s: string): ExpressionSpecification => ['==', ['get', 'status'], s];
+const iconSize = (s: number): ExpressionSpecification => ['case', isStatus('goated'), 1.25 * s, isStatus('mustSee'), 1.1 * s, s];
+const ringRadius = (s: number): ExpressionSpecification => ['case', isStatus('goated'), 20 * s, ['get', 'selected'], 18 * s, 16 * s];
+const GLOW_RADIUS = 28;
+
 export default defineModule({
   id: 'pois',
   setup(ctx) {
@@ -28,22 +35,26 @@ export default defineModule({
     layers.addSource(SOURCE, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
     layers.addLayer(
       {
+        id: 'pois-glow',
+        type: 'circle',
+        source: SOURCE,
+        filter: isStatus('goated'),
+        // Transparency in the colour, so the overlay's opacity slider can still scale it.
+        paint: { 'circle-radius': GLOW_RADIUS, 'circle-color': 'rgba(252, 196, 25, 0.75)', 'circle-blur': 0.55 },
+      },
+      'poi',
+    );
+    layers.addLayer(
+      {
         id: 'pois-ring',
         type: 'circle',
         source: SOURCE,
-        filter: ['any', ['in', ['get', 'status'], ['literal', ['mustSee', 'booked']]], ['get', 'selected']],
+        filter: ['any', ['in', ['get', 'status'], ['literal', ['mustSee', 'goated']]], ['get', 'selected']],
         paint: {
-          'circle-radius': ['case', ['get', 'selected'], 18, 16],
+          'circle-radius': ringRadius(1),
           'circle-color': 'rgba(0,0,0,0)',
-          'circle-stroke-width': ['case', ['get', 'selected'], 3, 2.5],
-          'circle-stroke-color': [
-            'case',
-            ['get', 'selected'],
-            '#212529',
-            ['==', ['get', 'status'], 'booked'],
-            '#2f9e44',
-            '#f59f00',
-          ],
+          'circle-stroke-width': ['case', isStatus('goated'), 3.5, ['get', 'selected'], 3, 2.5],
+          'circle-stroke-color': ['case', ['get', 'selected'], '#212529', '#f59f00'],
         },
       },
       'poi',
@@ -55,7 +66,7 @@ export default defineModule({
         source: SOURCE,
         layout: {
           'icon-image': ['concat', 'poi-', ['get', 'category']],
-          'icon-size': ['case', ['==', ['get', 'status'], 'mustSee'], 1.1, 1],
+          'icon-size': iconSize(1),
           'icon-allow-overlap': true,
           'text-field': ['step', ['zoom'], '', 11, ['get', 'name']],
           'text-font': ['Noto Sans Regular'],
@@ -76,9 +87,10 @@ export default defineModule({
     );
     // Size and labels from the Settings window.
     const offSize = prefs.watch('placeSize', (s) => {
-      map.setLayoutProperty('pois', 'icon-size', ['case', ['==', ['get', 'status'], 'mustSee'], 1.1 * s, s]);
+      map.setLayoutProperty('pois', 'icon-size', iconSize(s));
       map.setLayoutProperty('pois', 'text-offset', [0, 1.4 * s]);
-      map.setPaintProperty('pois-ring', 'circle-radius', ['case', ['get', 'selected'], 18 * s, 16 * s]);
+      map.setPaintProperty('pois-ring', 'circle-radius', ringRadius(s));
+      map.setPaintProperty('pois-glow', 'circle-radius', GLOW_RADIUS * s);
     });
     const offNames = prefs.watch('placeNames', (names) => map.setLayoutProperty('pois', 'text-field', placeNameField(names)));
     // Who added each place: a dot in their colour, on shared trips.
@@ -105,7 +117,7 @@ export default defineModule({
       map.setPaintProperty('pois-author', 'circle-translate', [9 * s, -9 * s]);
     });
     const removePointLayer = ui.addPointLayer('pois');
-    const removeOverlay = layers.registerOverlay({ id: 'pois', label: t('poi.overlay'), layerIds: ['pois', 'pois-ring', 'pois-author'], visible: true, order: 10, group: 'trip' });
+    const removeOverlay = layers.registerOverlay({ id: 'pois', label: t('poi.overlay'), layerIds: ['pois', 'pois-ring', 'pois-glow', 'pois-author'], visible: true, order: 10, group: 'trip' });
 
     // Rendering
     let dragging: { id: string; lngLat: LngLat } | null = null;
@@ -134,8 +146,18 @@ export default defineModule({
     const schedule = () => {
       if (!frame) frame = requestAnimationFrame(render);
     };
+    // "Booked" is no longer a status: such places (older data, or from someone on an older
+    // version) become must-see, without an undo step.
+    const retireBooked = (ids?: string[]) => {
+      const pois = ids ? ids.map((id) => store.get(id, 'poi')).filter((p): p is Poi => !!p) : store.list('poi');
+      const old = pois.filter((p) => (p.status as string) === 'booked');
+      if (old.length) queueMicrotask(() => commands.patch(old.filter((p) => store.get(p.id, 'poi')).map((p) => edits.update<Poi>(store, p.id, { status: 'mustSee' }))));
+    };
+    retireBooked();
+
     const offStore = store.onChange(({ ids }) => {
       if (ids.some((id) => store.getRaw(id)?.type === 'poi' || store.getRaw(id)?.type === 'poiFolder')) schedule();
+      retireBooked(ids);
     });
     const offSelection = ctx.bus.on('selection:changed', schedule);
     const offPeople = [ctx.cloud.shared, ctx.cloud.members, ctx.cloud.profile].map((s) => s.subscribe(schedule));

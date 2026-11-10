@@ -83,7 +83,11 @@
   const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
   function nameOf(id: string, fallback?: string): string {
-    const e = store.getRaw(id) as { name?: string; type?: string } | undefined;
+    const e = store.getRaw(id) as { name?: string; type?: string; poiId?: string } | undefined;
+    if (e?.type === 'vote' && e.poiId) {
+      const place = store.getRaw(e.poiId) as { name?: string } | undefined;
+      if (place?.name) return t('history.voteOn', { name: place.name });
+    }
     return fallback || e?.name || t(`history.type.${e?.type ?? 'item'}` as StringKey);
   }
 

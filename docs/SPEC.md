@@ -34,7 +34,7 @@ Design goals, in priority order: **simple, lean, clean, modular, fast.** I will 
 - **Data model** — propose your own, but it must support:
   - `Trip` → ordered `Stage`s (e.g. a day or a leg) → ordered `Segment`s.
   - `Segment`: travel mode (`bike | walk | train | bus | boat | plane | car`), geometry type (`routed | manual | imported | greatCircle`), routing anchors (the user's control points), full-resolution geometry with elevation, name, notes, colour override, optional planned date.
-  - `POI` / waypoint: category, name, notes, links, OSM id if from OSM, cached OSM tags, created by, status (idea / must-see / booked / skip).
+  - `POI` / waypoint: category, name, notes, links, OSM id if from OSM, cached OSM tags, created by, status (idea / must-see / GOATED / skip), and everyone's votes (separate `vote` entities).
   - `AvoidZone`: polygon, reason, severity, source, date added.
   - `BorderCrossing` annotation: linked to an OSM node if possible; our own status (open / closed to foreigners / unknown), notes, link to an external source (e.g. the Caravanistan page), last-verified date.
   - Every entity: `id` (uuid), `updatedAt`, `updatedBy`, soft delete.

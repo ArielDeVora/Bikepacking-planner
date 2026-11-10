@@ -6,6 +6,7 @@
   import { icons } from '../../lib/icons';
   import { authorOf, distinctAuthors, type Author } from '../../lib/places/authors';
   import { createFolderCommand, deleteFolderCommand, moveToFolderCommand, sortedFolders } from '../../lib/places/folders';
+  import { tally, votesByPlace, VOTES, type Tally } from '../../lib/places/votes';
   import Icon from '../../lib/ui/Icon.svelte';
   import IconButton from '../../lib/ui/IconButton.svelte';
   import type { Poi, PoiFolder, PoiStatus } from '../../model/types';
@@ -38,13 +39,15 @@
   interface Item {
     poi: Poi;
     author: Author;
+    votes: Tally;
   }
 
   const all = $derived.by((): Item[] => {
     void $store;
     void $members;
     void $profile;
-    return store.list('poi').map((poi) => ({ poi, author: authorOf(ctx.cloud, t, poi.createdBy) }));
+    const votes = votesByPlace(store);
+    return store.list('poi').map((poi) => ({ poi, author: authorOf(ctx.cloud, t, poi.createdBy), votes: tally(votes.get(poi.id) ?? []) }));
   });
   const authors = $derived(distinctAuthors(all.map((x) => x.author)));
   const showAuthors = $derived($shared || authors.length > 1);
@@ -216,6 +219,13 @@
       <span class="icon" style:background={POI_CATEGORIES[poi.category].color}><Icon d={POI_CATEGORIES[poi.category].icon} size={11} /></span>
       <span class="label">{poi.name || t('poi.untitled')}</span>
       {#if poi.status !== 'idea'}<span class="tag {poi.status}">{t(`poi.status.${poi.status}`)}</span>{/if}
+      {#if item.votes.counts[2] || item.votes.counts[1] || item.votes.counts[-1]}
+        <span class="votes" title={t('vote.summary', { n: item.votes.counts[2] + item.votes.counts[1] + item.votes.counts[-1], score: item.votes.score })}>
+          {#each VOTES as o (o.value)}
+            {#if item.votes.counts[o.value]}<span>{o.emoji}{item.votes.counts[o.value]}</span>{/if}
+          {/each}
+        </span>
+      {/if}
       {#if showAuthors}
         <span class="author" style:background={item.author.color} title={t('poi.addedBy', { name: item.author.name })}></span>
       {/if}
@@ -587,8 +597,20 @@
     color: #b45309;
   }
 
-  .tag.booked {
-    color: #2f9e44;
+  .tag.goated {
+    background: linear-gradient(90deg, #fcc419, #f59f00);
+    color: #3b2700;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+  }
+
+  .votes {
+    display: inline-flex;
+    flex: none;
+    gap: 4px;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    color: var(--fg-muted);
   }
 
   .tag.skip {
