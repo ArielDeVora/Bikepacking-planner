@@ -1,13 +1,14 @@
 import { edits, type Command } from '../../core/commands';
 import { newId } from '../../model/ids';
-import type { LngLat, OsmRef, Poi, PoiCategory } from '../../model/types';
+import type { LngLat, OsmRef, Poi } from '../../model/types';
 
 export interface NewPoi {
   tripId: string;
   userId: string;
   lngLat: LngLat;
   name: string;
-  category: PoiCategory;
+  /** Built-in or custom category id. */
+  category: string;
   notes?: string;
   links?: string[];
   osm?: OsmRef;

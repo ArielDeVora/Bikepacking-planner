@@ -3,6 +3,7 @@ export const en = {
   'app.loading': 'Loading…',
   'app.storageUnavailable': 'Local storage is unavailable: changes will not be saved in this browser.',
   'app.loadFailed': 'Could not load the trip.',
+  'app.partFailed': 'This part couldn’t be shown because of an error. Try again, or reload the page.',
   'app.resizePanel': 'Drag to resize the panel (double-click: default width)',
   'app.otherTabOld': 'The planner is open in another tab with an older version. Close that tab (or reload it) to continue.',
   'app.replacedByNewer': 'A newer version of the planner was opened in another tab. Reload this one to keep saving.',

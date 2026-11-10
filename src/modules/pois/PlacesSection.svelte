@@ -7,10 +7,12 @@
   import { authorOf, distinctAuthors, type Author } from '../../lib/places/authors';
   import {
     allCategories,
+    categoryInfo,
     categoryVisibilityId,
     createCategoryCommand,
     customCategories,
     deleteCategoryCommand,
+    resolveCategory,
     setCategoryCommand,
     type CategoryInfo,
   } from '../../lib/places/categories';
@@ -64,11 +66,15 @@
     void $members;
     void $profile;
     const votes = votesByPlace(store);
+    // A place's stored category may be a replaced built-in one or a deleted one: use what it shows as.
     const byId = new Map(categories.map((c) => [c.id, c]));
-    const other = byId.get('other')!;
+    const infoOf = (id: string) => {
+      const resolved = resolveCategory(store, id);
+      return byId.get(resolved) ?? categoryInfo(store, t, resolved);
+    };
     return store.list('poi').map((poi) => ({
       poi,
-      category: byId.get(poi.category) ?? other,
+      category: infoOf(poi.category),
       author: authorOf(ctx.cloud, t, poi.createdBy),
       votes: tally(votes.get(poi.id) ?? []),
       approvals: approvals(votes.get(poi.id) ?? []),

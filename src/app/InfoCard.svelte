@@ -3,6 +3,7 @@
   import { createSettings } from '../core/settings';
   import { icons } from '../lib/icons';
   import IconButton from '../lib/ui/IconButton.svelte';
+  import SafeSection from '../lib/ui/SafeSection.svelte';
 
   let { core }: { core: Core } = $props();
   const { t, selection } = $derived(core);
@@ -100,19 +101,19 @@
     <div class="body">
     {#if multi}
       {#each $multiCards as card (card.id)}
-        <card.component ids={$ids} {...card.props} />
+        <SafeSection message={t('app.partFailed')}><card.component ids={$ids} {...card.props} /></SafeSection>
       {/each}
     {:else if target}
       {#key target.id}
-        <target.renderer.component id={target.id} {...target.renderer.props} />
+        <SafeSection message={t('app.partFailed')}><target.renderer.component id={target.id} {...target.renderer.props} /></SafeSection>
         {#each $sections.filter((s) => !s.types || s.types.includes(target.type)) as section (section.id)}
-          <section.component id={target.id} {...section.props} />
+          <SafeSection message={t('app.partFailed')}><section.component id={target.id} {...section.props} /></SafeSection>
         {/each}
       {/key}
     {:else if $place}
       {@const Place = $place.component}
       {#key $place}
-        <Place {...$place.props} />
+        <SafeSection message={t('app.partFailed')}><Place {...$place.props} /></SafeSection>
       {/key}
     {/if}
     </div>

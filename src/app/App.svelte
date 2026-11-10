@@ -3,6 +3,7 @@
   import { createSettings } from '../core/settings';
   import { icons } from '../lib/icons';
   import IconButton from '../lib/ui/IconButton.svelte';
+  import SafeSection from '../lib/ui/SafeSection.svelte';
   import Cheatsheet from './Cheatsheet.svelte';
   import InfoCard from './InfoCard.svelte';
   import SettingsDialog from './SettingsDialog.svelte';
@@ -119,7 +120,7 @@
         <IconButton icon={icons.close} label={t('card.close')} size={14} onclick={togglePane} />
       </div>
       {#each paneSections as section (section.id)}
-        <section.component {...section.props} />
+        <SafeSection message={t('app.partFailed')}><section.component {...section.props} /></SafeSection>
       {/each}
     </div>
   {/if}
@@ -128,7 +129,7 @@
       <details open>
         <summary>{section.title}</summary>
         <div class="section-body">
-          <section.component {...section.props} />
+          <SafeSection message={t('app.partFailed')}><section.component {...section.props} /></SafeSection>
         </div>
       </details>
     {/each}

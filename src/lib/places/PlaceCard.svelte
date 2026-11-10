@@ -3,6 +3,7 @@
   import type { LngLat, PoiCategory } from '../../model/types';
   import { osmDetails } from './details';
   import PlaceInfo from './PlaceInfo.svelte';
+  import { resolveCategory } from './categories';
   import { createPoiCommand } from './poi';
 
   /** A place that isn't in the trip (an OSM feature or a search result). */
@@ -33,7 +34,7 @@
         userId: ctx.user.id,
         lngLat: place.lngLat,
         name: title || place.kind,
-        category: place.category,
+        category: resolveCategory(ctx.store, place.category),
         osm: place.osm ? { ...place.osm, fetchedAt: Date.now() } : undefined,
       },
       t('cmd.addPoi'),

@@ -227,7 +227,7 @@ export default defineModule({
       // The click ends the tool; claim it so other map click handlers don't take it too.
       ui.claim(e.originalEvent);
       const { command, id } = createPoiCommand(
-        { tripId: ctx.tripId, userId: ctx.user.id, lngLat: [e.lngLat.lng, e.lngLat.lat], name: t('poi.newName'), category: 'other' },
+        { tripId: ctx.tripId, userId: ctx.user.id, lngLat: [e.lngLat.lng, e.lngLat.lat], name: t('poi.newName'), category: resolveCategory(store, 'other') },
         t('cmd.addPoi'),
       );
       commands.run(command);
