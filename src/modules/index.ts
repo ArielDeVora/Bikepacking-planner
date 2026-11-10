@@ -17,4 +17,5 @@ export const modules: ModuleLoader[] = [
   () => import('./elevation'),
   () => import('./stats'),
   () => import('./editing'),
+  () => import('./history'),
 ];

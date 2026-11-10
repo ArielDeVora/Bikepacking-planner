@@ -16,6 +16,9 @@ export interface Command {
   mergeKey?: string;
 }
 
+/** What happened to the trip: a command was run (possibly merged into the previous one), undone or redone. */
+export type CommitListener = (cmd: Command, kind: 'edit' | 'undo' | 'redo', merged: boolean) => void;
+
 export interface HistoryState {
   canUndo: boolean;
   canRedo: boolean;
@@ -35,6 +38,18 @@ export class CommandStack {
    */
   guard: ((current: Entity[]) => boolean) | null = null;
 
+  #listeners = new Set<CommitListener>();
+
+  /** Called after every command, undo and redo (not for patches). */
+  onCommit(fn: CommitListener): () => void {
+    this.#listeners.add(fn);
+    return () => this.#listeners.delete(fn);
+  }
+
+  #emit(cmd: Command, kind: 'edit' | 'undo' | 'redo', merged: boolean): void {
+    for (const fn of this.#listeners) fn(cmd, kind, merged);
+  }
+
   constructor(
     private store: TripStore,
     private userId: () => string,
@@ -45,11 +60,12 @@ export class CommandStack {
     if (cmd.changes.length === 0) return;
     this.#write(cmd.changes.map((c) => c.after));
     const top = this.#undo.at(-1);
-    if (cmd.mergeKey && top?.mergeKey === cmd.mergeKey && this.#redo.length === 0) {
+    const merged = !!cmd.mergeKey && top?.mergeKey === cmd.mergeKey && this.#redo.length === 0;
+    if (merged) {
       for (const change of cmd.changes) {
-        const existing = top.changes.find((c) => c.id === change.id);
+        const existing = top!.changes.find((c) => c.id === change.id);
         if (existing) existing.after = change.after;
-        else top.changes.push({ ...change });
+        else top!.changes.push({ ...change });
       }
     } else {
       this.#undo.push({ ...cmd, changes: cmd.changes.map((c) => ({ ...c })) });
@@ -57,15 +73,18 @@ export class CommandStack {
     }
     this.#redo = [];
     this.#publish();
+    this.#emit(cmd, 'edit', merged);
   }
 
   undo(): Command | undefined {
     const cmd = this.#undo.at(-1);
     if (!cmd || !this.#allowed(cmd)) return undefined;
     this.#undo.pop();
-    this.#write(cmd.changes.map((c) => c.before ?? { ...c.after, deleted: true }).reverse());
+    const back = cmd.changes.map((c) => ({ id: c.id, before: c.after, after: c.before ?? { ...c.after, deleted: true } })).reverse();
+    this.#write(back.map((c) => c.after));
     this.#redo.push(cmd);
     this.#publish();
+    this.#emit({ label: cmd.label, changes: back }, 'undo', false);
     return cmd;
   }
 
@@ -76,6 +95,7 @@ export class CommandStack {
     this.#write(cmd.changes.map((c) => c.after));
     this.#undo.push(cmd);
     this.#publish();
+    this.#emit(cmd, 'redo', false);
     return cmd;
   }
 

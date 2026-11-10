@@ -16,6 +16,7 @@
     { id: 'places', icon: icons.pin },
     { id: 'files', icon: icons.upload },
     { id: 'share', icon: icons.users },
+    { id: 'history', icon: icons.history },
     { id: 'help', icon: icons.help },
   ];
 

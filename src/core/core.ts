@@ -8,6 +8,8 @@ import type { Entity, Stage, Trip } from '../model/types';
 import { EventBus, type Events } from './bus';
 import { createCloud } from './cloud/cloud';
 import { CommandStack } from './commands';
+import { HistoryLog } from './history/log';
+import { HistoryRecorder } from './history/recorder';
 import { t } from './i18n';
 import { LayerManager } from './layers';
 import type { ModuleContext, ModuleLoader } from './module';
@@ -85,6 +87,25 @@ export function createCore(container: HTMLElement) {
     const names = [...new Set(foreign.map((e) => cloud.profileOf(e.updatedBy)?.name || t('collab.someone')))];
     return window.confirm(t('collab.undoOverwrite', { names: names.join(', ') }));
   };
+  // History: every action becomes a commit, kept in this browser and, for shared trips, on the server.
+  const historyLog = new HistoryLog(
+    () => db,
+    () => cloud.history(),
+    () => tripId,
+  );
+  const recorder = new HistoryRecorder(commands, {
+    tripId: () => tripId,
+    userId: () => user.id,
+    label: (kind, label) => (kind === 'undo' ? t('history.undone', { label }) : kind === 'redo' ? t('history.redone', { label }) : label),
+    save: (commit) => void historyLog.add(commit),
+  });
+  cloud.shared.subscribe((on) => {
+    if (on) void historyLog.upload();
+  });
+  window.addEventListener('pagehide', () => recorder.flush());
+  window.addEventListener('online', () => void historyLog.upload());
+  const history = { log: historyLog, recorder };
+
   const selection = new Selection(bus);
   const layers = new LayerManager(map, createSettings('layers'));
   const ui = new UiRegistry();
@@ -150,7 +171,10 @@ export function createCore(container: HTMLElement) {
 
   async function loadLocalTrip(): Promise<void> {
     try {
-      db = await openDb();
+      db = await openDb({
+        onBlocked: () => ui.notify(t('app.otherTabOld'), 'warn', 0),
+        onReplaced: () => ui.notify(t('app.replacedByNewer'), 'warn', 0, { label: t('update.reload'), run: () => location.reload() }),
+      });
     } catch (err) {
       console.warn(err);
       ui.notify(t('app.storageUnavailable'), 'warn', 0);
@@ -210,6 +234,7 @@ export function createCore(container: HTMLElement) {
           cloud,
           trips,
           visibility,
+          history,
           t,
           settings: createSettings(mod.id),
           get tripId() {
@@ -246,6 +271,7 @@ export function createCore(container: HTMLElement) {
     cloud,
     trips,
     visibility,
+    history,
     t,
     status: { subscribe: status.subscribe } as Readable<CoreStatus>,
     firstVisit,

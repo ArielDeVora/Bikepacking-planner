@@ -11,6 +11,15 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    id: '2026-11-10c',
+    title: 'History of changes',
+    items: [
+      'Press H (or the clock button) to see every change to the trip: what, who and when, on a timeline with one lane per person.',
+      'Restore the whole trip to any earlier point, or undo just one change. A restore is one step: you can undo it too.',
+      'Each card has a “History of this item” link.',
+    ],
+  },
+  {
     id: '2026-11-10b',
     title: 'Routes: several versions of the trip',
     items: [

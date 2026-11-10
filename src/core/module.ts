@@ -1,3 +1,5 @@
+import type { HistoryLog } from './history/log';
+import type { HistoryRecorder } from './history/recorder';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import type { Entity, Trip } from '../model/types';
 import type { EventBus, Events } from './bus';
@@ -29,6 +31,8 @@ export interface ModuleContext {
   readonly trips: TripManager;
   /** Routes, stages, groups and segments hidden from the map (per browser). */
   readonly visibility: Visibility;
+  /** The trip's history: commits, and marking a restore. */
+  readonly history: { log: HistoryLog; recorder: HistoryRecorder };
   readonly tripId: string;
   readonly t: typeof t;
 }

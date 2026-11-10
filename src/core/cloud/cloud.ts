@@ -7,6 +7,8 @@ import type { EventBus, Events } from '../bus';
 import type { Settings } from '../settings';
 import type { TripStore } from '../store';
 import { supabaseSyncApi, toSyncError } from './api';
+import { supabaseHistoryApi } from './history-api';
+import type { RemoteHistory } from '../history/log';
 import type { Row } from './rows';
 import { SyncEngine, type Conflict, type SyncStatus } from './sync';
 
@@ -317,6 +319,11 @@ export function createCloud(deps: CloudDeps) {
     start,
     saveProfile,
     refreshTrips,
+
+    /** The server-side history of the open trip, when it is shared. */
+    history(): RemoteHistory | null {
+      return client && engine ? supabaseHistoryApi(client) : null;
+    },
 
     /** Name and colour of a user, if they are a member of the open trip. */
     profileOf(id: string): Profile | undefined {
