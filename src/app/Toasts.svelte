@@ -7,7 +7,7 @@
   const toasts = $derived(core.ui.toasts);
 </script>
 
-<div class="toasts" aria-live="polite" style:bottom="{40 + offset}px">
+<div class="toasts" aria-live="polite" style:bottom="calc({40 + offset}px + var(--sheet-h, 0px))">
   {#each $toasts as toast (toast.id)}
     <div class="toast {toast.kind}" role={toast.kind === 'error' ? 'alert' : 'status'}>
       <span>{toast.message}</span>

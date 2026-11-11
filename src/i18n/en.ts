@@ -143,6 +143,8 @@ export const en = {
 
   'routes.draw': 'Draw route',
   'routes.drawHint': 'Click the map to add points. Press Esc or Cmd+D to finish.',
+  'routes.drawHintTouch': 'Tap the map to add points. Tap the route button again to finish.',
+  'routes.deletePoint': 'Delete point',
   'routes.segmentName': 'Segment {n}',
   'routes.legend': 'Legend',
   'routes.legendPending': 'Routing…',
@@ -399,6 +401,7 @@ export const en = {
   'place.tag.description': 'Description',
 
   'search.placeholder': 'Search places or coordinates (Cmd+K)',
+  'search.placeholderTouch': 'Search places or coordinates',
   'search.failed': 'Search is unavailable right now.',
   'search.coordinates': 'Coordinates',
   'search.goToCoordinates': 'Go to these coordinates (Enter)',

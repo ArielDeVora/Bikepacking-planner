@@ -17,6 +17,10 @@
   --panel-w: 320px;
   --font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-size: 14px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  /* Height of the bottom sheets on phones (zero elsewhere). */
+  --sheet-h: max(var(--panel-h, 0px), var(--card-h, 0px));
   color-scheme: light;
 }
 
@@ -45,6 +49,8 @@
 html,
 body {
   margin: 0;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
   height: 100%;
   overflow: hidden;
   font-family: var(--font);
@@ -56,6 +62,9 @@ body {
 #map {
   position: fixed;
   inset: 0;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 #app {
@@ -162,4 +171,24 @@ textarea {
 :root[data-theme='dark'] .maplibregl-ctrl-icon,
 :root[data-theme='dark'] .maplibregl-ctrl-attrib-button {
   filter: invert(1);
+}
+
+/* Phones: iOS zooms into text fields under 16px; map controls move above the bottom sheets. */
+@media (max-width: 640px) {
+  input:not([type='checkbox'], [type='radio'], [type='range'], [type='color']),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  .maplibregl-ctrl-bottom-right,
+  .maplibregl-ctrl-bottom-left {
+    bottom: var(--sheet-h);
+  }
+
+  .maplibregl-ctrl-scale,
+  .maplibregl-ctrl-zoom-in,
+  .maplibregl-ctrl-zoom-out {
+    display: none !important;
+  }
 }

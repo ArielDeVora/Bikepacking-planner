@@ -4,6 +4,8 @@
   import { createSettings } from '../core/settings';
   import { icons } from '../lib/icons';
   import IconButton from '../lib/ui/IconButton.svelte';
+  import { phone } from '../lib/ui/phone';
+  import { createSheet } from '../lib/ui/sheet';
   import SafeSection from '../lib/ui/SafeSection.svelte';
   import Cheatsheet from './Cheatsheet.svelte';
   import InfoCard from './InfoCard.svelte';
@@ -18,6 +20,10 @@
   const widgets = $derived(core.ui.widgets);
   const drawers = $derived(core.ui.drawers);
   let bottomHeight = $state(0);
+  let topHeight = $state(0);
+  $effect(() => {
+    document.documentElement.style.setProperty('--top-h', `${topHeight}px`);
+  });
   const dialog = $derived(core.ui.dialog);
 
   function onKeydown(e: KeyboardEvent) {
@@ -80,8 +86,21 @@
   function togglePane() {
     paneOpen = !paneOpen;
     if (paneOpen && !panelOpen) togglePanel();
+    if (paneOpen && $phone && $sheetSnap === 'peek') panelSheet.snapTo('half');
     prefs.set('mapPane', paneOpen);
   }
+
+  // On phones the panel is a bottom sheet; it gets out of the way while a map tool is in use.
+  const tool = $derived(core.ui.tool);
+  const panelSheet = createSheet({
+    cssVar: '--panel-h',
+    initial: 'peek',
+    peek: (node, handle) => handle.offsetHeight + parseFloat(getComputedStyle(node).paddingBottom),
+  });
+  const sheetSnap = panelSheet.snap;
+  $effect(() => {
+    if ($tool && $phone) panelSheet.snapTo('peek');
+  });
   $effect(() => core.shortcuts.add({ keys: KEYS.mapPane, label: t('layers.togglePane'), run: togglePane }));
 
   // Panel width: drag the panel's edge; double-click it to go back to the default.
@@ -117,7 +136,7 @@
   }
 </script>
 
-<aside class="panel" class:open={panelOpen} class:resizing aria-label={t('app.title')}>
+<aside class="panel" class:open={panelOpen} class:resizing aria-label={t('app.title')} use:panelSheet.action={'.sheet-head'}>
   <div
     class="resize"
     role="separator"
@@ -127,20 +146,23 @@
     onpointerdown={startResize}
     ondblclick={resetWidth}
   ></div>
-  <header>
-    <h1>{t('app.title')}</h1>
-    {#each $views as view (view.id)}
-      <IconButton icon={view.icon} label={view.label} onclick={() => openView(view.id)} />
-    {/each}
-    <IconButton icon={icons.layers} label={`${t('layers.pane')} (${core.shortcuts.format(KEYS.mapPane)})`} active={paneOpen} onclick={togglePane} />
-    <IconButton
-      icon={$theme === 'dark' ? icons.sun : icons.moon}
-      label={t('toolbar.theme')}
-      onclick={() => theme.toggle()}
-    />
-    <IconButton icon={icons.settings} label={`${t('settings.title')} (${core.shortcuts.format(KEYS.settings)})`} onclick={openSettings} />
-    <IconButton icon={icons.panel} label={t('toolbar.panel')} onclick={togglePanel} />
-  </header>
+  <div class="sheet-head">
+    <div class="grip" aria-hidden="true"></div>
+    <header>
+      <h1>{t('app.title')}</h1>
+      {#each $views as view (view.id)}
+        <IconButton icon={view.icon} label={view.label} onclick={() => openView(view.id)} />
+      {/each}
+      <IconButton icon={icons.layers} label={`${t('layers.pane')} (${core.shortcuts.format(KEYS.mapPane)})`} active={paneOpen} onclick={togglePane} />
+      <IconButton
+        icon={$theme === 'dark' ? icons.sun : icons.moon}
+        label={t('toolbar.theme')}
+        onclick={() => theme.toggle()}
+      />
+      <IconButton icon={icons.settings} label={`${t('settings.title')} (${core.shortcuts.format(KEYS.settings)})`} onclick={openSettings} />
+      <span class="panel-btn"><IconButton icon={icons.panel} label={t('toolbar.panel')} onclick={togglePanel} /></span>
+    </header>
+  </div>
   {#if paneOpen && paneSections.length}
     <div class="map-pane" role="region" aria-label={t('layers.paneTitle')}>
       <div class="pane-head">
@@ -171,7 +193,7 @@
 {/if}
 
 <Toolbar {core} shifted={panelOpen} />
-<div class="top" class:shifted={panelOpen}>
+<div class="top" class:shifted={panelOpen} bind:clientHeight={topHeight}>
   {#each $widgets.filter((w) => w.position === 'top') as widget (widget.id)}
     <widget.component {...widget.props} />
   {/each}
@@ -435,29 +457,81 @@
     font-size: 13px;
   }
 
+  .grip {
+    display: none;
+  }
+
+  /* Phone layout: keep in sync with PHONE_QUERY. */
   @media (max-width: 640px) {
-    .resize {
+    .resize,
+    .panel-btn,
+    .panel-toggle {
       display: none;
     }
-    .bottom.shifted {
-      left: var(--gap);
-    }
 
-    .top,
-    .top.shifted {
-      left: calc(var(--gap) + 52px);
-      right: var(--gap);
-    }
-
-    .panel {
+    .panel,
+    .panel.open {
+      --sheet-top: calc(var(--safe-top) + 64px);
       top: auto;
       left: 0;
       right: 0;
       bottom: 0;
       width: auto;
-      max-height: 60vh;
-      border-radius: var(--radius) var(--radius) 0 0;
-      transform: translateY(100%);
+      height: 76px;
+      padding-bottom: var(--safe-bottom);
+      border-radius: 14px 14px 0 0;
+      box-shadow: 0 -2px 16px rgb(0 0 0 / 0.16);
+      transform: none;
+      transition: none;
+    }
+
+    .panel:global(.sheet-animate) {
+      transition: height 0.22s ease;
+    }
+
+    .sheet-head {
+      flex: none;
+      padding-top: 6px;
+      touch-action: none;
+      cursor: grab;
+    }
+
+    .grip {
+      display: block;
+      width: 36px;
+      height: 5px;
+      margin: 0 auto;
+      border-radius: 3px;
+      background: var(--border);
+    }
+
+    header {
+      padding-top: 2px;
+    }
+
+    .top,
+    .top.shifted {
+      top: calc(var(--safe-top) + var(--gap));
+      left: var(--gap);
+      right: var(--gap);
+      flex-direction: column;
+      align-items: stretch;
+      gap: 8px;
+    }
+
+    .bottom,
+    .bottom.shifted {
+      left: var(--gap);
+      bottom: calc(var(--sheet-h) + var(--gap));
+      transition: none;
+    }
+
+    .backdrop {
+      padding: calc(var(--safe-top) + 8px) 8px calc(var(--safe-bottom) + 8px);
+    }
+
+    .dialog {
+      padding: 14px;
     }
   }
 </style>

@@ -85,7 +85,9 @@
   async function invite() {
     try {
       const url = await cloud.createInvite();
-      await navigator.clipboard.writeText(url).catch(() => window.prompt(t('collab.invite'), url));
+      // The clipboard is only available over HTTPS (or localhost).
+      if (navigator.clipboard) await navigator.clipboard.writeText(url).catch(() => window.prompt(t('collab.invite'), url));
+      else window.prompt(t('collab.invite'), url);
       ui.notify(t('collab.inviteCopied'));
     } catch (err) {
       ui.notify(t('collab.inviteFailed', { reason: reason(err) }), 'error');

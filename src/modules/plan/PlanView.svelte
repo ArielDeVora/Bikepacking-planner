@@ -814,4 +814,36 @@
   .sw.bad {
     background: #e06666;
   }
+
+  /* Phones: the calendar on top, the side panel below it. */
+  @media (max-width: 640px) {
+    .plan {
+      padding: calc(var(--safe-top) + 6px) 6px calc(var(--safe-bottom) + 6px);
+      gap: 6px;
+      overflow-y: auto;
+    }
+
+    header {
+      gap: 6px 10px;
+      padding: 8px 10px;
+    }
+
+    label input[type='number'] {
+      width: 64px;
+    }
+
+    .main {
+      flex: none;
+      flex-direction: column;
+    }
+
+    .calendar {
+      height: 62vh;
+    }
+
+    aside {
+      width: auto;
+      overflow: visible;
+    }
+  }
 </style>

@@ -5,6 +5,7 @@ import { writable, type Readable } from 'svelte/store';
 import { newId } from '../model/ids';
 import { STAGE_COLORS } from '../config/modes';
 import { keyBetween } from '../model/order';
+import { isPhone } from '../lib/ui/phone';
 import type { Entity, Stage, Trip } from '../model/types';
 import { EventBus, type Events } from './bus';
 import { createCloud } from './cloud/cloud';
@@ -60,6 +61,13 @@ export function createCore(container: HTMLElement) {
   });
   map.addControl(new NavigationControl({ visualizePitch: true }), 'bottom-right');
   map.addControl(new ScaleControl({ unit: 'metric' }), 'bottom-right');
+  // Phones: start with the credits folded behind their (i) button.
+  map.once('load', () => {
+    if (!isPhone()) return;
+    const credits = container.querySelector('.maplibregl-ctrl-attrib');
+    credits?.classList.remove('maplibregl-compact-show');
+    credits?.removeAttribute('open');
+  });
   map.on('moveend', () => {
     const c = map.getCenter();
     mapSettings.set('view', { center: [c.lng, c.lat], zoom: map.getZoom() } satisfies MapView);

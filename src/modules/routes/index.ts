@@ -7,6 +7,7 @@ import { icons } from '../../lib/icons';
 import type { Segment, TravelMode } from '../../model/types';
 import { RouteEditor } from './editor';
 import Legend from './Legend.svelte';
+import PointActions from './PointActions.svelte';
 import { RouteRenderer } from './render';
 import { brouter } from './routing/brouter';
 import { defaultProfile, type RoutingError } from './routing/provider';
@@ -151,6 +152,12 @@ export default defineModule({
       props: { ctx, provider: brouter, reconciler, onModeChosen: lastMode.set },
     });
     const removeLegend = ui.addWidget({ id: 'routes.legend', component: Legend, props: { t, visibleModes } });
+    const removePointActions = ui.addWidget({
+      id: 'routes.point',
+      component: PointActions,
+      props: { t, anchor: editor.selectedAnchor, remove: () => editor.deleteSelectedAnchor() },
+      order: 5,
+    });
 
     return () => {
       offWidth();
@@ -163,6 +170,7 @@ export default defineModule({
       removeTool();
       removeCard();
       removeLegend();
+      removePointActions();
     };
   },
 });

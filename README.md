@@ -36,6 +36,7 @@ Requires Node 22.12+ (CI uses Node 24).
 ```bash
 npm install
 npm run dev        # http://localhost:5173
+npm run dev:phone  # same, also reachable from a phone on the same Wi-Fi (see docs/13-phone.md)
 npm test           # unit tests (Vitest)
 npm run check      # type check (svelte-check)
 npm run build      # production build into dist/
@@ -123,6 +124,7 @@ Free Supabase projects pause after a week with little activity. The **Keep Supab
 - [History](docs/11-history.md): every change, who made it, and restoring the trip to an earlier point.
 - [Climate](docs/12-climate.md): usual temperature and rain by week (TerraClimate).
 - [Settings](docs/14-settings.md): the Settings window, and the nature place category.
+- [Phone layout](docs/13-phone.md): bottom sheets, touch editing, and testing on an iPhone over Wi-Fi.
 - [Planning](docs/15-planning.md): schedule, calendar with season heatmap, rest periods, countries timeline.
 - [Backups](docs/16-backups.md): nightly encrypted backups of the shared database, and restoring.
 - [Spec](docs/SPEC.md)

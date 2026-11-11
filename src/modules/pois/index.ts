@@ -1,5 +1,5 @@
 import { KEYS } from '../../config/shortcuts';
-import { LngLatBounds, type ExpressionSpecification, type GeoJSONSource, type MapLayerMouseEvent, type MapMouseEvent } from 'maplibre-gl';
+import { LngLatBounds, type ExpressionSpecification, type GeoJSONSource, type MapLayerMouseEvent, type MapLayerTouchEvent, type MapMouseEvent, type MapTouchEvent } from 'maplibre-gl';
 import { derived, get } from 'svelte/store';
 import { POI_CATEGORIES, POI_CATEGORY_ORDER } from '../../config/pois';
 import { edits } from '../../core/commands';
@@ -267,6 +267,36 @@ export default defineModule({
       map.on('mousemove', move);
       document.addEventListener('mouseup', up, { once: true });
     };
+    // On a touch screen: a selected place follows the finger (one finger; two still move the map).
+    const onPoiTouch = (e: MapLayerTouchEvent) => {
+      const id = e.features?.[0]?.properties.id as string | undefined;
+      const poi = id ? store.get(id, 'poi') : undefined;
+      if (!poi || get(ui.tool) || e.points.length !== 1 || !selection.current.includes(poi.id)) return;
+      e.preventDefault();
+      map.dragPan.disable();
+      const start = e.point;
+      let moved = false;
+      const move = (ev: MapTouchEvent) => {
+        if (ev.points.length !== 1) return;
+        if (!moved && Math.hypot(ev.point.x - start.x, ev.point.y - start.y) <= CLICK_PX * 3) return;
+        moved = true;
+        dragging = { id: poi.id, lngLat: [ev.lngLat.lng, ev.lngLat.lat] };
+        schedule();
+      };
+      const end = () => {
+        map.off('touchmove', move);
+        map.off('touchend', end);
+        map.off('touchcancel', end);
+        map.dragPan.enable();
+        const done = dragging;
+        dragging = null;
+        if (moved && done) commands.run({ label: t('cmd.movePoi'), changes: [edits.update<Poi>(store, poi.id, { lngLat: done.lngLat })] });
+        else schedule();
+      };
+      map.on('touchmove', move);
+      map.on('touchend', end);
+      map.on('touchcancel', end);
+    };
     const onEnter = () => {
       if (!get(ui.tool)) map.getCanvas().style.cursor = 'pointer';
     };
@@ -276,6 +306,7 @@ export default defineModule({
     map.on('click', onClick);
     map.on('click', 'pois', onPoiClick);
     map.on('mousedown', 'pois', onPoiDown);
+    map.on('touchstart', 'pois', onPoiTouch);
     map.on('mouseenter', 'pois', onEnter);
     map.on('mouseleave', 'pois', onLeave);
 
@@ -327,6 +358,7 @@ export default defineModule({
       map.off('click', onClick);
       map.off('click', 'pois', onPoiClick);
       map.off('mousedown', 'pois', onPoiDown);
+      map.off('touchstart', 'pois', onPoiTouch);
       map.off('mouseenter', 'pois', onEnter);
       map.off('mouseleave', 'pois', onLeave);
     };

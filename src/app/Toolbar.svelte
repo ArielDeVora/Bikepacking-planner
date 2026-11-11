@@ -64,8 +64,19 @@
   @media (max-width: 640px) {
     .toolbar,
     .toolbar.shifted {
-      left: var(--gap);
-      top: calc(var(--gap) + 48px);
+      --above: calc(var(--safe-top) + var(--gap) + var(--top-h, 0px) + 8px);
+      left: auto;
+      right: var(--gap);
+      top: var(--above);
+      max-height: calc(100% - var(--above) - var(--sheet-h) - var(--gap) - 72px);
+      overflow-y: auto;
+      scrollbar-width: none;
+      transition: none;
+    }
+
+    .toolbar :global(.icon-btn) {
+      width: 38px;
+      height: 38px;
     }
   }
 </style>

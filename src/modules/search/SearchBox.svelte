@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { isCoarse } from '../../lib/ui/phone';
   import type { ModuleContext } from '../../core/module';
   import { icons } from '../../lib/icons';
   import Icon from '../../lib/ui/Icon.svelte';
@@ -20,6 +21,8 @@
   } = $props();
   const { t } = $derived(ctx);
 
+  // No keyboard shortcut to mention on a touch screen.
+  const touch = isCoarse();
   const DEBOUNCE_MS = 350;
   const MIN_CHARS = 3;
 
@@ -102,8 +105,8 @@
       bind:this={input}
       bind:value={query}
       type="search"
-      placeholder={t('search.placeholder')}
-      aria-label={t('search.placeholder')}
+      placeholder={touch ? t('search.placeholderTouch') : t('search.placeholder')}
+      aria-label={t('search.placeholderTouch')}
       oninput={onInput}
       onkeydown={onKey}
       onfocus={() => (open = results.length > 0 || !!coords)}
