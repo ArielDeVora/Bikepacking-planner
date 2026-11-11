@@ -1,6 +1,6 @@
 export type LngLat = [lng: number, lat: number];
 
-export type EntityType = 'trip' | 'route' | 'stage' | 'group' | 'segment' | 'poi' | 'poiFolder' | 'vote' | 'restPeriod' | 'zone' | 'borderCrossing' | 'comment';
+export type EntityType = 'trip' | 'route' | 'stage' | 'group' | 'segment' | 'poi' | 'poiFolder' | 'vote' | 'restPeriod' | 'zone' | 'borderCrossing' | 'comment' | 'gear';
 
 export interface BaseEntity {
   id: string;
@@ -258,9 +258,33 @@ export interface Comment extends BaseEntity {
   body: string;
   authorId: string;
   createdAt: number;
+  /** Ids of the members mentioned with "@Name". */
+  mentions?: string[];
 }
 
-export type Entity = Trip | Route | Stage | Group | Segment | Poi | PoiFolder | Vote | RestPeriod | Zone | BorderCrossing | Comment;
+export type GearStatus = 'needed' | 'bought' | 'packed';
+
+/** An item on the gear checklist: the group's shared gear, or one person's own. */
+export interface Gear extends BaseEntity {
+  type: 'gear';
+  name: string;
+  /** Section of the list (Sleeping, Cooking…). */
+  category: string;
+  /** The member it's for; none for shared gear. */
+  forId?: string;
+  status: GearStatus;
+  /** Who bought it (or already has it). */
+  boughtBy?: string;
+  qty: number;
+  /** Grams, for one. */
+  weight?: number;
+  /** Price paid for all of them. */
+  price?: number;
+  notes?: string;
+  order: number;
+}
+
+export type Entity = Trip | Route | Stage | Group | Segment | Poi | PoiFolder | Vote | RestPeriod | Zone | BorderCrossing | Comment | Gear;
 export type EntityOf<T extends EntityType> = Extract<Entity, { type: T }>;
 
 /** An entity before it has been stamped by the command system. */

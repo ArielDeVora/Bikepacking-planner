@@ -16,6 +16,7 @@ export const icons = {
   folderPlus: 'M3 6a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1zM12 10v6M9 13h6',
   history: 'M3 12a9 9 0 1 0 2.6-6.4L3 8M3 3v5h5M12 7v5l3 2',
   tag: 'M3 12V4h8l10 10-8 8zM7.5 8.5h.01',
+  backpack: 'M9 6V4.5a3 3 0 0 1 6 0V6M6 10a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v10a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1zM9 21v-5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v5M10 10h4',
   calendar: 'M4 6h16v15H4zM4 10h16M8 3v4M16 3v4M8 14h2M12 14h2M16 14h.01M8 17h2M12 17h2',
   back: 'M15 18l-6-6 6-6',
   play: 'M7 4.5v15l12-7.5z',

@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { ModuleContext } from '../../core/module';
   import type { Trip } from '../../model/types';
+  import FollowLinks from './FollowLinks.svelte';
 
   let { ctx }: { ctx: ModuleContext } = $props();
   const { t, cloud, trips: tripManager, ui } = $derived(ctx);
@@ -174,6 +175,7 @@
     </ul>
     {#if $role === 'owner'}
       <button type="button" class="btn" onclick={invite}>{t('collab.invite')}</button>
+      <FollowLinks {ctx} />
     {/if}
   {:else}
     <p class="muted small">{t('collab.shareHint')}</p>

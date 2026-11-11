@@ -2,7 +2,10 @@ import type { Entity } from '../../model/types';
 import { defineModule } from '../../core/module';
 import Comments from './Comments.svelte';
 import EditedBy from './EditedBy.svelte';
+import FollowBanner from './FollowBanner.svelte';
+import FollowSection from './FollowSection.svelte';
 import SharingSection from './SharingSection.svelte';
+import { fitToTrip } from './fit';
 
 const CONFLICT_TOAST_MS = 15_000;
 const MAX_CONFLICT_TOASTS = 3;
@@ -14,11 +17,13 @@ export default defineModule({
 
     const offSection = ui.addPanelSection({
       id: 'collab',
-      title: t('collab.title'),
-      component: SharingSection,
+      title: ctx.readOnly ? t('follow.sectionTitle') : t('collab.title'),
+      component: ctx.readOnly ? FollowSection : SharingSection,
       props: { ctx },
       order: 80,
     });
+    const offBanner = ctx.readOnly ? ui.addWidget({ id: 'collab.follow', component: FollowBanner, props: { ctx }, position: 'top', order: 0 }) : () => {};
+    if (ctx.readOnly) fitToTrip(ctx.map, store);
     const offEdited = ui.addCardSection({ id: 'collab.edited', component: EditedBy, props: { ctx }, order: 10 });
     const offComments = ui.addCardSection({
       id: 'collab.comments',
@@ -55,6 +60,7 @@ export default defineModule({
 
     return () => {
       offSection();
+      offBanner();
       offEdited();
       offComments();
       offConflict();

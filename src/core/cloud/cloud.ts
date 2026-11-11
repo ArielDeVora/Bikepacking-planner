@@ -378,6 +378,34 @@ export function createCloud(deps: CloudDeps) {
 
     hasPendingInvite: () => !!settings.get<string | null>('pendingInvite', null),
     isSharedLocally,
+
+    /** Read-only follow links of the open trip (owner only). Empty when the server doesn't have them yet. */
+    async followLinks(): Promise<{ token: string; createdAt: string }[]> {
+      if (!client) return [];
+      const { data, error } = await client.from('follow_links').select('token, created_at').eq('trip_id', deps.tripId()).order('created_at');
+      if (error) throw error;
+      return (data as { token: string; created_at: string }[]).map((r) => ({ token: r.token, createdAt: r.created_at }));
+    },
+
+    /** A link anyone can open to see the trip, without an account or the right to change it. */
+    async createFollowLink(): Promise<string> {
+      if (!client) throw new Error('Not signed in');
+      const { data, error } = await client.from('follow_links').insert({ trip_id: deps.tripId() }).select('token').single();
+      if (error) throw error;
+      return (data as { token: string }).token;
+    },
+
+    async deleteFollowLink(token: string): Promise<void> {
+      if (!client) throw new Error('Not signed in');
+      const { error } = await client.from('follow_links').delete().eq('token', token);
+      if (error) throw error;
+    },
+
+    /** Read-only view through a follow link: shows the members' names and colours. */
+    follow(list: Member[]): void {
+      members.set(list);
+      shared.set(true);
+    },
   };
 }
 

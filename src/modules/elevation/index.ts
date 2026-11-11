@@ -108,6 +108,7 @@ export default defineModule({
       shortcut: KEYS.elevation,
       order: 50,
       active: open,
+      viewOnly: true,
       run: toggle,
     });
     const removeShortcut = shortcuts.add({ keys: KEYS.elevation, label: t('elevation.title'), run: toggle });

@@ -12,6 +12,8 @@ export interface ToolSpec {
   disabled?: Readable<boolean>;
   /** Clicking other segments while it's on doesn't select them (the tool uses those clicks). */
   keepSelection?: boolean;
+  /** Changes nothing in the trip, so it stays available in a read-only view. */
+  viewOnly?: boolean;
   run: () => void;
 }
 
@@ -158,7 +160,11 @@ export class UiRegistry {
   readonly toasts: Readable<Toast[]> = { subscribe: this.#toasts.subscribe };
   #toastId = 0;
 
+  /** A read-only view of someone's trip (a follow link): tools that edit are left out. */
+  readOnly = false;
+
   addTool(spec: ToolSpec) {
+    if (this.readOnly && !spec.viewOnly) return () => {};
     return this.tools.add(spec);
   }
 

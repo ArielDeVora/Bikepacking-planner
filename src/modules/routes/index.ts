@@ -1,3 +1,4 @@
+import type { MapMouseEvent } from 'maplibre-gl';
 import { KEYS } from '../../config/shortcuts';
 import { get, writable } from 'svelte/store';
 import { removeChanges } from '../../lib/segment-edits';
@@ -7,6 +8,11 @@ import { icons } from '../../lib/icons';
 import type { Segment, TravelMode } from '../../model/types';
 import { RouteEditor } from './editor';
 import Legend from './Legend.svelte';
+import HoverCard from './HoverCard.svelte';
+import type { Hovered } from './hover';
+import { planSchedule, TRIP_SOURCE } from '../plan/plan';
+import { fromDayNumber, toDayNumber, type Schedule } from '../plan/schedule';
+import { isCoarse } from '../../lib/ui/phone';
 import PointActions from './PointActions.svelte';
 import { RouteRenderer } from './render';
 import { brouter } from './routing/brouter';
@@ -152,6 +158,45 @@ export default defineModule({
       props: { ctx, provider: brouter, reconciler, onModeChosen: lastMode.set },
     });
     const removeLegend = ui.addWidget({ id: 'routes.legend', component: Legend, props: { t, visibleModes } });
+
+    // Hovering a segment (with a mouse) shows its name, stage, distance and planned dates.
+    const hovered = writable<Hovered | null>(null);
+    const schedules = new Map<string, Schedule>();
+    const plannedDates = (seg: Segment) => {
+      const source = store.get(seg.stageId, 'stage')?.routeId ?? TRIP_SOURCE;
+      let schedule = schedules.get(source);
+      if (!schedule) schedules.set(source, (schedule = planSchedule(store, source)));
+      const span = schedule.spans.get(seg.id);
+      if (!span) return null;
+      const start = toDayNumber(schedule.start);
+      return { from: fromDayNumber(start + span.first), to: fromDayNumber(start + span.last) };
+    };
+    let hoverFrame = 0;
+    const onHover = (e: MapMouseEvent) => {
+      if (hoverFrame) return;
+      hoverFrame = requestAnimationFrame(() => {
+        hoverFrame = 0;
+        if (get(ui.tool) || e.originalEvent.buttons) return hovered.set(null);
+        const hit = map.queryRenderedFeatures(
+          [
+            [e.point.x - 5, e.point.y - 5],
+            [e.point.x + 5, e.point.y + 5],
+          ],
+          { layers: renderer.hitLayerIds.filter((id) => map.getLayer(id)) },
+        )[0];
+        const seg = hit ? store.get(hit.properties.sid as string, 'segment') : undefined;
+        hovered.set(seg ? { segmentId: seg.id, x: e.originalEvent.clientX, y: e.originalEvent.clientY, dates: plannedDates(seg) } : null);
+      });
+    };
+    const offHover = () => hovered.set(null);
+    const hoverOn = !isCoarse();
+    if (hoverOn) {
+      map.on('mousemove', onHover);
+      map.on('mouseout', offHover);
+      map.on('mousedown', offHover);
+    }
+    const offSchedules = store.onChange(() => schedules.clear());
+    const removeHoverCard = ui.addWidget({ id: 'routes.hover', component: HoverCard, props: { ctx, hovered }, order: 99 });
     const removePointActions = ui.addWidget({
       id: 'routes.point',
       component: PointActions,
@@ -170,6 +215,14 @@ export default defineModule({
       removeTool();
       removeCard();
       removeLegend();
+      removeHoverCard();
+      offSchedules();
+      cancelAnimationFrame(hoverFrame);
+      if (hoverOn) {
+        map.off('mousemove', onHover);
+        map.off('mouseout', offHover);
+        map.off('mousedown', offHover);
+      }
       removePointActions();
     };
   },

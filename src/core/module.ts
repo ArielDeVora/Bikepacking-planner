@@ -37,6 +37,8 @@ export interface ModuleContext {
   /** The trip's history: commits, and marking a restore. */
   readonly history: { log: HistoryLog; recorder: HistoryRecorder };
   readonly tripId: string;
+  /** Someone else's trip seen through a follow link: nothing can be changed. */
+  readonly readOnly: boolean;
   readonly t: typeof t;
 }
 

@@ -11,6 +11,17 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    id: '2026-11-19',
+    title: 'Follow links, @mentions and a shared gear list',
+    items: [
+      'Follow links: the trip’s owner can make a read-only link (Sharing → Create a follow link) for family and friends to follow the trip without an account. A link can be stopped at any time.',
+      'Type @ in a comment to mention someone: they get a notice, or see it when they next open the trip.',
+      'Since your last visit: a card sums up what the others changed, commented and voted on while you were away.',
+      'Gear checklist (backpack button): shared and personal gear, to buy → bought → packed, who bought what, weights, prices and who owes whom.',
+      'Hover a segment on the map to see its stage, distance, climb and planned dates; click it to find it in the side panel.',
+    ],
+  },
+  {
     id: '2026-11-18',
     title: 'Offline, and on your phone’s home screen',
     items: [

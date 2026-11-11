@@ -32,6 +32,13 @@
   const { t, commands, selection } = $derived(ctx);
   const store = $derived(ctx.store);
   const selected = $derived(ctx.selection.ids);
+  // What's selected (e.g. clicked on the map) is scrolled into view in the list.
+  let listEl = $state<HTMLElement>();
+  $effect(() => {
+    const id = $selected.at(-1);
+    if (!id || !listEl) return;
+    requestAnimationFrame(() => listEl?.querySelector(`[data-id="${id}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
+  });
   const hidden = $derived(ctx.visibility.hidden);
 
   // Collapsed stages and groups (contents not listed), remembered per trip in this browser.
@@ -350,6 +357,7 @@
 {#snippet segmentRow(seg: Segment, parentHidden: boolean)}
   <li
     class="row {dropClass(seg.id)}"
+    data-id={seg.id}
     class:selected={$selected.includes(seg.id)}
     class:dragged={dragging?.includes(seg.id)}
     class:hidden={parentHidden || $hidden.has(seg.id)}
@@ -386,6 +394,7 @@
   <li>
     <div
       class="row {dropClass(stage.id)}"
+      data-id={stage.id}
       class:selected={$selected.includes(stage.id)}
       class:hidden={stageHidden}
       class:dragged={dragging?.includes(stage.id)}
@@ -436,6 +445,7 @@
             <li>
               <div
                 class="row group {dropClass(child.id)}"
+                data-id={child.id}
                 class:selected={$selected.includes(child.id)}
                 class:hidden={stageHidden || groupHidden}
                 class:dragged={dragging?.includes(child.id)}
@@ -499,7 +509,7 @@
 {#if top.length === 0}
   <p class="muted">{t('tree.empty')}</p>
 {:else}
-  <ol>
+  <ol bind:this={listEl}>
     {#each top as child (child.id)}
       {#if child.type === 'route'}
         {@const rstages = stagesByRoute.get(child.id) ?? []}
@@ -508,6 +518,7 @@
         <li>
           <div
             class="row route {dropClass(child.id)}"
+            data-id={child.id}
             class:selected={$selected.includes(child.id)}
             class:hidden={routeHidden}
             class:dragged={dragging?.includes(child.id)}

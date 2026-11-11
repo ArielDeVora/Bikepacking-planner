@@ -38,6 +38,9 @@ export class CommandStack {
    */
   guard: ((current: Entity[]) => boolean) | null = null;
 
+  /** When set, nothing can be changed: commands, undo and redo call it instead. */
+  locked: (() => void) | null = null;
+
   #listeners = new Set<CommitListener>();
 
   /** Called after every command, undo and redo (not for patches). */
@@ -58,6 +61,7 @@ export class CommandStack {
 
   run(cmd: Command): void {
     if (cmd.changes.length === 0) return;
+    if (this.locked) return this.locked();
     this.#write(cmd.changes.map((c) => c.after));
     const top = this.#undo.at(-1);
     const merged = !!cmd.mergeKey && top?.mergeKey === cmd.mergeKey && this.#redo.length === 0;
@@ -77,6 +81,7 @@ export class CommandStack {
   }
 
   undo(): Command | undefined {
+    if (this.locked) return void this.locked();
     const cmd = this.#undo.at(-1);
     if (!cmd || !this.#allowed(cmd)) return undefined;
     this.#undo.pop();
@@ -89,6 +94,7 @@ export class CommandStack {
   }
 
   redo(): Command | undefined {
+    if (this.locked) return void this.locked();
     const cmd = this.#redo.at(-1);
     if (!cmd || !this.#allowed(cmd)) return undefined;
     this.#redo.pop();
@@ -105,7 +111,7 @@ export class CommandStack {
    * brings back the old value.
    */
   patch(changes: Change[]): void {
-    if (changes.length) this.#write(changes.map((c) => c.after));
+    if (changes.length && !this.locked) this.#write(changes.map((c) => c.after));
   }
 
   /** Ends any pending merge so the next command starts a new undo step. */

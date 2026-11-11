@@ -29,6 +29,7 @@ export const openGuide = (core: Core) => core.ui.openDialog(Guide, { core });
 
 /** Once the app is ready: the guide on a first visit, What's new after an update (unless turned off in Settings). */
 export function startOnboarding(core: Core): void {
+  if (core.readOnly) return;
   const seen = prefs.get<string | null>('seenRelease', null);
   if (seen === (RELEASES[0]?.id ?? null) || get(core.ui.dialog)) return;
   const pending = pendingReleases(RELEASES, seen, !core.firstVisit);

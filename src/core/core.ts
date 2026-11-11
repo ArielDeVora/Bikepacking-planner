@@ -9,6 +9,7 @@ import { isPhone } from '../lib/ui/phone';
 import type { Entity, Stage, Trip } from '../model/types';
 import { EventBus, type Events } from './bus';
 import { createCloud } from './cloud/cloud';
+import { createFollower, followToken } from './cloud/follow';
 import { createPreferences } from './preferences';
 import { syncTabs } from './tabs';
 import { CommandStack } from './commands';
@@ -30,6 +31,8 @@ import { Visibility } from './visibility';
 export const BASE_STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
 
 export type CoreStatus = 'loading' | 'ready' | 'error';
+
+const FOLLOW_REFRESH_MS = 3 * 60_000;
 
 interface MapView {
   center: [number, number];
@@ -72,6 +75,9 @@ export function createCore(container: HTMLElement) {
     const c = map.getCenter();
     mapSettings.set('view', { center: [c.lng, c.lat], zoom: map.getZoom() } satisfies MapView);
   });
+
+  /** A follow link (?follow=…): someone else's trip, read only, nothing saved in this browser. */
+  const follow = followToken();
 
   const bus = new EventBus<Events>();
   const store = new TripStore();
@@ -120,6 +126,8 @@ export function createCore(container: HTMLElement) {
   const selection = new Selection(bus);
   const layers = new LayerManager(map, createSettings('layers'));
   const ui = new UiRegistry();
+  ui.readOnly = !!follow;
+  if (follow) commands.locked = () => ui.notify(t('follow.readOnly'), 'info', 4000);
   const shortcuts = new ShortcutManager();
   const theme = createTheme(settings);
   const prefs = createPreferences(createSettings('prefs'));
@@ -224,13 +232,38 @@ export function createCore(container: HTMLElement) {
     bus.emit('trip:loaded', { tripId });
   }
 
+  /** Loads the trip behind a follow link, then checks for changes every few minutes while visible. */
+  async function loadFollowedTrip(token: string): Promise<void> {
+    const follower = await createFollower(token);
+    const [entities, people] = await Promise.all([follower.pull(), follower.members()]);
+    const trip = entities.find((e) => e.type === 'trip' && !e.deleted);
+    if (!trip) throw new Error(t('follow.notFound'));
+    tripId = trip.id;
+    cloud.follow(people);
+    store.apply(entities, 'load');
+    visibility.load();
+    bus.emit('trip:loaded', { tripId });
+
+    const refresh = async () => {
+      if (document.visibilityState !== 'visible') return;
+      try {
+        const changed = await follower.pull();
+        if (changed.length) store.apply(changed, 'remote');
+      } catch (err) {
+        console.warn(err);
+      }
+    };
+    setInterval(() => void refresh(), FOLLOW_REFRESH_MS);
+    document.addEventListener('visibilitychange', () => void refresh());
+  }
+
   async function start(modules: ModuleLoader[]): Promise<void> {
     try {
       const mapReady = map.isStyleLoaded()
         ? Promise.resolve()
         : new Promise<void>((r) => map.once('style.load', () => r()));
       const loadedModules = Promise.all(modules.map((load) => load()));
-      await Promise.all([mapReady, loadLocalTrip()]);
+      await Promise.all([mapReady, follow ? loadFollowedTrip(follow) : loadLocalTrip()]);
       layers.installSlots();
 
       for (const { default: mod } of await loadedModules) {
@@ -254,6 +287,7 @@ export function createCore(container: HTMLElement) {
           get tripId() {
             return tripId;
           },
+          readOnly: !!follow,
         };
         try {
           await mod.setup(ctx);
@@ -263,11 +297,11 @@ export function createCore(container: HTMLElement) {
         }
       }
       status.set('ready');
-      void cloud.start();
+      if (!follow) void cloud.start();
     } catch (err) {
       console.error(err);
       status.set('error');
-      ui.notify(t('app.loadFailed'), 'error', 0);
+      ui.notify(follow ? t('follow.loadFailed') : t('app.loadFailed'), 'error', 0);
     }
   }
 
@@ -290,6 +324,7 @@ export function createCore(container: HTMLElement) {
     t,
     status: { subscribe: status.subscribe } as Readable<CoreStatus>,
     firstVisit,
+    readOnly: !!follow,
     get tripId() {
       return tripId;
     },
