@@ -1,0 +1,41 @@
+name: Back up the database
+
+# Every night: the whole shared database (trips, members, profiles, items, history) as one
+# encrypted file, kept 30 days as a workflow artifact. Needs two repository secrets:
+# SUPABASE_SECRET_KEY (Supabase → Project settings → API keys → secret key) and
+# BACKUP_PASSPHRASE (any long phrase; needed to read the backups). See docs/16-backups.md.
+on:
+  schedule:
+    - cron: '23 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Back up
+        id: backup
+        env:
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          if [ -z "$SUPABASE_SECRET_KEY" ] || [ -z "$BACKUP_PASSPHRASE" ]; then
+            echo "Set the SUPABASE_SECRET_KEY and BACKUP_PASSPHRASE secrets to turn backups on."
+            exit 0
+          fi
+          node scripts/backup.mjs --out backups
+          echo "made=true" >> "$GITHUB_OUTPUT"
+      - if: steps.backup.outputs.made == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: planner-database-${{ github.run_id }}
+          path: backups/
+          retention-days: 30
+          if-no-files-found: error

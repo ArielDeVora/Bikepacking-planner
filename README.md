@@ -41,6 +41,7 @@ npm run check      # type check (svelte-check)
 npm run build      # production build into dist/
 npm run preview    # serve the production build
 npm run advisories # fetch US travel advisory levels into public/data/ (done automatically on deploy)
+npm run backup     # save the shared database to backups/ (needs .env.backup.local, see docs/16-backups.md)
 ```
 
 ## Deploying to GitHub Pages
@@ -123,6 +124,7 @@ Free Supabase projects pause after a week with little activity. The **Keep Supab
 - [Climate](docs/12-climate.md): usual temperature and rain by week (TerraClimate).
 - [Settings](docs/14-settings.md): the Settings window, and the nature place category.
 - [Planning](docs/15-planning.md): schedule, calendar with season heatmap, rest periods, countries timeline.
+- [Backups](docs/16-backups.md): nightly encrypted backups of the shared database, and restoring.
 - [Spec](docs/SPEC.md)
 
 ## Credits

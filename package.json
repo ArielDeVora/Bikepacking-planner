@@ -11,7 +11,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "advisories": "node scripts/fetch-advisories.mjs",
-    "climate": "node scripts/fetch-climate.mjs"
+    "climate": "node scripts/fetch-climate.mjs",
+    "backup": "node scripts/backup.mjs",
+    "restore": "node scripts/restore.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.119.0",
