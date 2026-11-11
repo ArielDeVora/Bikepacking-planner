@@ -340,6 +340,16 @@ export function createCloud(deps: CloudDeps) {
       if (error) throw error;
     },
 
+    /**
+     * Signs in with the code from the sign-in email, instead of its link: for the planner added to
+     * a phone's home screen, which the link (opening in the browser) can't sign in.
+     */
+    async verifyCode(email: string, code: string): Promise<void> {
+      if (!client) throw new Error('Sharing is not configured');
+      const { error } = await client.auth.verifyOtp({ email, token: code.replace(/\s/g, ''), type: 'email' });
+      if (error) throw error;
+    },
+
     async signOut(): Promise<void> {
       await engine?.flush();
       await client?.auth.signOut();

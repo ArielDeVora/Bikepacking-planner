@@ -11,6 +11,15 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    id: '2026-11-18',
+    title: 'Offline, and on your phone’s home screen',
+    items: [
+      'The planner works without a connection: it opens, shows your trips and keeps your changes until you’re back online.',
+      'Save the map along a stage before leaving (Map for offline use, in its card); every map tile you’ve seen is kept too.',
+      'Add it to your iPhone’s home screen (Safari → Share → Add to Home Screen) to open it like an app; sign in there with the code from the email.',
+    ],
+  },
+  {
     id: '2026-11-17',
     title: 'Plan each segment of the calendar',
     items: [

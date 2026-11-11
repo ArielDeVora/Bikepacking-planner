@@ -71,6 +71,20 @@
     }
   }
 
+  let code = $state('');
+  async function signInWithCode(e: SubmitEvent) {
+    e.preventDefault();
+    if (!code.trim()) return;
+    busy = true;
+    try {
+      await cloud.verifyCode(sentTo, code);
+    } catch (err) {
+      ui.notify(t('collab.codeFailed', { reason: reason(err) }), 'error');
+    } finally {
+      busy = false;
+    }
+  }
+
   async function share() {
     busy = true;
     try {
@@ -106,6 +120,18 @@
 {:else if !$account}
   {#if sentTo}
     <p class="small">{t('collab.linkSent', { email: sentTo })}</p>
+    <form class="signin" onsubmit={signInWithCode}>
+      <input
+        type="text"
+        inputmode="numeric"
+        autocomplete="one-time-code"
+        placeholder={t('collab.code')}
+        aria-label={t('collab.code')}
+        bind:value={code}
+      />
+      <button type="submit" class="btn primary" disabled={busy || !code.trim()}>{t('collab.signInCode')}</button>
+    </form>
+    <button type="button" class="link small" onclick={() => ((sentTo = ''), (code = ''))}>{t('collab.otherEmail')}</button>
   {:else}
     <p class="muted small">{cloud.hasPendingInvite() ? t('collab.inviteWaiting') : t('collab.signInIntro')}</p>
     <form class="signin" onsubmit={sendLink}>

@@ -2,6 +2,7 @@
   import type { Core } from '../core/core';
   import type { PlaceNames, Preferences } from '../core/preferences';
   import type { ThemeMode } from '../core/theme';
+  import { clearTiles, savedTiles } from '../modules/offline/download';
   import { brouter } from '../modules/routes/routing/brouter';
 
   let { core }: { core: Core } = $props();
@@ -19,6 +20,16 @@
 
   const percent = (v: number) => `${Math.round(v * 100)} %`;
   const set = <K extends keyof Preferences>(key: K, value: Preferences[K]) => prefs.set(key, value);
+
+  // Offline: map tiles kept on this device.
+  let offline = $state<{ count: number; bytes: number | null } | null>(null);
+  $effect(() => {
+    savedTiles().then((s) => (offline = s));
+  });
+  async function clearOffline() {
+    await clearTiles();
+    offline = await savedTiles();
+  }
 
   function reset() {
     prefs.reset();
@@ -112,6 +123,18 @@
           </button>
         {/each}
       </span>
+    </div>
+  </section>
+
+  <section>
+    <h3>{t('settings.offline')}</h3>
+    <div class="row">
+      <span class="text">
+        <span class="hint">
+          {offline?.count ? t('settings.offlineTiles', { n: offline.count, mb: offline.bytes ? Math.round(offline.bytes / 1024 / 1024) : '?' }) : t('settings.offlineNone')}
+        </span>
+      </span>
+      {#if offline?.count}<button type="button" class="btn" onclick={clearOffline}>{t('settings.offlineClear')}</button>{/if}
     </div>
   </section>
 

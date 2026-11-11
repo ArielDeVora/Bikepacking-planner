@@ -127,6 +127,7 @@ Free Supabase projects pause after a week with little activity. The **Keep Supab
 - [Phone layout](docs/13-phone.md): bottom sheets, touch editing, and testing on an iPhone over Wi-Fi.
 - [Planning](docs/15-planning.md): schedule, calendar with season heatmap, rest periods, countries timeline.
 - [Backups](docs/16-backups.md): nightly encrypted backups of the shared database, and restoring.
+- [Offline](docs/17-offline.md): the planner as a phone app, the map along a stage without a connection, signing in with a code.
 - [Spec](docs/SPEC.md)
 
 ## Credits

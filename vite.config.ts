@@ -1,6 +1,7 @@
 import { defineConfig, type Plugin } from 'vitest/config';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { buildId } from './scripts/build-id.mjs';
+import { serviceWorker } from './scripts/sw-plugin.mjs';
 
 const BUILD = buildId();
 
@@ -15,7 +16,7 @@ const versionFile = (): Plugin => ({
 
 export default defineConfig({
   base: './',
-  plugins: [svelte(), versionFile()],
+  plugins: [svelte(), versionFile(), serviceWorker(BUILD)],
   define: { __APP_BUILD__: JSON.stringify(BUILD) },
   build: {
     target: 'es2022',
