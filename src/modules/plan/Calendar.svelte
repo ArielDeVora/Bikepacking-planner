@@ -28,6 +28,8 @@
 </script>
 
 <script lang="ts">
+  import { isPhone } from '../../lib/ui/phone';
+
   let {
     first,
     count,
@@ -64,9 +66,9 @@
   let LABEL_W = $state(readLabelWidth());
   function readLabelWidth(): number {
     try {
-      return Math.min(MAX_LABEL, Math.max(MIN_LABEL, Number(localStorage.getItem('bp:plan:labelWidth')) || 250));
+      return Math.min(MAX_LABEL, Math.max(MIN_LABEL, Number(localStorage.getItem('bp:plan:labelWidth')) || (isPhone() ? MIN_LABEL : 250)));
     } catch {
-      return 250;
+      return isPhone() ? MIN_LABEL : 250;
     }
   }
   function resizeLabels(e: PointerEvent) {
@@ -157,7 +159,17 @@
 
   // Tooltip
   let tip = $state<{ x: number; y: number; lines: string[] } | null>(null);
+  // On a touch screen there's no hovering: a tap shows the day's details for a few seconds.
+  let tipTimer = 0;
+  function tap(e: PointerEvent, row: CalRow | null) {
+    if (e.pointerType !== 'touch') return;
+    hover(e, row);
+    clearTimeout(tipTimer);
+    tipTimer = window.setTimeout(() => (tip = null), 4000);
+  }
+
   function hover(e: PointerEvent, row: CalRow | null) {
+    if (e.pointerType === 'touch' && e.type === 'pointermove') return;
     const track = e.currentTarget as HTMLElement;
     const r = track.getBoundingClientRect();
     const col = Math.floor((e.clientX - r.left) / width);
@@ -239,6 +251,7 @@
             role="presentation"
             style:background-image="{grid}, {heatGradient(row.heat)}"
             onpointermove={(e) => hover(e, row)}
+            onpointerdown={(e) => tap(e, row)}
             onpointerleave={() => (tip = null)}
           >
             {#each row.bars ?? [] as bar, i (bar.from)}
@@ -280,7 +293,7 @@
 </div>
 
 {#if tip}
-  <div class="tip" style:left="{tip.x + 14}px" style:top="{tip.y + 14}px">
+  <div class="tip" style:left="{Math.max(12, Math.min(tip.x + 14, window.innerWidth - 332))}px" style:top="{tip.y + 14}px">
     {#each tip.lines as line, i (i)}<div class:first={i === 0}>{line}</div>{/each}
   </div>
 {/if}
@@ -498,6 +511,8 @@
 
   .bar.draggable {
     cursor: grab;
+    /* A finger on a bar drags it rather than scrolling the calendar. */
+    touch-action: none;
   }
 
   .bar.draggable::after {
@@ -576,6 +591,7 @@
 
   .tip {
     position: fixed;
+    max-width: min(320px, calc(100vw - 24px));
     z-index: 40;
     max-width: 320px;
     padding: 8px 10px;

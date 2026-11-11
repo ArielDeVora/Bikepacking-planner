@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { isPhone } from '../../lib/ui/phone';
   import { LngLatBounds } from 'maplibre-gl';
   import { edits } from '../../core/commands';
   import type { ModuleContext } from '../../core/module';
@@ -106,9 +107,10 @@
     if (bounds.isEmpty()) return;
     const view = ctx.map.getBounds();
     if (view.contains(bounds.getSouthWest()) && view.contains(bounds.getNorthEast())) return;
-    const wide = window.innerWidth > 640;
+    const wide = !isPhone();
+    // On phones the details sheet opens over the bottom half of the map.
     ctx.map.fitBounds(bounds, {
-      padding: { top: 60, bottom: 60, left: wide ? 380 : 40, right: wide ? 340 : 40 },
+      padding: { top: 60, bottom: wide ? 60 : Math.round(window.innerHeight * 0.5) + 30, left: wide ? 380 : 40, right: wide ? 340 : 60 },
       maxZoom: 14,
     });
   }

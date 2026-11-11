@@ -182,4 +182,14 @@
     color: var(--fg-muted);
     font-size: 10.5px;
   }
+
+  @media (max-width: 640px) {
+    .bar {
+      width: auto;
+    }
+
+    .note {
+      display: none;
+    }
+  }
 </style>

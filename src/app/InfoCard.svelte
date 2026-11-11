@@ -3,6 +3,8 @@
   import { createSettings } from '../core/settings';
   import { icons } from '../lib/icons';
   import IconButton from '../lib/ui/IconButton.svelte';
+  import { phone } from '../lib/ui/phone';
+  import { createSheet } from '../lib/ui/sheet';
   import SafeSection from '../lib/ui/SafeSection.svelte';
 
   let { core }: { core: Core } = $props();
@@ -58,6 +60,17 @@
     prefs.set('cardHeight', height);
   }
 
+  // On phones the card is a bottom sheet, kept low while a map tool is in use.
+  const tool = $derived(core.ui.tool);
+  const sheet = createSheet({
+    cssVar: '--card-h',
+    initial: 'half',
+    peek: (_node, handle) => handle.offsetHeight + 64,
+  });
+  $effect(() => {
+    if ($tool && $phone) sheet.snapTo('peek');
+  });
+
   const target = $derived.by(() => {
     void $store;
     if ($ids.length !== 1) return null;
@@ -68,7 +81,16 @@
 </script>
 
 {#if target || multi || $place}
-  <div class="card" class:resizing class:sized={height !== null} style:height={height !== null ? `${height}px` : null} role="dialog" aria-label="Details">
+  <div
+    class="card"
+    class:resizing
+    class:sized={height !== null}
+    style:height={height !== null && !$phone ? `${height}px` : null}
+    role="dialog"
+    aria-label="Details"
+    use:sheet.action={'.grip-bar'}
+  >
+    <div class="grip-bar" aria-hidden="true"><div class="grip"></div></div>
     <div
       class="edge left"
       role="separator"
@@ -187,15 +209,48 @@
     right: 6px;
   }
 
+  .grip-bar {
+    display: none;
+  }
+
   @media (max-width: 640px) {
-    .card {
-      left: var(--gap);
+    .card,
+    .card.sized {
+      --sheet-top: calc(var(--safe-top) + 64px);
+      top: auto;
+      left: 0;
+      right: 0;
+      bottom: 0;
       width: auto;
-      max-height: 45vh;
+      height: 50vh;
+      max-height: none;
+      padding-bottom: var(--safe-bottom);
+      border-radius: 14px 14px 0 0;
+      box-shadow: 0 -2px 16px rgb(0 0 0 / 0.2);
     }
 
-    .card.sized {
-      height: auto !important;
+    .card:global(.sheet-animate) {
+      transition: height 0.22s ease;
+    }
+
+    .grip-bar {
+      display: block;
+      flex: none;
+      padding: 8px 0 8px;
+      touch-action: none;
+      cursor: grab;
+    }
+
+    .grip {
+      width: 36px;
+      height: 5px;
+      margin: 0 auto;
+      border-radius: 3px;
+      background: var(--border);
+    }
+
+    .body {
+      padding-top: 2px;
     }
 
     .edge {

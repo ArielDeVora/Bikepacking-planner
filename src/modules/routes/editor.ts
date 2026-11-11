@@ -1,9 +1,10 @@
 import { ancestorIds } from '../../lib/tree';
-import type { MapMouseEvent, PointLike } from 'maplibre-gl';
-import { derived, get, type Readable } from 'svelte/store';
+import type { MapMouseEvent, MapTouchEvent, PointLike } from 'maplibre-gl';
+import { derived, get, writable, type Readable } from 'svelte/store';
 import { edits } from '../../core/commands';
 import type { ModuleContext } from '../../core/module';
 import { closestOnPolyline } from '../../lib/geo/geo';
+import { isCoarse } from '../../lib/ui/phone';
 import { insertAnchor, legCoords, moveAnchor, removeAnchor } from '../../model/segment';
 import type { LngLat, Segment, TravelMode } from '../../model/types';
 import { createSegment } from './actions';
@@ -11,9 +12,13 @@ import { routeColor, SRC, type RouteRenderer } from './render';
 
 export const DRAW_TOOL = 'routes.draw';
 
-const HIT_PX = 5;
-const SNAP_PX = 10;
-const CLICK_PX = 3;
+// Fingers need bigger targets than a mouse.
+const TOUCH = isCoarse();
+const HIT_PX = TOUCH ? 14 : 5;
+const SNAP_PX = TOUCH ? 20 : 10;
+const CLICK_PX = TOUCH ? 8 : 3;
+/** On touch screens, a point is added to a line by holding it this long, then dragging. */
+const HOLD_MS = 350;
 
 interface Drag {
   segId: string;
@@ -31,17 +36,20 @@ const box = (p: { x: number; y: number }, r: number): [PointLike, PointLike] => 
   [p.x + r, p.y + r],
 ];
 
-const toLngLat = (e: MapMouseEvent): LngLat => [e.lngLat.lng, e.lngLat.lat];
+const toLngLat = (e: MapMouseEvent | MapTouchEvent): LngLat => [e.lngLat.lng, e.lngLat.lat];
 
 /** Map interactions for drawing segments and editing their anchors. */
 export class RouteEditor {
   readonly drawing: Readable<boolean>;
+  /** Index of the selected point of the selected segment. */
+  readonly selectedAnchor = writable<number | null>(null);
   #start: LngLat | null = null;
   #anchor: number | null = null;
   #drag: Drag | null = null;
   #ghost: Ghost = null;
   #cursor: LngLat | null = null;
   #frame = 0;
+  #hold: { timer: number; start: { x: number; y: number } } | null = null;
 
   constructor(
     private ctx: ModuleContext,
@@ -76,7 +84,14 @@ export class RouteEditor {
       contextmenu: (e: MapMouseEvent) => this.#onContextMenu(e),
       mouseout: () => this.#setHover(null, null),
     };
+    const touch = {
+      touchstart: (e: MapTouchEvent) => this.#onTouchStart(e),
+      touchmove: (e: MapTouchEvent) => this.#onTouchMove(e),
+      touchend: () => this.#onTouchEnd(),
+      touchcancel: () => this.#onTouchEnd(),
+    };
     for (const [type, fn] of Object.entries(handlers)) map.on(type as 'click', fn);
+    for (const [type, fn] of Object.entries(touch)) map.on(type as 'touchstart', fn);
     const offTool = this.ctx.ui.tool.subscribe((tool) => {
       if (tool !== DRAW_TOOL && (this.#start || this.#cursor)) {
         this.#start = null;
@@ -88,6 +103,8 @@ export class RouteEditor {
     });
     return () => {
       for (const [type, fn] of Object.entries(handlers)) map.off(type as 'click', fn);
+      for (const [type, fn] of Object.entries(touch)) map.off(type as 'touchstart', fn);
+      this.#cancelHold();
       offTool();
     };
   }
@@ -101,7 +118,7 @@ export class RouteEditor {
   toggleDrawing(): void {
     const starting = !get(this.drawing);
     this.ctx.ui.toggleTool(DRAW_TOOL);
-    if (starting) this.ctx.ui.notify(this.ctx.t('routes.drawHint'), 'info', 4000);
+    if (starting) this.ctx.ui.notify(this.ctx.t(TOUCH ? 'routes.drawHintTouch' : 'routes.drawHint'), 'info', 4000);
   }
 
   stopDrawing(): void {
@@ -267,22 +284,30 @@ export class RouteEditor {
     }
     if (!drag) return;
     e.preventDefault();
-    this.#drag = drag;
-    this.#ghost = null;
-    this.ctx.map.getCanvas().style.cursor = 'grabbing';
+    this.#startDrag(drag);
     document.addEventListener('mouseup', this.#endDrag, { once: true });
   }
 
-  #onMouseMove(e: MapMouseEvent): void {
+  #startDrag(drag: Drag): void {
+    this.#drag = drag;
+    this.#ghost = null;
+    this.ctx.map.getCanvas().style.cursor = 'grabbing';
+  }
+
+  /** Moves the dragged point; returns false if nothing is being dragged. */
+  #dragTo(e: MapMouseEvent | MapTouchEvent): boolean {
     const drag = this.#drag;
-    if (drag) {
-      if (Math.hypot(e.point.x - drag.start.x, e.point.y - drag.start.y) > CLICK_PX) drag.moved = true;
-      if (drag.moved) {
-        drag.lngLat = this.#snap(e.point, toLngLat(e), drag.kind === 'move' ? drag : undefined);
-        this.refresh();
-      }
-      return;
+    if (!drag) return false;
+    if (Math.hypot(e.point.x - drag.start.x, e.point.y - drag.start.y) > CLICK_PX) drag.moved = true;
+    if (drag.moved) {
+      drag.lngLat = this.#snap(e.point, toLngLat(e), drag.kind === 'move' ? drag : undefined);
+      this.refresh();
     }
+    return true;
+  }
+
+  #onMouseMove(e: MapMouseEvent): void {
+    if (this.#dragTo(e)) return;
     if (get(this.drawing)) {
       this.#cursor = toLngLat(e);
       this.refresh();
@@ -295,6 +320,7 @@ export class RouteEditor {
   #endDrag = (): void => {
     const drag = this.#drag;
     this.#drag = null;
+    if (!this.ctx.map.dragPan.isEnabled()) this.ctx.map.dragPan.enable();
     this.#updateCursor();
     if (!drag?.moved) {
       this.refresh();
@@ -323,28 +349,85 @@ export class RouteEditor {
     this.#removeAnchor(seg, anchor);
   }
 
-  #hover(e: MapMouseEvent): void {
+  // Touch: drag a point at once; hold a line, then drag, to add a point. Two fingers are left to the map.
+
+  #onTouchStart(e: MapTouchEvent): void {
+    this.#cancelHold();
+    if (e.points.length !== 1 || get(this.drawing) || this.#otherTool) return;
+    const seg = this.#active;
+    if (!seg) return;
+    const anchor = this.#anchorAt(e.point);
+    if (anchor !== null) {
+      e.preventDefault();
+      this.ctx.map.dragPan.disable();
+      this.#startDrag({ segId: seg.id, index: anchor, kind: 'move', start: e.point, lngLat: seg.anchors[anchor]!.lngLat, moved: false });
+      return;
+    }
+    if (this.#onMarker(e.point)) return;
+    const ghost = this.#ghostAt(e.point);
+    if (!ghost) return;
+    const start = e.point;
+    this.#hold = {
+      start,
+      timer: window.setTimeout(() => {
+        this.#hold = null;
+        if (this.#active?.id !== seg.id) return;
+        this.ctx.map.dragPan.disable();
+        this.#startDrag({ segId: seg.id, index: ghost.index, kind: 'insert', start, lngLat: ghost.lngLat, moved: true });
+        this.refresh();
+      }, HOLD_MS),
+    };
+  }
+
+  #onTouchMove(e: MapTouchEvent): void {
+    if (e.points.length !== 1) {
+      this.#cancelHold();
+      return;
+    }
+    if (this.#hold && Math.hypot(e.point.x - this.#hold.start.x, e.point.y - this.#hold.start.y) > CLICK_PX) this.#cancelHold();
+    if (this.#drag) {
+      e.preventDefault();
+      this.#dragTo(e);
+    }
+  }
+
+  #onTouchEnd(): void {
+    this.#cancelHold();
+    if (this.#drag) this.#endDrag();
+  }
+
+  #cancelHold(): void {
+    if (!this.#hold) return;
+    clearTimeout(this.#hold.timer);
+    this.#hold = null;
+  }
+
+  /** The point on the selected segment's line under the pointer, where a new point would go. */
+  #ghostAt(point: { x: number; y: number }): Ghost {
     const { map } = this.ctx;
     const seg = this.#active;
-    if (seg && this.#anchorAt(e.point) !== null) return this.#setHover('grab', null);
+    if (!seg) return null;
+    const own = map.queryRenderedFeatures(box(point, HIT_PX), { layers: this.renderer.hitLayerIds }).find((h) => h.properties.sid === seg.id);
+    if (!own) return null;
+    const legIndex = own.properties.leg as number;
+    const leg = seg.legs[legIndex];
+    if (!leg) return null;
+    const pts = legCoords(leg).map((c) => {
+      const p = map.project([c[0], c[1]]);
+      return [p.x, p.y] as [number, number];
+    });
+    const best = closestOnPolyline(pts, [point.x, point.y]);
+    if (!best) return null;
+    const ll = map.unproject(best.point);
+    return { index: legIndex + 1, lngLat: [ll.lng, ll.lat] };
+  }
 
-    const hits = map.queryRenderedFeatures(box(e.point, HIT_PX), { layers: this.renderer.hitLayerIds });
-    const own = seg && hits.find((h) => h.properties.sid === seg.id);
-    if (seg && own) {
-      const legIndex = own.properties.leg as number;
-      const leg = seg.legs[legIndex];
-      if (leg) {
-        const pts = legCoords(leg).map((c) => {
-          const p = map.project([c[0], c[1]]);
-          return [p.x, p.y] as [number, number];
-        });
-        const best = closestOnPolyline(pts, [e.point.x, e.point.y]);
-        if (best) {
-          const ll = map.unproject(best.point);
-          return this.#setHover('grab', { index: legIndex + 1, lngLat: [ll.lng, ll.lat] });
-        }
-      }
-    }
+  #hover(e: MapMouseEvent): void {
+    const seg = this.#active;
+    if (seg && this.#anchorAt(e.point) !== null) return this.#setHover('grab', null);
+    const ghost = this.#ghostAt(e.point);
+    if (ghost) return this.#setHover('grab', ghost);
+    const hits = this.ctx.map.queryRenderedFeatures(box(e.point, HIT_PX), { layers: this.renderer.hitLayerIds });
     this.#setHover(hits.length ? 'pointer' : null, null);
   }
 
@@ -369,6 +452,7 @@ export class RouteEditor {
   #render(): void {
     this.#frame = 0;
     const seg = this.#active;
+    this.selectedAnchor.set(seg ? this.#anchor : null);
     const color = seg ? routeColor(this.ctx.store, seg) : '#495057';
     const point = (lngLat: LngLat, props: Record<string, unknown>): GeoJSON.Feature => ({
       type: 'Feature',

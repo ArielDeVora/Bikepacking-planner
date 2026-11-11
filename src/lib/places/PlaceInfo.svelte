@@ -66,7 +66,7 @@
   const distance = (m: number) => (m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(m < 10_000 ? 1 : 0)} km`);
 
   async function copy() {
-    await navigator.clipboard.writeText(formatLngLat(lngLat)).catch(() => {});
+    await navigator.clipboard?.writeText(formatLngLat(lngLat)).catch(() => {});
     copied = true;
     setTimeout(() => (copied = false), 1500);
   }
