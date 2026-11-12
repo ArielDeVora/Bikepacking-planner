@@ -28,14 +28,16 @@
   const title = $derived(englishName || place.name);
 
   function add() {
+    // Plain copies: the place may come from reactive state (search results), which can't be stored.
+    const { lngLat, osm } = $state.snapshot(place);
     const { command, id } = createPoiCommand(
       {
         tripId: ctx.tripId,
         userId: ctx.user.id,
-        lngLat: place.lngLat,
+        lngLat,
         name: title || place.kind,
         category: resolveCategory(ctx.store, place.category),
-        osm: place.osm ? { ...place.osm, fetchedAt: Date.now() } : undefined,
+        osm: osm ? { ...osm, fetchedAt: Date.now() } : undefined,
       },
       t('cmd.addPoi'),
     );

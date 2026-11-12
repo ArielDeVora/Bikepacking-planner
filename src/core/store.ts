@@ -76,7 +76,14 @@ export class TripStore {
 
   #emit(change: StoreChange): void {
     this.#version++;
-    for (const fn of this.#listeners) fn(change);
+    // One failing listener mustn't keep the others (map, saving, sync) from hearing of the change.
+    for (const fn of this.#listeners) {
+      try {
+        fn(change);
+      } catch (err) {
+        console.error(err);
+      }
+    }
     for (const run of this.#subscribers) run(this.#version);
   }
 }

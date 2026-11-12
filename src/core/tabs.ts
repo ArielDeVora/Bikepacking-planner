@@ -10,7 +10,13 @@ export function syncTabs(store: TripStore, tripId: () => string): () => void {
   const off = store.onChange(({ ids, origin }) => {
     if (origin !== 'local') return;
     const entities = ids.map((id) => store.getRaw(id)).filter((e) => !!e);
-    if (entities.length) channel.postMessage({ tripId: tripId(), entities });
+    if (!entities.length) return;
+    try {
+      // As JSON, like the server gets them: nothing that can't be copied to another tab.
+      channel.postMessage({ tripId: tripId(), entities: JSON.parse(JSON.stringify(entities)) as unknown });
+    } catch (err) {
+      console.warn('Could not pass the change to other tabs', err);
+    }
   });
   channel.onmessage = (e: MessageEvent<{ tripId?: string; entities?: unknown }>) => {
     const { tripId: id, entities } = e.data ?? {};

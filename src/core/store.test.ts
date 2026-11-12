@@ -28,4 +28,18 @@ describe('TripStore', () => {
     expect(listener).toHaveBeenCalledWith({ ids: ['s1'], origin: 'remote' });
     expect(versions).toEqual([0, 1]);
   });
+
+  it('tells every listener even if one of them fails', () => {
+    const store = new TripStore();
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const after = vi.fn();
+    store.onChange(() => {
+      throw new Error('boom');
+    });
+    store.onChange(after);
+    store.apply([stage('s1', 'V')], 'local');
+    expect(after).toHaveBeenCalledOnce();
+    expect(error).toHaveBeenCalled();
+    error.mockRestore();
+  });
 });
