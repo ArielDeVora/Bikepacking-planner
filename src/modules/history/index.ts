@@ -40,7 +40,16 @@ export default defineModule({
     const offMentions = store.onChange(({ ids, origin }) => {
       if (origin !== 'remote') return;
       for (const id of ids) {
-        const c = store.getRaw(id);
+        const raw = store.getRaw(id);
+        if (raw?.type === 'poi' && raw.followerId && !raw.deleted && !notified.has(id) && raw.updatedAt >= startedAt && !raw.editedBy) {
+          notified.add(id);
+          ui.notify(t('since.suggestedToast', { name: raw.suggestedBy || t('follow.aFollower'), place: raw.name }), 'info', MENTION_TOAST_MS, {
+            label: t('since.show'),
+            run: () => ctx.selection.set([id]),
+          });
+          continue;
+        }
+        const c = raw;
         if (c?.type !== 'comment' || c.deleted || notified.has(id)) continue;
         const comment = c as Comment;
         if (comment.createdAt < startedAt || cloud.isMine(comment.authorId) || !comment.mentions?.some(cloud.isMine)) continue;

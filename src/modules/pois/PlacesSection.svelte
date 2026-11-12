@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { matchesQuery } from '../../lib/text';
   import { untrack, type Snippet } from 'svelte';
   import { POI_STATUS_ORDER } from '../../config/pois';
   import type { ModuleContext } from '../../core/module';
@@ -77,7 +78,7 @@
     return store.list('poi').map((poi) => ({
       poi,
       category: infoOf(poi.category),
-      author: authorOf(ctx.cloud, t, poi.createdBy),
+      author: authorOf(ctx.cloud, t, poi.createdBy, poi.suggestedBy),
       votes: tally(votes.get(poi.id) ?? []),
       approvals: approvals(votes.get(poi.id) ?? []),
     }));
@@ -86,11 +87,18 @@
   const showAuthors = $derived($shared || authors.length > 1);
   // A filter on someone who no longer has places falls back to everyone.
   const authorFilter = $derived(authors.some((a) => a.key === author) ? author : 'all');
-  const filtering = $derived(status !== 'all' || authorFilter !== 'all');
+  const query = $derived(ctx.ui.panelQuery);
+  const searching = $derived(!!$query.trim());
+  const filtering = $derived(status !== 'all' || authorFilter !== 'all' || searching);
 
   const items = $derived(
     all
-      .filter((x) => (status === 'all' || x.poi.status === status) && (authorFilter === 'all' || x.author.key === authorFilter))
+      .filter(
+        (x) =>
+          (status === 'all' || x.poi.status === status) &&
+          (authorFilter === 'all' || x.author.key === authorFilter) &&
+          (!searching || matchesQuery($query, x.poi.name, x.category.name, x.poi.notes)),
+      )
       .sort((a, b) => a.poi.name.localeCompare(b.poi.name)),
   );
 
@@ -313,7 +321,7 @@
 
 <!-- A collapsible row in the style of the trip tree's groups, with its places below. -->
 {#snippet groupRow(key: string, label: string, list: Item[], icon: Snippet, category?: CategoryInfo)}
-  {@const closed = collapsed.has(key)}
+  {@const closed = !searching && collapsed.has(key)}
   {@const visibilityId = category ? categoryVisibilityId(category.id) : ''}
   {@const off = !!category && $hidden.has(visibilityId)}
   <li>

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import type { Core } from '../core/core';
   import { KEYS } from '../config/shortcuts';
   import { createSettings } from '../core/settings';
@@ -11,11 +12,25 @@
   import InfoCard from './InfoCard.svelte';
   import SettingsDialog from './SettingsDialog.svelte';
   import { startOnboarding, watchForUpdates } from './onboarding';
+  import { watchCommands } from './undo-notice';
   import Toasts from './Toasts.svelte';
   import Toolbar from './Toolbar.svelte';
 
   let { core }: { core: Core } = $props();
   const { t } = $derived(core);
+  const panelQuery = untrack(() => core.ui.panelQuery);
+  const appPrefs = $derived(core.prefs);
+  let searchEl = $state<HTMLInputElement>();
+  $effect(() =>
+    core.shortcuts.add({
+      keys: KEYS.panelSearch,
+      label: t('panel.search'),
+      run: () => {
+        if (!panelOpen) togglePanel();
+        requestAnimationFrame(() => searchEl?.focus());
+      },
+    }),
+  );
   const sections = $derived(core.ui.panelSections);
   const widgets = $derived(core.ui.widgets);
   const drawers = $derived(core.ui.drawers);
@@ -49,6 +64,7 @@
     startOnboarding(core);
   });
   $effect(() => watchForUpdates(core));
+  $effect(() => watchCommands(core, t));
 
   const prefs = createSettings('app');
   let panelOpen = $state(prefs.get('panelOpen', window.innerWidth > 640));
@@ -174,7 +190,30 @@
       {/each}
     </div>
   {/if}
-  <div class="sections">
+  <div class="panel-search">
+    <input
+      type="search"
+      placeholder={`${t('panel.search')} (${core.shortcuts.format(KEYS.panelSearch)})`}
+      aria-label={t('panel.search')}
+      bind:this={searchEl}
+      bind:value={$panelQuery}
+      onkeydown={(e) => {
+        if (e.key === 'Escape') {
+          e.stopPropagation();
+          $panelQuery = '';
+          searchEl?.blur();
+        }
+      }}
+    />
+    <IconButton
+      icon={$appPrefs.compactPanel ? icons.expand : icons.collapse}
+      label={$appPrefs.compactPanel ? t('panel.comfortable') : t('panel.compact')}
+      size={15}
+      active={$appPrefs.compactPanel}
+      onclick={() => core.prefs.set('compactPanel', !$appPrefs.compactPanel)}
+    />
+  </div>
+  <div class="sections" class:compact={$appPrefs.compactPanel}>
     {#each listSections as section (section.id)}
       <details open>
         <summary>{section.title}</summary>
@@ -329,6 +368,32 @@
   .sections {
     flex: 1;
     overflow-y: auto;
+  }
+
+  .panel-search {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 10px 8px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .panel-search input {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .sections.compact summary {
+    padding-block: 6px;
+  }
+
+  .sections.compact .section-body {
+    padding-bottom: 8px;
+  }
+
+  .sections.compact :global(.row > .name) {
+    padding-block: 2px;
+    font-size: 12.5px;
   }
 
   details {

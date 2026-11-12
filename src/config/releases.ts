@@ -11,6 +11,18 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    id: '2026-11-20',
+    title: 'Badges, search, undo notices, a dark map and suggestions from followers',
+    items: [
+      'Family and friends can suggest places: turn on “Followers can suggest places” on a follow link. They type their name once, and their places land in their own category (“From Mum”). They can only add, never change or delete. Every member can now make follow links, not just the owner.',
+      'Badges next to names in Sharing: Scout, GOAT whisperer, Cartographer, Quartermaster and more. Hover one to see what it’s for.',
+      'Search the side panel (Cmd+Shift+F): routes, stages, segments and places, by name. The button next to it makes the list compact.',
+      'After each change, a notice says what was done, with an Undo button (can be turned off in Settings).',
+      'In dark mode, the map is dark too.',
+      'Gear checklist: each price has its own currency (CHF, EUR, USD…), with totals in the trip’s currency and editable exchange rates.',
+    ],
+  },
+  {
     id: '2026-11-19',
     title: 'Follow links, @mentions and a shared gear list',
     items: [

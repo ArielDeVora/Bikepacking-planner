@@ -40,6 +40,28 @@ export async function createFollower(token: string) {
       return rows.map(rowToEntity);
     },
 
+    /** Whether the link lets its followers suggest places (false where the server can't tell). */
+    async canSuggest(): Promise<boolean> {
+      const { data, error } = await client.rpc('follow_link_info', { link: token });
+      if (error) return false;
+      return !!(data as { can_suggest: boolean }[])[0]?.can_suggest;
+    },
+
+    /** Adds a place to the trip, in this follower's own category. */
+    async suggest(place: { id: string; name: string; lngLat: [number, number]; notes?: string }, who: Follower): Promise<void> {
+      const { error } = await client.rpc('follow_suggest_place', {
+        link: token,
+        follower: who.id,
+        follower_name: who.name,
+        place_id: place.id,
+        lng: place.lngLat[0],
+        lat: place.lngLat[1],
+        place_name: place.name,
+        place_notes: place.notes ?? '',
+      });
+      if (error) throw new Error(error.message);
+    },
+
     async members(): Promise<Member[]> {
       const { data, error } = await client.rpc('follow_members', { link: token });
       if (error) throw new Error(error.message);
@@ -48,4 +70,31 @@ export async function createFollower(token: string) {
   };
 }
 
-export type Follower = Awaited<ReturnType<typeof createFollower>>;
+export type FollowClient = Awaited<ReturnType<typeof createFollower>>;
+
+/** Someone following a trip, as their browser remembers them (no account). */
+export interface Follower {
+  id: string;
+  name: string;
+}
+
+const FOLLOWER_KEY = 'bp-follower';
+
+export function savedFollower(): Follower | null {
+  try {
+    const v = JSON.parse(localStorage.getItem(FOLLOWER_KEY) ?? 'null') as Follower | null;
+    return v?.id && v.name ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveFollower(name: string): Follower {
+  const f = { id: savedFollower()?.id ?? crypto.randomUUID(), name: name.trim() };
+  try {
+    localStorage.setItem(FOLLOWER_KEY, JSON.stringify(f));
+  } catch {
+    /* private browsing: remembered for this visit only */
+  }
+  return f;
+}

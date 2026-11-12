@@ -31,4 +31,16 @@ describe('since your last visit', () => {
   it('is empty when only I changed things', () => {
     expect(isEmpty(sinceLastVisit(entities, 350, mine))).toBe(true);
   });
+
+  it('counts places suggested through follow links per follower', () => {
+    const suggested = [
+      e('f1', 'poi', '', 500, { followerId: 'x', createdBy: 'follower:x', suggestedBy: 'Mum', name: 'Lake' }),
+      e('f2', 'poi', '', 600, { followerId: 'x', createdBy: 'follower:x', suggestedBy: 'Mum', name: 'Pass' }),
+      e('f3', 'poi', '', 50, { followerId: 'y', createdBy: 'follower:y', suggestedBy: 'Léa', name: 'Old' }),
+    ];
+    const s = sinceLastVisit([...entities, ...suggested], 100, mine);
+    expect(s.suggestions).toEqual([{ name: 'Mum', count: 2 }]);
+    expect(s.latest?.id).toBe('f2');
+    expect(isEmpty(sinceLastVisit(suggested, 100, mine))).toBe(false);
+  });
 });

@@ -92,10 +92,20 @@ export default defineModule({
         'overlay',
       );
       const syncLabels = () => {
-        const baseShown = map.getLayer('label_country_1') && map.getLayoutProperty('label_country_1', 'visibility') !== 'none';
+        const label = ['label_country_1', 'place_country_major'].find((id) => map.getLayer(id));
+        const baseShown = !!label && map.getLayoutProperty(label, 'visibility') !== 'none';
         const want = baseShown ? 'none' : 'visible';
         if (map.getLayoutProperty('borders-labels', 'visibility') !== want) map.setLayoutProperty('borders-labels', 'visibility', want);
       };
+      // The light casing and halo that make borders stand out on a light map would glare on a dark one.
+      removers.push(
+        ctx.theme.subscribe((theme) => {
+          const halo = theme === 'dark' ? '#0c0c0c' : '#ffffff';
+          map.setPaintProperty('borders-casing', 'line-color', halo);
+          map.setPaintProperty('borders-casing', 'line-opacity', theme === 'dark' ? 0.5 : 0.7);
+          map.setPaintProperty('borders-labels', 'text-halo-color', halo);
+        }),
+      );
       map.on('styledata', syncLabels);
       syncLabels();
       removers.push(() => map.off('styledata', syncLabels));

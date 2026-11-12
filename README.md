@@ -71,7 +71,7 @@ Without this, the app works locally in each browser. One-time setup, about 10 mi
 2. Paste the whole content of [`supabase/migrations/001_init.sql`](supabase/migrations/001_init.sql) and click **Run**. It should end with "Success. No rows returned". (Running it again is harmless.)
 3. Do the same with [`supabase/migrations/002_history.sql`](supabase/migrations/002_history.sql) (shared change history, see [docs/11](docs/11-history.md)). Without it everything works, but each person's History shows only their own changes.
    Then [`supabase/migrations/003_history_slim.sql`](supabase/migrations/003_history_slim.sql), which keeps the history small (see [docs/11](docs/11-history.md#keeping-it-small)).
-4. For read-only follow links (family and friends, no account): [`supabase/migrations/004_follow.sql`](supabase/migrations/004_follow.sql) (see [docs/18](docs/18-together.md)).
+4. For read-only follow links (family and friends, no account): [`supabase/migrations/004_follow.sql`](supabase/migrations/004_follow.sql), then [`supabase/migrations/005_follow_suggestions.sql`](supabase/migrations/005_follow_suggestions.sql) so every member can make links and followers can suggest places (see [docs/18](docs/18-together.md)).
 
 ### 3. Allow sign-in links back to the site
 1. Open **Authentication → URL Configuration**.
@@ -129,7 +129,7 @@ Free Supabase projects pause after a week with little activity. The **Keep Supab
 - [Planning](docs/15-planning.md): schedule, calendar with season heatmap, rest periods, countries timeline.
 - [Backups](docs/16-backups.md): nightly encrypted backups of the shared database, and restoring.
 - [Offline](docs/17-offline.md): the planner as a phone app, the map along a stage without a connection, signing in with a code.
-- [Together](docs/18-together.md): read-only follow links, @mentions, since your last visit, the shared gear checklist, the map hover.
+- [Together](docs/18-together.md): read-only follow links and follower suggestions, @mentions, since your last visit, the shared gear checklist and its currencies, badges, side panel search, undo notices, the dark map, the map hover.
 - [Spec](docs/SPEC.md)
 
 ## Credits

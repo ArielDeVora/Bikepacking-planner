@@ -49,7 +49,11 @@
 <h3>{title || place.kind}</h3>
 {#if title && place.kind}<p class="kind muted">{place.kind}{englishName && place.name && englishName !== place.name ? ` · ${place.name}` : ''}</p>{/if}
 <PlaceInfo {ctx} lngLat={place.lngLat} name={title || place.kind} osm={place.osm} />
-<button type="button" class="add" onclick={add}>{t('place.addToTrip')}</button>
+{#if !ctx.readOnly}
+  <button type="button" class="add" onclick={add}>{t('place.addToTrip')}</button>
+{:else if ctx.ui.suggestPlace}
+  <button type="button" class="add" onclick={() => ctx.ui.suggestPlace?.({ name: title || place.kind, lngLat: $state.snapshot(place.lngLat) })}>{t('suggest.thisPlace')}</button>
+{/if}
 
 <style>
   h3 {

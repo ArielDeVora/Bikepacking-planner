@@ -160,8 +160,14 @@ export class UiRegistry {
   readonly toasts: Readable<Toast[]> = { subscribe: this.#toasts.subscribe };
   #toastId = 0;
 
+  /** What's typed in the side panel's search box: lists in the panel show only what matches. */
+  readonly panelQuery = writable('');
+
   /** A read-only view of someone's trip (a follow link): tools that edit are left out. */
   readOnly = false;
+
+  /** Set in a follow link that allows suggestions: suggests a place found by search or on the map. */
+  suggestPlace: ((place: { name: string; lngLat: [number, number] }) => void) | null = null;
 
   addTool(spec: ToolSpec) {
     if (this.readOnly && !spec.viewOnly) return () => {};
@@ -211,10 +217,12 @@ export class UiRegistry {
     queueMicrotask(() => this.#dialog.update((d) => (!component || d?.component === component ? null : d)));
   }
 
-  notify(message: string, kind: Toast['kind'] = 'info', ms = 5000, action?: Toast['action']): void {
+  /** Shows a notice; returns its id (for `dismiss`). */
+  notify(message: string, kind: Toast['kind'] = 'info', ms = 5000, action?: Toast['action']): number {
     const id = ++this.#toastId;
     this.#toasts.update((list) => [...list, { id, message, kind, action }]);
     if (ms > 0) setTimeout(() => this.dismiss(id), ms);
+    return id;
   }
 
   dismiss(id: number): void {

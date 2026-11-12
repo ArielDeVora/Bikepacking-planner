@@ -28,6 +28,7 @@
   import { untrack } from 'svelte';
   import { editedAt, editedBy } from '../../model/edited';
   import { deleteStage } from './actions';
+  import { visibleIds, type TreeNode } from './filter';
 
   let { ctx }: { ctx: ModuleContext } = $props();
   const { t, commands, selection } = $derived(ctx);
@@ -101,6 +102,26 @@
   });
   const childSegments = (c: StageChild): Segment[] => (c.type === 'group' ? (segmentsByGroup.get(c.id) ?? []) : [c]);
   const segmentsByStage = $derived(new Map(stages.map((st) => [st.id, (childrenByStage.get(st.id) ?? []).flatMap(childSegments)])));
+  // Search from the side panel's box: only matches (with what they're in) are listed, opened.
+  const query = $derived(ctx.ui.panelQuery);
+  const visible = $derived.by(() => {
+    if (!$query.trim()) return null;
+    const segNode = (s: Segment): TreeNode => ({ id: s.id, name: s.name, children: [] });
+    const stageNode = (st: Stage): TreeNode => ({
+      id: st.id,
+      name: st.name,
+      children: (childrenByStage.get(st.id) ?? []).map((c) =>
+        c.type === 'group' ? { id: c.id, name: c.name, children: (segmentsByGroup.get(c.id) ?? []).map(segNode) } : segNode(c),
+      ),
+    });
+    return visibleIds(
+      top.map((c) => (c.type === 'route' ? { id: c.id, name: c.name, children: (stagesByRoute.get(c.id) ?? []).map(stageNode) } : stageNode(c))),
+      $query,
+    );
+  });
+  const shown = (id: string) => !visible || visible.has(id);
+  const open = (id: string) => (visible ? true : !collapsed.has(id));
+
   const routeSegs = (id: string) => (stagesByRoute.get(id) ?? []).flatMap((st) => segmentsByStage.get(st.id) ?? []);
 
   const km = (segs: Segment[]) => {
@@ -402,7 +423,7 @@
       class:dragged={dragging?.includes(stage.id)}
       role="treeitem"
       aria-selected={$selected.includes(stage.id)}
-      aria-expanded={!collapsed.has(stage.id)}
+      aria-expanded={open(stage.id)}
       tabindex="-1"
       draggable="true"
       ondragstart={(e) => dragStageStart(e, stage.id)}
@@ -414,7 +435,7 @@
       <button
         type="button"
         class="chevron"
-        class:closed={collapsed.has(stage.id)}
+        class:closed={!open(stage.id)}
         disabled={!children.length}
         aria-label={collapsed.has(stage.id) ? t('tree.expand') : t('tree.collapse')}
         title={collapsed.has(stage.id) ? t('tree.expand') : t('tree.collapse')}
@@ -438,9 +459,9 @@
         />
       </span>
     </div>
-    {#if children.length && !collapsed.has(stage.id)}
+    {#if children.length && open(stage.id)}
       <ol class="segments">
-        {#each children as child (child.id)}
+        {#each children.filter((c) => shown(c.id)) as child (child.id)}
           {#if child.type === 'group'}
             {@const gsegs = segmentsByGroup.get(child.id) ?? []}
             {@const groupHidden = $hidden.has(child.id)}
@@ -453,7 +474,7 @@
                 class:dragged={dragging?.includes(child.id)}
                 role="treeitem"
                 aria-selected={$selected.includes(child.id)}
-                aria-expanded={!collapsed.has(child.id)}
+                aria-expanded={open(child.id)}
                 tabindex="-1"
                 draggable="true"
                 title={t('tree.groupHint')}
@@ -466,7 +487,7 @@
                 <button
                   type="button"
                   class="chevron"
-                  class:closed={collapsed.has(child.id)}
+                  class:closed={!open(child.id)}
                   disabled={!gsegs.length}
                   aria-label={collapsed.has(child.id) ? t('tree.expand') : t('tree.collapse')}
                   title={collapsed.has(child.id) ? t('tree.expand') : t('tree.collapse')}
@@ -491,9 +512,9 @@
                   />
                 </span>
               </div>
-              {#if gsegs.length && !collapsed.has(child.id)}
+              {#if gsegs.length && open(child.id)}
                 <ol class="segments">
-                  {#each gsegs as seg (seg.id)}
+                  {#each gsegs.filter((s) => shown(s.id)) as seg (seg.id)}
                     {@render segmentRow(seg, stageHidden || groupHidden)}
                   {/each}
                 </ol>
@@ -511,8 +532,11 @@
 {#if top.length === 0}
   <p class="muted">{t('tree.empty')}</p>
 {:else}
+  {#if visible && !visible.size}
+    <p class="muted">{t('panel.noMatch')}</p>
+  {/if}
   <ol bind:this={listEl}>
-    {#each top as child (child.id)}
+    {#each top.filter((c) => shown(c.id)) as child (child.id)}
       {#if child.type === 'route'}
         {@const rstages = stagesByRoute.get(child.id) ?? []}
         {@const rsegs = routeSegs(child.id)}
@@ -526,7 +550,7 @@
             class:dragged={dragging?.includes(child.id)}
             role="treeitem"
             aria-selected={$selected.includes(child.id)}
-            aria-expanded={!collapsed.has(child.id)}
+            aria-expanded={open(child.id)}
             tabindex="-1"
             draggable="true"
             title={t('tree.routeHint')}
@@ -539,7 +563,7 @@
             <button
               type="button"
               class="chevron"
-              class:closed={collapsed.has(child.id)}
+              class:closed={!open(child.id)}
               disabled={!rstages.length}
               aria-label={collapsed.has(child.id) ? t('tree.expand') : t('tree.collapse')}
               title={collapsed.has(child.id) ? t('tree.expand') : t('tree.collapse')}
@@ -565,9 +589,9 @@
               />
             </span>
           </div>
-          {#if rstages.length && !collapsed.has(child.id)}
+          {#if rstages.length && open(child.id)}
             <ol class="stages">
-              {#each rstages as stage (stage.id)}
+              {#each rstages.filter((s) => shown(s.id)) as stage (stage.id)}
                 {@render stageRow(stage, routeHidden, child.color)}
               {/each}
             </ol>

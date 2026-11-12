@@ -379,12 +379,25 @@ export function createCloud(deps: CloudDeps) {
     hasPendingInvite: () => !!settings.get<string | null>('pendingInvite', null),
     isSharedLocally,
 
-    /** Read-only follow links of the open trip (owner only). Empty when the server doesn't have them yet. */
-    async followLinks(): Promise<{ token: string; createdAt: string }[]> {
+    /**
+     * Follow links of the open trip. `canSuggest` is null where the server doesn't have
+     * suggestions yet (migration 005 not run).
+     */
+    async followLinks(): Promise<{ token: string; createdAt: string; createdBy: string; canSuggest: boolean | null }[]> {
       if (!client) return [];
-      const { data, error } = await client.from('follow_links').select('token, created_at').eq('trip_id', deps.tripId()).order('created_at');
+      type Row = { token: string; created_at: string; created_by: string; can_suggest?: boolean };
+      const query = (columns: string) => client!.from('follow_links').select(columns).eq('trip_id', deps.tripId()).order('created_at');
+      let res = await query('token, created_at, created_by, can_suggest');
+      if (res.error && /can_suggest/.test(res.error.message)) res = await query('token, created_at, created_by');
+      if (res.error) throw res.error;
+      return (res.data as unknown as Row[]).map((r) => ({ token: r.token, createdAt: r.created_at, createdBy: r.created_by, canSuggest: r.can_suggest ?? null }));
+    },
+
+    /** Lets a link's followers suggest places, or stops it. */
+    async setFollowSuggest(token: string, on: boolean): Promise<void> {
+      if (!client) throw new Error('Not signed in');
+      const { error } = await client.from('follow_links').update({ can_suggest: on }).eq('token', token);
       if (error) throw error;
-      return (data as { token: string; created_at: string }[]).map((r) => ({ token: r.token, createdAt: r.created_at }));
     },
 
     /** A link anyone can open to see the trip, without an account or the right to change it. */

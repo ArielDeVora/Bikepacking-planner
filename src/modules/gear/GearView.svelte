@@ -6,7 +6,8 @@
   import { icons } from '../../lib/icons';
   import Icon from '../../lib/ui/Icon.svelte';
   import IconButton from '../../lib/ui/IconButton.svelte';
-  import type { Gear, GearStatus } from '../../model/types';
+  import type { Gear, GearStatus, Trip } from '../../model/types';
+  import { CURRENCIES, currencyOf, formatMoney, inMain, moneyOf, rate, unknownRate, withRate } from './currency';
   import { download, safeFileName } from '../io/gpx';
   import {
     addGearCommand,
@@ -55,18 +56,44 @@
     void $store;
     return gearList(store);
   });
+  // Currencies: each price keeps its own; totals and the cost split are in the trip's currency.
+  const trip = $derived.by(() => {
+    void $store;
+    return store.get(ctx.tripId, 'trip');
+  });
+  const money = $derived(moneyOf(trip));
+  const conv = (items: Gear[]) => items.map((g) => inMain(money, g));
+  let myCurrency = $state(untrack(() => ctx.settings.get<string | null>('currency', null)));
+  const newCurrency = $derived(myCurrency ?? money.main);
+  function chooseMyCurrency(code: string) {
+    myCurrency = code;
+    ctx.settings.set('currency', code);
+  }
+  /** Currencies in use (and offered), the trip's first. */
+  const used = $derived([...new Set(all.filter((g) => g.price !== undefined).map(currencyOf))].filter((c) => c !== money.main));
+  const choices = $derived([...new Set([money.main, ...CURRENCIES, ...used])]);
+  function setTrip(patch: Partial<Pick<Trip, 'currency' | 'currencyRates'>>) {
+    if (!trip) return;
+    commands.run({ label: t('gear.currencyEdit'), changes: [edits.update<Trip>(store, trip.id, patch)], mergeKey: `trip-money:${Object.keys(patch).join(',')}` });
+  }
+  function setRate(code: string, value: number) {
+    const next = withRate(money, code, value);
+    if (Object.keys(next).length) setTrip({ currencyRates: { ...trip?.currencyRates, ...next } });
+  }
+  const shownRate = (code: string) => Math.round(rate(money, code) * 10000) / 10000;
+
   const inSection = (g: Gear) => !sectionFilter || (g.category.trim() || '') === sectionFilter;
   const shown = $derived(all.filter((g) => matches(g, filter) && inSection(g) && (status === 'all' || g.status === status)));
   const sections = $derived(bySection(shown));
   const allSections = $derived(bySection(all).map(([sec]) => sec));
-  const sum = $derived(totals(all.filter((g) => matches(g, filter) && inSection(g))));
+  const sum = $derived(totals(conv(all.filter((g) => matches(g, filter) && inSection(g)))));
   const report = $derived(
     spending(
-      all.map((g) => ({ ...g, boughtBy: norm(g.boughtBy), forId: norm(g.forId) })),
+      conv(all).map((g) => ({ ...g, boughtBy: norm(g.boughtBy), forId: norm(g.forId) })),
       people.map((p) => p.id),
     ),
   );
-  const money = $derived(report.people.filter((s) => s.shared || s.personal || Math.abs(s.balance) > 0.005));
+  const moneyRows = $derived(report.people.filter((s) => s.shared || s.personal || Math.abs(s.balance) > 0.005));
   const unassignedCost = $derived(report.unassigned.reduce((n, g) => n + totalCost(g), 0));
 
   const suggested = GEAR_CATEGORIES.map((k) => t(`gear.cat.${k}` as StringKey));
@@ -90,6 +117,7 @@
         forIds,
         weight: Number(newWeight) || undefined,
         price: Number(newPrice) || undefined,
+        currency: newCurrency,
         label: t('gear.add'),
       }),
     );
@@ -106,8 +134,8 @@
   const num = (v: string) => (v.trim() === '' ? Number.NaN : Number(v));
 
   const kg = (grams: number) => (grams >= 1000 ? `${(grams / 1000).toFixed(1)} kg` : `${Math.round(grams)} g`);
-  const price = (n: number) => `${n.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${t('gear.currency')}`;
-  const sectionTotals = (items: Gear[]) => totals(items);
+  const price = (n: number, code = money.main) => formatMoney(n, code);
+  const sectionTotals = (items: Gear[]) => totals(conv(items));
 
   // Export: what's shown with the current filters.
   const decimalComma = (1.5).toLocaleString().includes(',');
@@ -122,7 +150,8 @@
       t('gear.weightEach'),
       t('gear.weightTotal'),
       t('gear.priceEach'),
-      t('gear.priceTotal'),
+      t('gear.currencyCol'),
+      t('gear.priceTotalIn', { currency: money.main }),
       t('gear.notes'),
     ];
     const rows = shown.map((g) => [
@@ -135,11 +164,12 @@
       g.weight ?? null,
       g.weight ? g.weight * (g.qty || 1) : null,
       g.price ?? null,
-      g.price ? totalCost(g) : null,
+      g.price !== undefined ? currencyOf(g) : '',
+      g.price ? totalCost(inMain(money, g)) : null,
       g.notes ?? '',
     ]);
-    const s = totals(shown);
-    return [header, ...rows, [t('gear.total'), '', '', '', '', '', '', s.weight || null, '', s.price || null, '']];
+    const s = totals(conv(shown));
+    return [header, ...rows, [t('gear.total'), '', '', '', '', '', '', s.weight || null, '', '', s.price || null, '']];
   }
   function exportCsv() {
     const trip = store.get(ctx.tripId, 'trip')?.name || t('trip.defaultName');
@@ -245,7 +275,12 @@
           <input class="name" placeholder={t('gear.newName')} bind:value={name} aria-label={t('gear.name')} />
           <input placeholder={t('gear.category')} list="gear-categories" bind:value={category} aria-label={t('gear.category')} />
           <input class="num" type="number" min="0" step="10" placeholder={t('gear.weightEach')} bind:value={newWeight} aria-label={t('gear.weightEach')} />
-          <input class="num" type="number" min="0" step="0.01" placeholder={t('gear.priceEach')} bind:value={newPrice} aria-label={t('gear.priceEach')} />
+          <span class="money-in">
+            <input class="num" type="number" min="0" step="0.01" placeholder={t('gear.priceEach')} bind:value={newPrice} aria-label={t('gear.priceEach')} />
+            <select value={newCurrency} aria-label={t('gear.myCurrency')} title={t('gear.myCurrency')} onchange={(e) => chooseMyCurrency(e.currentTarget.value)}>
+              {#each choices as c (c)}<option value={c}>{c}</option>{/each}
+            </select>
+          </span>
           <select bind:value={forWhom} aria-label={t('gear.for')}>
             <option value="shared">{t('gear.forShared')}</option>
             {#if people.length > 1}<option value="everyone">{t('gear.forEveryone')}</option>{/if}
@@ -323,7 +358,21 @@
                 </span>
                 <input class="qty" type="number" min="1" step="1" value={g.qty} disabled={readOnly} aria-label={t('gear.qty')} onchange={(e) => set(g, { qty: Math.max(1, Math.round(num(e.currentTarget.value)) || 1) })} />
                 <input class="weight" type="number" min="0" step="10" value={g.weight ?? ''} placeholder="g" disabled={readOnly} aria-label={t('gear.weight')} onchange={(e) => set(g, { weight: num(e.currentTarget.value) })} />
-                <input class="price" type="number" min="0" step="0.01" value={g.price ?? ''} placeholder={t('gear.currency')} title={g.qty > 1 && g.price ? t('gear.lineTotal', { qty: g.qty, amount: price(totalCost(g)) }) : undefined} disabled={readOnly} aria-label={t('gear.price')} onchange={(e) => set(g, { price: num(e.currentTarget.value) })} />
+                <span class="price money-in">
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={g.price ?? ''}
+                    title={g.qty > 1 && g.price ? t('gear.lineTotal', { qty: g.qty, amount: price(totalCost(g), currencyOf(g)) }) : undefined}
+                    disabled={readOnly}
+                    aria-label={t('gear.price')}
+                    onchange={(e) => set(g, { price: num(e.currentTarget.value), ...(g.currency ? {} : { currency: currencyOf(g) }) })}
+                  />
+                  <select value={currencyOf(g)} disabled={readOnly} aria-label={t('gear.itemCurrency')} onchange={(e) => set(g, { currency: e.currentTarget.value })}>
+                    {#each choices.includes(currencyOf(g)) ? choices : [...choices, currencyOf(g)] as c (c)}<option value={c}>{c}</option>{/each}
+                  </select>
+                </span>
                 <span class="notes">
                   <input value={g.notes ?? ''} placeholder={t('gear.notes')} disabled={readOnly} aria-label={t('gear.notes')} onchange={(e) => set(g, { notes: e.currentTarget.value.trim() })} />
                   <input class="cat" value={g.category} list="gear-categories" disabled={readOnly} aria-label={t('gear.category')} title={t('gear.category')} onchange={(e) => set(g, { category: e.currentTarget.value.trim() })} />
@@ -336,9 +385,28 @@
       {/each}
     </main>
 
-    {#if money.length || report.unassigned.length}
+    {#if moneyRows.length || report.unassigned.length || all.some((g) => g.price !== undefined)}
       <aside>
         <h2>{t('gear.money')}</h2>
+        <label class="main-currency">
+          <span>{t('gear.totalsIn')}</span>
+          <select value={money.main} disabled={readOnly} onchange={(e) => setTrip({ currency: e.currentTarget.value })}>
+            {#each choices as c (c)}<option value={c}>{c}</option>{/each}
+          </select>
+        </label>
+        {#if used.length}
+          <div class="rates">
+            <span class="muted">{t('gear.rates')}</span>
+            {#each used as c (c)}
+              <label class="rate" class:unknown={unknownRate(money, c)}>
+                <span>1 {c} =</span>
+                <input type="number" min="0" step="0.0001" value={unknownRate(money, c) ? '' : shownRate(c)} disabled={readOnly} onchange={(e) => setRate(c, Number(e.currentTarget.value))} />
+                <span>{money.main}</span>
+              </label>
+            {/each}
+            <p class="muted small">{t('gear.ratesHint')}</p>
+          </div>
+        {/if}
         <p class="muted">{t('gear.moneyHint')}</p>
         {#if report.unassigned.length}
           <p class="warn-box">
@@ -346,7 +414,7 @@
           </p>
         {/if}
         <ul class="money">
-          {#each money as s (s.userId)}
+          {#each moneyRows as s (s.userId)}
             {@const p = personOf(s.userId)}
             <li>
               <span class="dot" style:background={p?.color ?? 'var(--fg-muted)'}></span>
@@ -561,7 +629,7 @@
   .cols,
   .row {
     display: grid;
-    grid-template-columns: 16px 76px minmax(110px, 2fr) minmax(90px, 1fr) minmax(90px, 1fr) 52px 100px 84px minmax(100px, 1.5fr) 28px;
+    grid-template-columns: 16px 76px minmax(110px, 2fr) minmax(90px, 1fr) minmax(90px, 1fr) 52px 100px 132px minmax(100px, 1.5fr) 28px;
     align-items: center;
     gap: 6px;
   }
@@ -629,6 +697,73 @@
 
   .export button:hover {
     background: var(--bg-hover);
+  }
+
+  .money-in {
+    display: flex;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .money-in input {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .money-in select {
+    flex: none;
+    width: 62px;
+    padding-inline: 2px;
+    font-size: 12px;
+  }
+
+  .add .money-in {
+    flex: 0 1 180px;
+  }
+
+  .main-currency {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 6px 0;
+    font-size: 12px;
+    color: var(--fg);
+  }
+
+  .main-currency span {
+    white-space: nowrap;
+  }
+
+  .main-currency select {
+    flex: none;
+    width: auto;
+  }
+
+  .rates {
+    display: grid;
+    gap: 4px;
+    margin: 6px 0 10px;
+  }
+
+  .rate {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--fg);
+  }
+
+  .rate input {
+    width: 90px;
+  }
+
+  .rate.unknown input {
+    border-color: var(--warn);
+  }
+
+  .small {
+    margin: 0;
+    font-size: 11px;
   }
 
   .warn-box {

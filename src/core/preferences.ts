@@ -18,6 +18,10 @@ export interface Preferences {
   bikeProfile: string | null;
   /** Opens "What's new" after an update. */
   whatsNew: boolean;
+  /** Tighter rows in the side panel. */
+  compactPanel: boolean;
+  /** A notice after each change, with a button to undo it. */
+  undoNotices: boolean;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
@@ -28,6 +32,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
   routeWidth: 1,
   bikeProfile: null,
   whatsNew: true,
+  compactPanel: false,
+  undoNotices: true,
 };
 
 /** Zoom level from which place names show when `placeNames` is 'zoomed'. */

@@ -183,7 +183,7 @@ export default defineModule({
           name: p.name,
           selected: sel.has(p.id) || sel.has(category),
           crowned: approvals(votes.get(p.id) ?? []) >= CROWN_APPROVALS,
-          ...(authors ? { author: authorOf(ctx.cloud, t, p.createdBy).color } : {}),
+          ...(authors ? { author: authorOf(ctx.cloud, t, p.createdBy, p.suggestedBy).color } : {}),
         },
         geometry: { type: 'Point', coordinates: dragging?.id === p.id ? dragging.lngLat : p.lngLat },
         });

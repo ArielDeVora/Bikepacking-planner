@@ -24,7 +24,7 @@
   const members = $derived(ctx.cloud.members);
   const author = $derived.by(() => {
     void $members;
-    return poi ? authorOf(ctx.cloud, t, poi.createdBy) : null;
+    return poi ? authorOf(ctx.cloud, t, poi.createdBy, poi.suggestedBy) : null;
   });
 
   // Categories: built-in ones, then the custom ones; "+" makes a new one (and opens its card).

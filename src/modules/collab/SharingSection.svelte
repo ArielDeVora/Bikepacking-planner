@@ -2,8 +2,12 @@
   import type { ModuleContext } from '../../core/module';
   import type { Trip } from '../../model/types';
   import FollowLinks from './FollowLinks.svelte';
+  import type { Readable } from 'svelte/store';
+  import type { Award } from './badges';
+  import BadgeLegend from './BadgeLegend.svelte';
+  import MemberBadges from './MemberBadges.svelte';
 
-  let { ctx }: { ctx: ModuleContext } = $props();
+  let { ctx, badges }: { ctx: ModuleContext; badges: Readable<Map<string, Award[]>> } = $props();
   const { t, cloud, trips: tripManager, ui } = $derived(ctx);
   const status = $derived(ctx.cloud.status);
   const account = $derived(ctx.cloud.account);
@@ -168,15 +172,17 @@
         <li>
           <span class="dot" style:background={m.color}></span>
           <span class="label">{m.name || t('collab.someone')}{cloud.isMine(m.id) ? ` (${t('collab.you')})` : ''}</span>
+          <MemberBadges {badges} id={m.id} {t} />
           {#if m.role === 'owner'}<span class="tag">{t('collab.owner')}</span>{/if}
           {#if $online.includes(m.id)}<span class="online" title={t('collab.online')}></span>{/if}
         </li>
       {/each}
     </ul>
+    <BadgeLegend {badges} members={$members} {t} isMine={cloud.isMine} />
     {#if $role === 'owner'}
       <button type="button" class="btn" onclick={invite}>{t('collab.invite')}</button>
-      <FollowLinks {ctx} />
     {/if}
+    <FollowLinks {ctx} />
   {:else}
     <p class="muted small">{t('collab.shareHint')}</p>
     <button type="button" class="btn primary" disabled={busy} onclick={share}>{t('collab.shareTrip')}</button>

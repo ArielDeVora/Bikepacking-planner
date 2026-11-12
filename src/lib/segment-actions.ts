@@ -29,7 +29,10 @@ export function fuseAction(ctx: ModuleContext, segments: Segment[], keepId?: str
 export function arrangeAction(ctx: ModuleContext, segments: Segment[]): void {
   const { t } = ctx;
   const res = arrangeCommand(ctx.store, segments, t('cmd.arrange'));
-  if (!res) return ctx.ui.notify(t('arrange.none'));
+  if (!res) {
+    ctx.ui.notify(t('arrange.none'));
+    return;
+  }
   ctx.commands.run(res.command);
   ctx.ui.notify(t('arrange.done', { moved: res.moved, reversed: res.reversed }));
 }

@@ -141,6 +141,10 @@
   <section>
     <h3>{t('settings.updates')}</h3>
     <label class="row check">
+      <input type="checkbox" checked={$prefs.undoNotices} onchange={(e) => set('undoNotices', e.currentTarget.checked)} />
+      <span>{t('settings.undoNotices')}</span>
+    </label>
+    <label class="row check">
       <input type="checkbox" checked={$prefs.whatsNew} onchange={(e) => set('whatsNew', e.currentTarget.checked)} />
       <span>{t('settings.whatsNew')}</span>
     </label>

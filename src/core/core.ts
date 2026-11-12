@@ -1,7 +1,8 @@
 import { KEYS } from '../config/shortcuts';
+import { BASE_STYLE_URLS } from '../config/basemap';
 import { Map as MapLibreMap, NavigationControl, ScaleControl, setWorkerUrl } from 'maplibre-gl';
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
-import { writable, type Readable } from 'svelte/store';
+import { get, writable, type Readable } from 'svelte/store';
 import { newId } from '../model/ids';
 import { editedBy } from '../model/edited';
 import { STAGE_COLORS } from '../config/modes';
@@ -10,7 +11,7 @@ import { isPhone } from '../lib/ui/phone';
 import type { Entity, Stage, Trip } from '../model/types';
 import { EventBus, type Events } from './bus';
 import { createCloud } from './cloud/cloud';
-import { createFollower, followToken } from './cloud/follow';
+import { createFollower, followToken, saveFollower } from './cloud/follow';
 import { createPreferences } from './preferences';
 import { syncTabs } from './tabs';
 import { CommandStack } from './commands';
@@ -18,7 +19,7 @@ import { HistoryLog } from './history/log';
 import { HistoryRecorder } from './history/recorder';
 import { t } from './i18n';
 import { LayerManager } from './layers';
-import type { ModuleContext, ModuleLoader } from './module';
+import type { FollowAccess, ModuleContext, ModuleLoader } from './module';
 import { listTrips, loadTripEntities, openDb, putEntities } from './persistence/idb';
 import { attachDebouncedSave } from './persistence/local';
 import { Selection } from './selection';
@@ -29,7 +30,7 @@ import { createTheme } from './theme';
 import { UiRegistry } from './ui';
 import { Visibility } from './visibility';
 
-export const BASE_STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
+
 
 export type CoreStatus = 'loading' | 'ready' | 'error';
 
@@ -54,11 +55,13 @@ export function createCore(container: HTMLElement) {
   /** The signed-in account's id, or a per-browser id when signed out. */
   const user = { id: localUserId };
 
+  const theme = createTheme(settings);
+
   setWorkerUrl(maplibreWorkerUrl);
   const view = mapSettings.get<MapView>('view', { center: [60, 42], zoom: 2.5 });
   const map = new MapLibreMap({
     container,
-    style: BASE_STYLE_URL,
+    style: BASE_STYLE_URLS[get(theme)],
     center: view.center,
     zoom: view.zoom,
     attributionControl: { compact: true },
@@ -130,7 +133,6 @@ export function createCore(container: HTMLElement) {
   ui.readOnly = !!follow;
   if (follow) commands.locked = () => ui.notify(t('follow.readOnly'), 'info', 4000);
   const shortcuts = new ShortcutManager();
-  const theme = createTheme(settings);
   const prefs = createPreferences(createSettings('prefs'));
   const visibility = new Visibility(settings, () => tripId);
 
@@ -234,9 +236,10 @@ export function createCore(container: HTMLElement) {
   }
 
   /** Loads the trip behind a follow link, then checks for changes every few minutes while visible. */
+  let followAccess: FollowAccess | null = null;
   async function loadFollowedTrip(token: string): Promise<void> {
     const follower = await createFollower(token);
-    const [entities, people] = await Promise.all([follower.pull(), follower.members()]);
+    const [entities, people, canSuggest] = await Promise.all([follower.pull(), follower.members(), follower.canSuggest()]);
     const trip = entities.find((e) => e.type === 'trip' && !e.deleted);
     if (!trip) throw new Error(t('follow.notFound'));
     tripId = trip.id;
@@ -256,6 +259,16 @@ export function createCore(container: HTMLElement) {
     };
     setInterval(() => void refresh(), FOLLOW_REFRESH_MS);
     document.addEventListener('visibilitychange', () => void refresh());
+    followAccess = {
+      canSuggest,
+      async suggest(place, followerName) {
+        const id = newId();
+        await follower.suggest({ ...place, id }, saveFollower(followerName));
+        const changed = await follower.pull();
+        if (changed.length) store.apply(changed, 'remote');
+        return id;
+      },
+    };
   }
 
   async function start(modules: ModuleLoader[]): Promise<void> {
@@ -283,12 +296,14 @@ export function createCore(container: HTMLElement) {
           visibility,
           history,
           prefs,
+          theme,
           t,
           settings: createSettings(mod.id),
           get tripId() {
             return tripId;
           },
           readOnly: !!follow,
+          follow: followAccess,
         };
         try {
           await mod.setup(ctx);

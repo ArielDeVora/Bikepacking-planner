@@ -68,6 +68,13 @@
         <li><span class="dot" style:background={who.color}></span><strong>{who.name}</strong> <span class="muted">{counts(p)}</span></li>
       {/each}
     </ul>
+    {#if data.suggestions.length}
+      <ul class="people">
+        {#each data.suggestions as s (s.name)}
+          <li><span class="dot follower"></span><strong>{s.name || t('follow.aFollower')}</strong> <span class="muted">{t('since.suggested', { n: s.count })}</span></li>
+        {/each}
+      </ul>
+    {/if}
     <footer>
       {#if data.latest}
         <button type="button" class="link" onclick={() => show(data.latest!.id)}>{t('since.latest')}</button>
@@ -127,6 +134,10 @@
 
   .muted {
     color: var(--fg-muted);
+  }
+
+  .dot.follower {
+    background: #ae3ec9;
   }
 
   .mentions {

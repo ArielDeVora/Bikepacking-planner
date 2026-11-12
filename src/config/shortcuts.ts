@@ -15,6 +15,7 @@ export const KEYS = {
   history: 'mod+shift+h',
   importFiles: 'mod+i',
   search: 'mod+k',
+  panelSearch: 'mod+shift+f',
   help: 'mod+/',
   settings: 'mod+,',
   split: 'mod+s',

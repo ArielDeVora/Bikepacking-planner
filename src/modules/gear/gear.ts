@@ -46,7 +46,7 @@ export function bySection(items: Gear[]): [string, Gear[]][] {
  */
 export function addGearCommand(
   store: TripStore,
-  opts: { tripId: string; name: string; category: string; forIds: (string | null)[]; weight?: number; price?: number; label: string },
+  opts: { tripId: string; name: string; category: string; forIds: (string | null)[]; weight?: number; price?: number; currency?: string; label: string },
 ): Command {
   let order = Math.max(0, ...store.list('gear').map((g) => g.order)) + 1;
   const changes = opts.forIds.map((forId) =>
@@ -61,13 +61,14 @@ export function addGearCommand(
       qty: 1,
       ...(opts.weight && opts.weight > 0 ? { weight: opts.weight } : {}),
       ...(opts.price && opts.price > 0 ? { price: opts.price } : {}),
+      ...(opts.currency ? { currency: opts.currency } : {}),
       order: order++,
     }),
   );
   return { label: opts.label, changes };
 }
 
-export type GearPatch = Partial<Pick<Gear, 'name' | 'category' | 'forId' | 'status' | 'boughtBy' | 'qty' | 'weight' | 'price' | 'notes'>>;
+export type GearPatch = Partial<Pick<Gear, 'name' | 'category' | 'forId' | 'status' | 'boughtBy' | 'qty' | 'weight' | 'price' | 'currency' | 'notes'>>;
 
 /** Changes an item. Marking it bought or packed without a buyer makes `me` the buyer. */
 export function setGearCommand(store: TripStore, id: string, patch: GearPatch, me: string, label: string): Command | null {

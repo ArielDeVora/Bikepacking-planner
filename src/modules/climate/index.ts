@@ -43,6 +43,10 @@ export default defineModule({
         map.addLayer({ id, type: 'raster', source: id, paint: { 'raster-opacity': 0.65, 'raster-resampling': 'linear', 'raster-fade-duration': 0 } }, below());
       }
     }
+    // A new base style (theme change) puts its labels back under the overlays: move them below.
+    const offBase = ctx.bus.on('map:baseStyle', () => {
+      for (const kind of ['temp', 'rain'] as const) if (map.getLayer(OVERLAYS[kind])) map.moveLayer(OVERLAYS[kind], below());
+    });
     // Image sources can't carry an attribution: an empty source shown with the overlays does.
     layers.addSource(CREDIT, { type: 'geojson', data: { type: 'FeatureCollection', features: [] }, attribution: ATTRIBUTION });
     for (const kind of ['temp', 'rain'] as const) layers.addLayer({ id: `${OVERLAYS[kind]}-credit`, type: 'line', source: CREDIT }, 'overlay');
@@ -153,6 +157,7 @@ export default defineModule({
       if (lastUrl) URL.revokeObjectURL(lastUrl);
       map.off('click', onClick);
       removers.forEach((off) => off());
+      offBase();
     };
   },
 });

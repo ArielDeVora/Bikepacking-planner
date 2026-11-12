@@ -15,6 +15,8 @@ export interface BaseEntity {
    */
   editedAt?: number;
   editedBy?: string;
+  /** Who made it (recorded for items made since this was kept; places always had it). */
+  createdBy?: string;
 }
 
 export interface Trip extends BaseEntity {
@@ -22,6 +24,10 @@ export interface Trip extends BaseEntity {
   name: string;
   ownerId: string;
   startDate?: string;
+  /** Currency of the gear list's totals and cost split (ISO code); EUR when not set. */
+  currency?: string;
+  /** Value of one unit of each currency in euros, where the trip sets its own rate. */
+  currencyRates?: Record<string, number>;
   /** Built-in place categories this trip doesn't use, each replaced by one of its own (custom) categories. */
   categoryReplacements?: Record<string, string>;
   /** Display order of the place categories (ids); unlisted ones follow in their default order. */
@@ -171,6 +177,9 @@ export interface Poi extends BaseEntity {
   links: string[];
   status: PoiStatus;
   createdBy: string;
+  /** Suggested through a follow link: the follower's name, and their browser's id. */
+  suggestedBy?: string;
+  followerId?: string;
   osm?: OsmRef;
   /** Older data: the folder it was put in, turned into its category when loaded. */
   folderId?: string;
@@ -230,6 +239,8 @@ export interface PoiFolder extends BaseEntity {
   /** Key in `POI_ICONS`, chosen by whoever made it. */
   icon?: string;
   createdBy?: string;
+  /** The category of one follower's suggested places. */
+  followerId?: string;
 }
 
 export interface Zone extends BaseEntity {
@@ -286,6 +297,8 @@ export interface Gear extends BaseEntity {
   weight?: number;
   /** Price for one. */
   price?: number;
+  /** Currency of the price (ISO code); EUR when not set. */
+  currency?: string;
   notes?: string;
   order: number;
 }

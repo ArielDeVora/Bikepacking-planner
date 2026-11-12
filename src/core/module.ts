@@ -14,6 +14,8 @@ import type { ShortcutManager } from './shortcuts';
 import type { TripStore } from './store';
 import type { UiRegistry } from './ui';
 import type { Visibility } from './visibility';
+import type { Readable } from 'svelte/store';
+import type { Theme } from './theme';
 
 export interface ModuleContext {
   readonly map: MapLibreMap;
@@ -28,6 +30,8 @@ export interface ModuleContext {
   readonly settings: Settings;
   /** App-wide preferences (the Settings window). */
   readonly prefs: PreferenceStore;
+  /** The light or dark theme in use. */
+  readonly theme: Readable<Theme>;
   readonly user: { id: string };
   /** Sign-in, sharing and sync. */
   readonly cloud: Cloud;
@@ -39,7 +43,15 @@ export interface ModuleContext {
   readonly tripId: string;
   /** Someone else's trip seen through a follow link: nothing can be changed. */
   readonly readOnly: boolean;
+  /** In a follow link that allows it: suggesting places (the only change a follower can make). */
+  readonly follow: FollowAccess | null;
   readonly t: typeof t;
+}
+
+export interface FollowAccess {
+  canSuggest: boolean;
+  /** Adds a place in the follower's own category, then fetches the trip's changes. */
+  suggest(place: { name: string; lngLat: [number, number]; notes?: string }, followerName: string): Promise<string>;
 }
 
 export interface TripManager {

@@ -1,7 +1,11 @@
 <script lang="ts">
   import type { ModuleContext } from '../../core/module';
+  import type { Readable } from 'svelte/store';
+  import type { Award } from './badges';
+  import BadgeLegend from './BadgeLegend.svelte';
+  import MemberBadges from './MemberBadges.svelte';
 
-  let { ctx }: { ctx: ModuleContext } = $props();
+  let { ctx, badges }: { ctx: ModuleContext; badges: Readable<Map<string, Award[]>> } = $props();
   const { t } = $derived(ctx);
   const members = $derived(ctx.cloud.members);
   const store = $derived(ctx.store);
@@ -18,9 +22,10 @@
   <div class="muted small head">{t('collab.members')}</div>
   <ul>
     {#each $members as m (m.id)}
-      <li class="small"><span class="dot" style:background={m.color}></span>{m.name || t('collab.someone')}</li>
+      <li class="small"><span class="dot" style:background={m.color}></span>{m.name || t('collab.someone')} <MemberBadges {badges} id={m.id} {t} /></li>
     {/each}
   </ul>
+  <BadgeLegend {badges} members={$members} {t} isMine={() => false} />
 {/if}
 <a class="small" href={ownApp}>{t('follow.openOwn')}</a>
 

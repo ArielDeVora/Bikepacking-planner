@@ -139,7 +139,10 @@ export class CommandStack {
     const by = this.userId();
     this.store.apply(
       entities.map((e) => {
-        if (byHand) return { ...e, updatedAt: now, updatedBy: by, editedAt: now, editedBy: by };
+        if (byHand) {
+          const made = !e.createdBy && !this.store.getRaw(e.id) ? { createdBy: by } : {};
+          return { ...e, ...made, updatedAt: now, updatedBy: by, editedAt: now, editedBy: by };
+        }
         const previous = this.store.getRaw(e.id);
         const editor = previous ? { editedAt: editedAt(previous), editedBy: editedBy(previous) } : { editedAt: now, editedBy: by };
         return { ...e, ...editor, updatedAt: now, updatedBy: by };
