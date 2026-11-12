@@ -278,7 +278,7 @@ export interface Gear extends BaseEntity {
   qty: number;
   /** Grams, for one. */
   weight?: number;
-  /** Price paid for all of them. */
+  /** Price for one. */
   price?: number;
   notes?: string;
   order: number;

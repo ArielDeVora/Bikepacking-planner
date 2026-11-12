@@ -7,6 +7,7 @@
   import Icon from '../../lib/ui/Icon.svelte';
   import IconButton from '../../lib/ui/IconButton.svelte';
   import type { Gear, GearStatus } from '../../model/types';
+  import { download, safeFileName } from '../io/gpx';
   import {
     addGearCommand,
     bySection,
@@ -14,9 +15,12 @@
     GEAR_STATUSES,
     gearList,
     matches,
+    moveGearCommand,
     nextStatus,
     setGearCommand,
     spending,
+    totalCost,
+    toTable,
     totals,
     type GearFilter,
     type GearPatch,
@@ -33,11 +37,14 @@
     return list.length ? list : [{ id: ctx.user.id, name: t('collab.you'), color: 'var(--accent)' }];
   });
   const me = $derived(people.find((p) => cloud.isMine(p.id))?.id ?? ctx.user.id);
-  const personOf = (id: string | undefined) => (id ? people.find((p) => p.id === id) : undefined);
+  /** My ids (this browser's and my account's) all mean me. */
+  const norm = (id: string | undefined) => (id && cloud.isMine(id) ? me : id);
+  const personOf = (id: string | undefined) => (id ? people.find((p) => p.id === norm(id)) : undefined);
 
   // Filters, remembered in this browser.
   let who = $state(untrack(() => ctx.settings.get<string>('who', 'all')));
   let status = $state(untrack(() => ctx.settings.get<GearStatus | 'all'>('status', 'all')));
+  let sectionFilter = $state('');
   const filter = $derived<GearFilter>(who === 'all' ? { kind: 'all' } : who === 'shared' ? { kind: 'shared' } : { kind: 'person', id: who });
   $effect(() => {
     ctx.settings.set('who', who);
@@ -48,10 +55,19 @@
     void $store;
     return gearList(store);
   });
-  const shown = $derived(all.filter((g) => matches(g, filter) && (status === 'all' || g.status === status)));
+  const inSection = (g: Gear) => !sectionFilter || (g.category.trim() || '') === sectionFilter;
+  const shown = $derived(all.filter((g) => matches(g, filter) && inSection(g) && (status === 'all' || g.status === status)));
   const sections = $derived(bySection(shown));
-  const sum = $derived(totals(all.filter((g) => matches(g, filter))));
-  const money = $derived(spending(all, people.map((p) => p.id)).filter((s) => s.shared || s.personal || Math.abs(s.balance) > 0.005));
+  const allSections = $derived(bySection(all).map(([sec]) => sec));
+  const sum = $derived(totals(all.filter((g) => matches(g, filter) && inSection(g))));
+  const report = $derived(
+    spending(
+      all.map((g) => ({ ...g, boughtBy: norm(g.boughtBy), forId: norm(g.forId) })),
+      people.map((p) => p.id),
+    ),
+  );
+  const money = $derived(report.people.filter((s) => s.shared || s.personal || Math.abs(s.balance) > 0.005));
+  const unassignedCost = $derived(report.unassigned.reduce((n, g) => n + totalCost(g), 0));
 
   const suggested = GEAR_CATEGORIES.map((k) => t(`gear.cat.${k}` as StringKey));
   const categories = $derived([...new Set([...all.map((g) => g.category).filter(Boolean), ...suggested])]);
@@ -60,12 +76,26 @@
   let name = $state('');
   let category = $state('');
   let forWhom = $state('shared');
+  let newWeight = $state('');
+  let newPrice = $state('');
   function add(e: Event) {
     e.preventDefault();
     if (!name.trim()) return;
     const forIds = forWhom === 'shared' ? [null] : forWhom === 'everyone' ? people.map((p) => p.id) : [forWhom];
-    commands.run(addGearCommand(store, { tripId: ctx.tripId, name, category: category || t('gear.cat.other'), forIds, label: t('gear.add') }));
+    commands.run(
+      addGearCommand(store, {
+        tripId: ctx.tripId,
+        name,
+        category: category || t('gear.cat.other'),
+        forIds,
+        weight: Number(newWeight) || undefined,
+        price: Number(newPrice) || undefined,
+        label: t('gear.add'),
+      }),
+    );
     name = '';
+    newWeight = '';
+    newPrice = '';
   }
 
   function set(g: Gear, patch: GearPatch) {
@@ -77,7 +107,92 @@
 
   const kg = (grams: number) => (grams >= 1000 ? `${(grams / 1000).toFixed(1)} kg` : `${Math.round(grams)} g`);
   const price = (n: number) => `${n.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${t('gear.currency')}`;
-  const sectionWeight = (items: Gear[]) => totals(items).weight;
+  const sectionTotals = (items: Gear[]) => totals(items);
+
+  // Export: what's shown with the current filters.
+  const decimalComma = (1.5).toLocaleString().includes(',');
+  function tableRows() {
+    const header = [
+      t('gear.category'),
+      t('gear.name'),
+      t('gear.for'),
+      t('gear.status'),
+      t('gear.boughtBy'),
+      t('gear.qty'),
+      t('gear.weightEach'),
+      t('gear.weightTotal'),
+      t('gear.priceEach'),
+      t('gear.priceTotal'),
+      t('gear.notes'),
+    ];
+    const rows = shown.map((g) => [
+      g.category || t('gear.cat.other'),
+      g.name,
+      personOf(g.forId)?.name ?? (g.forId ? t('collab.someone') : t('gear.forShared')),
+      t(`gear.status.${g.status}` as StringKey),
+      personOf(g.boughtBy)?.name ?? '',
+      g.qty,
+      g.weight ?? null,
+      g.weight ? g.weight * (g.qty || 1) : null,
+      g.price ?? null,
+      g.price ? totalCost(g) : null,
+      g.notes ?? '',
+    ]);
+    const s = totals(shown);
+    return [header, ...rows, [t('gear.total'), '', '', '', '', '', '', s.weight || null, '', s.price || null, '']];
+  }
+  function exportCsv() {
+    const trip = store.get(ctx.tripId, 'trip')?.name || t('trip.defaultName');
+    download(safeFileName(`${trip} - ${t('gear.title')}`, 'csv'), `\uFEFF${toTable(tableRows(), 'csv', decimalComma)}`, 'text/csv;charset=utf-8');
+  }
+  async function copyTable() {
+    const text = toTable(tableRows(), 'tsv', decimalComma);
+    try {
+      await navigator.clipboard.writeText(text);
+      ctx.ui.notify(t('gear.copied', { n: shown.length }));
+    } catch {
+      window.prompt(t('gear.copy'), text);
+    }
+  }
+
+  // Dragging an item by its handle: before or after another item (a line shows where), or onto a
+  // section's title (to the end of it). It takes the section it's dropped in.
+  let armed = $state<string | null>(null);
+  let dragging = $state<string | null>(null);
+  let dropAt = $state<{ id: string; where: 'before' | 'after' } | { section: string } | null>(null);
+  function dragStart(e: DragEvent, g: Gear) {
+    dragging = g.id;
+    e.dataTransfer?.setData('text/plain', g.name);
+    if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+  }
+  function overItem(e: DragEvent, g: Gear) {
+    if (!dragging || dragging === g.id) return;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    dropAt = { id: g.id, where: e.clientY - r.top < r.height / 2 ? 'before' : 'after' };
+  }
+  function overSection(e: DragEvent, section: string) {
+    if (!dragging) return;
+    e.preventDefault();
+    dropAt = { section };
+  }
+  function drop(e: DragEvent) {
+    e.preventDefault();
+    const id = dragging;
+    const to = dropAt;
+    endDrag();
+    if (!id || !to) return;
+    const g = store.get(id, 'gear');
+    const cmd = moveGearCommand(store, id, 'section' in to ? { section: to.section || t('gear.cat.other') } : to, t('gear.move', { name: g?.name ?? '' }));
+    if (cmd) commands.run(cmd);
+  }
+  function endDrag() {
+    armed = null;
+    dragging = null;
+    dropAt = null;
+  }
+  const dropClass = (g: Gear) => (dropAt && 'id' in dropAt && dropAt.id === g.id ? `drop-${dropAt.where}` : '');
 </script>
 
 <div class="gear">
@@ -100,10 +215,26 @@
         </button>
       {/each}
     </div>
+    {#if allSections.length > 1}
+      <label>
+        <span>{t('gear.category')}</span>
+        <select bind:value={sectionFilter}>
+          <option value="">{t('gear.allSections')}</option>
+          {#each allSections as sec (sec)}<option value={sec}>{sec || t('gear.cat.other')}</option>{/each}
+        </select>
+      </label>
+    {/if}
     <span class="spacer"></span>
+    {#if shown.length}
+      <div class="export">
+        <button type="button" onclick={exportCsv} title={t('gear.exportHint')}><Icon d={icons.download} size={14} /> {t('gear.export')}</button>
+        <button type="button" onclick={copyTable} title={t('gear.copyHint')}><Icon d={icons.copy} size={14} /> {t('gear.copy')}</button>
+      </div>
+    {/if}
     <div class="sum">
       {#if sum.weight}<span>{kg(sum.weight)}</span>{/if}
-      {#if sum.price}<span>{price(sum.price)}</span>{/if}
+      {#if sum.price}<span title={t('gear.totalHint')}>{price(sum.price)}</span>{/if}
+      {#if sum.price - sum.spent > 0.005}<span class="muted" title={t('gear.spent', { amount: price(sum.spent) })}>{t('gear.toBuyTotal', { amount: price(sum.price - sum.spent) })}</span>{/if}
     </div>
   </header>
 
@@ -113,6 +244,8 @@
         <form class="add" onsubmit={add}>
           <input class="name" placeholder={t('gear.newName')} bind:value={name} aria-label={t('gear.name')} />
           <input placeholder={t('gear.category')} list="gear-categories" bind:value={category} aria-label={t('gear.category')} />
+          <input class="num" type="number" min="0" step="10" placeholder={t('gear.weightEach')} bind:value={newWeight} aria-label={t('gear.weightEach')} />
+          <input class="num" type="number" min="0" step="0.01" placeholder={t('gear.priceEach')} bind:value={newPrice} aria-label={t('gear.priceEach')} />
           <select bind:value={forWhom} aria-label={t('gear.for')}>
             <option value="shared">{t('gear.forShared')}</option>
             {#if people.length > 1}<option value="everyone">{t('gear.forEveryone')}</option>{/if}
@@ -132,18 +265,38 @@
       {/if}
 
       {#each sections as [section, items] (section)}
-        {@const w = sectionWeight(items)}
+        {@const st = sectionTotals(items)}
         <section>
-          <h2>{section || t('gear.cat.other')} <span class="muted">{items.length}{w ? ` · ${kg(w)}` : ''}</span></h2>
+          <h2 class:drop-into={dropAt && 'section' in dropAt && dropAt.section === section} ondragover={(e) => overSection(e, section)} ondrop={drop}>
+            {section || t('gear.cat.other')} <span class="muted">{items.length}{st.weight ? ` · ${kg(st.weight)}` : ''}{st.price ? ` · ${price(st.price)}` : ''}</span></h2>
           <div class="cols" aria-hidden="true">
-            <span>{t('gear.status')}</span><span>{t('gear.name')}</span><span>{t('gear.for')}</span><span>{t('gear.boughtBy')}</span>
+            <span></span><span>{t('gear.status')}</span><span>{t('gear.name')}</span><span>{t('gear.for')}</span><span>{t('gear.boughtBy')}</span>
             <span>{t('gear.qty')}</span><span>{t('gear.weight')}</span><span>{t('gear.price')}</span><span>{t('gear.notes')}</span><span></span>
           </div>
           <ul>
             {#each items as g (g.id)}
               {@const owner = personOf(g.forId)}
               {@const buyer = personOf(g.boughtBy)}
-              <li class="row" class:done={g.status === 'packed'}>
+              <li
+                class="row {dropClass(g)}"
+                class:done={g.status === 'packed'}
+                class:dragged={dragging === g.id}
+                draggable={armed === g.id}
+                ondragstart={(e) => dragStart(e, g)}
+                ondragover={(e) => overItem(e, g)}
+                ondrop={drop}
+                ondragend={endDrag}
+              >
+                <span
+                  class="grip"
+                  class:off={readOnly}
+                  role="presentation"
+                  title={readOnly ? undefined : t('gear.dragHint')}
+                  onpointerdown={() => !readOnly && (armed = g.id)}
+                  onpointerup={() => !dragging && (armed = null)}
+                >
+                  <Icon d={icons.grip} size={14} />
+                </span>
                 <button
                   type="button"
                   class="status s-{g.status}"
@@ -156,21 +309,21 @@
                 <input class="name" value={g.name} disabled={readOnly} aria-label={t('gear.name')} onchange={(e) => e.currentTarget.value.trim() && set(g, { name: e.currentTarget.value.trim() })} />
                 <span class="who for">
                   {#if owner}<span class="dot" style:background={owner.color}></span>{/if}
-                  <select value={g.forId ?? ''} disabled={readOnly} aria-label={t('gear.for')} onchange={(e) => set(g, { forId: e.currentTarget.value })}>
+                  <select value={norm(g.forId) ?? ''} disabled={readOnly} aria-label={t('gear.for')} onchange={(e) => set(g, { forId: e.currentTarget.value })}>
                     <option value="">{t('gear.forShared')}</option>
                     {#each people as p (p.id)}<option value={p.id}>{p.name}</option>{/each}
                   </select>
                 </span>
                 <span class="who buyer">
                   {#if buyer}<span class="dot" style:background={buyer.color}></span>{/if}
-                  <select value={g.boughtBy ?? ''} disabled={readOnly} aria-label={t('gear.boughtBy')} onchange={(e) => set(g, { boughtBy: e.currentTarget.value })}>
+                  <select value={norm(g.boughtBy) ?? ''} disabled={readOnly} aria-label={t('gear.boughtBy')} onchange={(e) => set(g, { boughtBy: e.currentTarget.value })}>
                     <option value="">—</option>
                     {#each people as p (p.id)}<option value={p.id}>{p.name}</option>{/each}
                   </select>
                 </span>
                 <input class="qty" type="number" min="1" step="1" value={g.qty} disabled={readOnly} aria-label={t('gear.qty')} onchange={(e) => set(g, { qty: Math.max(1, Math.round(num(e.currentTarget.value)) || 1) })} />
                 <input class="weight" type="number" min="0" step="10" value={g.weight ?? ''} placeholder="g" disabled={readOnly} aria-label={t('gear.weight')} onchange={(e) => set(g, { weight: num(e.currentTarget.value) })} />
-                <input class="price" type="number" min="0" step="0.01" value={g.price ?? ''} placeholder={t('gear.currency')} disabled={readOnly} aria-label={t('gear.price')} onchange={(e) => set(g, { price: num(e.currentTarget.value) })} />
+                <input class="price" type="number" min="0" step="0.01" value={g.price ?? ''} placeholder={t('gear.currency')} title={g.qty > 1 && g.price ? t('gear.lineTotal', { qty: g.qty, amount: price(totalCost(g)) }) : undefined} disabled={readOnly} aria-label={t('gear.price')} onchange={(e) => set(g, { price: num(e.currentTarget.value) })} />
                 <span class="notes">
                   <input value={g.notes ?? ''} placeholder={t('gear.notes')} disabled={readOnly} aria-label={t('gear.notes')} onchange={(e) => set(g, { notes: e.currentTarget.value.trim() })} />
                   <input class="cat" value={g.category} list="gear-categories" disabled={readOnly} aria-label={t('gear.category')} title={t('gear.category')} onchange={(e) => set(g, { category: e.currentTarget.value.trim() })} />
@@ -183,10 +336,15 @@
       {/each}
     </main>
 
-    {#if money.length}
+    {#if money.length || report.unassigned.length}
       <aside>
         <h2>{t('gear.money')}</h2>
         <p class="muted">{t('gear.moneyHint')}</p>
+        {#if report.unassigned.length}
+          <p class="warn-box">
+            {t('gear.unassigned', { names: report.unassigned.map((g) => g.name).join(', '), amount: price(unassignedCost) })}
+          </p>
+        {/if}
         <ul class="money">
           {#each money as s (s.userId)}
             {@const p = personOf(s.userId)}
@@ -354,6 +512,10 @@
     flex: 0 1 180px;
   }
 
+  .add .num {
+    flex: 0 1 110px;
+  }
+
   .add button {
     display: inline-flex;
     align-items: center;
@@ -399,13 +561,14 @@
   .cols,
   .row {
     display: grid;
-    grid-template-columns: 76px minmax(110px, 2fr) minmax(90px, 1fr) minmax(90px, 1fr) 52px 70px 76px minmax(100px, 1.5fr) 28px;
+    grid-template-columns: 16px 76px minmax(110px, 2fr) minmax(90px, 1fr) minmax(90px, 1fr) 52px 100px 84px minmax(100px, 1.5fr) 28px;
     align-items: center;
     gap: 6px;
   }
 
   .cols {
     padding: 0 0 2px;
+    white-space: nowrap;
     font-size: 11px;
     color: var(--fg-muted);
   }
@@ -413,6 +576,67 @@
   .row {
     padding: 3px 0;
     border-top: 1px solid var(--border);
+  }
+
+  .row.dragged {
+    opacity: 0.4;
+  }
+
+  .row.drop-before {
+    box-shadow: inset 0 2px 0 var(--accent);
+  }
+
+  .row.drop-after {
+    box-shadow: inset 0 -2px 0 var(--accent);
+  }
+
+  h2.drop-into {
+    border-radius: var(--radius-sm);
+    background: var(--accent-soft);
+  }
+
+  .grip {
+    display: flex;
+    justify-content: center;
+    color: var(--fg-muted);
+    cursor: grab;
+    touch-action: none;
+  }
+
+  .grip.off {
+    visibility: hidden;
+  }
+
+  .export {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 2px;
+  }
+
+  .export button {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+    color: var(--fg);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  .export button:hover {
+    background: var(--bg-hover);
+  }
+
+  .warn-box {
+    margin: 8px 0;
+    padding: 8px;
+    border-left: 3px solid var(--warn);
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--warn) 12%, var(--bg));
   }
 
   .row.done .name {
@@ -544,13 +768,17 @@
     }
 
     .row {
-      grid-template-columns: 76px 1fr 1fr 28px;
+      grid-template-columns: 16px 76px 1fr 1fr 28px;
       grid-template-areas:
-        'status name name del'
-        'for for buyer buyer'
-        'qty weight price price'
-        'notes notes notes notes';
+        'grip status name name del'
+        'grip for for buyer buyer'
+        'grip qty weight price price'
+        'grip notes notes notes notes';
       padding: 8px 0;
+    }
+
+    .row > .grip {
+      grid-area: grip;
     }
 
     .row > .status {

@@ -28,6 +28,8 @@ export const icons = {
   follow: 'M4 18c3 0 4-3 6-6s3-6 6-6h4M4 12h3M17 18h3M15 15l3 3-3 3',
   eraser: 'M7 21h10M5.5 13.5l7-7a2 2 0 0 1 2.8 0l3.2 3.2a2 2 0 0 1 0 2.8L12 19H8.5l-3-3a1.8 1.8 0 0 1 0-2.5zM9 10l5 5',
   reverse: 'M7 4 3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7',
+  grip: 'M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01',
+  download: 'M12 4v11m-5-5 5 5 5-5M5 20h14',
   copy: 'M9 9h11v11H9zM5 15H4V4h11v1',
   merge: 'M4 6h6l4 6-4 6H4M14 12h6M17 9l3 3-3 3',
   pencil: 'M4 20l4-1L19 8l-3-3L5 16zM14 7l3 3',

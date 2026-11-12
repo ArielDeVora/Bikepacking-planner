@@ -51,13 +51,26 @@ The backpack button in the panel header (or `#gear` in the address) opens the ge
   helmet). "Everyone (one each)" adds one item per member, so each can tick theirs off.
 - Its status goes **To buy → Bought → Packed** with a click. Marking it bought fills in **Bought by**
   with you, unless someone is set already.
-- Quantity, weight (grams, for one), price paid, notes and section can be filled in on each line.
-  Sections are free text, with suggestions.
+- Weight (grams) and price are **for one item**; quantity multiplies them. Weight and price can be
+  typed when adding an item, and changed on its line with the quantity, notes and section. Sections
+  are free text, with suggestions.
 - Filters: everyone's gear, shared gear only, or one person (their own gear and what they bought);
-  and by status, with counts. Total weight and price are at the top, per section weight on each.
-- **Who paid what**: what each person paid for shared and personal gear, and what they're owed or
-  owe once shared gear is split evenly between the members (personal gear bought for someone else
-  is owed back by them).
+  and by status, with counts. Totals (weight and price × quantity) are at the top, with in
+  parentheses what's still to buy, and for each section.
+- **Reordering**: drag an item by its handle (⋮⋮, at the start of its line) before or after another
+  one, or onto a section's title to put it at the end of that section. Dropped in another section,
+  it takes that section.
+- **Export**: **Spreadsheet** downloads what's shown, with the filters above (person, section,
+  status), as a CSV file for Excel, Numbers or Google Sheets (separated by semicolons with decimal
+  commas where the computer uses decimal commas, as Excel expects there). **Copy** puts the same
+  table on the clipboard, to paste into a spreadsheet or a message. Both list each item's weight and
+  price for one and in total, with the totals on the last line.
+- **Who paid what**: only bought or packed items count. What each person paid for shared and
+  personal gear, and what they're owed or owe once shared gear is split evenly between the members
+  (personal gear bought for someone else is owed back by them). Everyone's balances add up to zero.
+  Personal gear with no buyer is taken as bought by the person it's for. A bought item whose buyer
+  is empty or isn't a member (e.g. ticked before signing in) is left out and listed above the
+  balances, so it can be fixed.
 
 ## Map hover
 
