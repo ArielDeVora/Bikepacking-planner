@@ -4,6 +4,7 @@ import { get, writable } from 'svelte/store';
 import { removeChanges } from '../../lib/segment-edits';
 import { segmentsOf } from '../../lib/tree';
 import { defineModule } from '../../core/module';
+import { editedBy } from '../../model/edited';
 import { icons } from '../../lib/icons';
 import type { Segment, TravelMode } from '../../model/types';
 import { RouteEditor } from './editor';
@@ -38,11 +39,11 @@ export default defineModule({
         'warn',
       );
     };
-    // Someone else's pending legs are routed here only if they stay pending for a while.
-    const STALE_MS = 30_000;
+    // Someone else's pending legs are routed here only if their app hasn't done it after a while.
+    const STALE_MS = 90_000;
     const recheck = new Map<string, ReturnType<typeof setTimeout>>();
     const shouldRoute = (seg: Segment) => {
-      if (ctx.cloud.isMine(seg.updatedBy) || Date.now() - seg.updatedAt > STALE_MS) return true;
+      if (ctx.cloud.isMine(editedBy(seg)) || Date.now() - seg.updatedAt > STALE_MS) return true;
       clearTimeout(recheck.get(seg.id));
       recheck.set(
         seg.id,

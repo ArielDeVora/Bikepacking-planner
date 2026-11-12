@@ -1,3 +1,4 @@
+import { editedAt, editedBy } from '../../model/edited';
 import type { Comment, Entity } from '../../model/types';
 
 export interface PersonActivity {
@@ -22,9 +23,10 @@ export function sinceLastVisit(entities: Entity[], since: number, isMine: (id: s
   const mentions: Comment[] = [];
   let latest: Entity | null = null;
   for (const e of entities) {
-    if (e.updatedAt <= since || !e.updatedBy || isMine(e.updatedBy)) continue;
-    let p = byPerson.get(e.updatedBy);
-    if (!p) byPerson.set(e.updatedBy, (p = { userId: e.updatedBy, edits: 0, comments: 0, votes: 0 }));
+    const by = editedBy(e);
+    if (editedAt(e) <= since || !by || isMine(by)) continue;
+    let p = byPerson.get(by);
+    if (!p) byPerson.set(by, (p = { userId: by, edits: 0, comments: 0, votes: 0 }));
     if (e.type === 'comment') {
       if (e.deleted) continue;
       p.comments++;
@@ -32,7 +34,7 @@ export function sinceLastVisit(entities: Entity[], since: number, isMine: (id: s
     } else if (e.type === 'vote') p.votes++;
     else {
       p.edits++;
-      if (!e.deleted && e.type !== 'trip' && (!latest || e.updatedAt > latest.updatedAt)) latest = e;
+      if (!e.deleted && e.type !== 'trip' && (!latest || editedAt(e) > editedAt(latest))) latest = e;
     }
   }
   const people = [...byPerson.values()]

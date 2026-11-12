@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { ModuleContext } from '../../core/module';
   import { timeAgo } from '../../lib/time';
+  import { editedAt, editedBy } from '../../model/edited';
 
   let { id, ctx }: { id: string; ctx: ModuleContext } = $props();
   const { t, cloud } = $derived(ctx);
@@ -12,13 +13,14 @@
     void $store;
     void $members;
     const e = store.get(id);
-    if (!e || !e.updatedBy) return null;
-    const mine = cloud.isMine(e.updatedBy);
-    const p = cloud.profileOf(e.updatedBy);
+    const by = e && editedBy(e);
+    if (!e || !by) return null;
+    const mine = cloud.isMine(by);
+    const p = cloud.profileOf(by);
     return {
       name: mine ? t('collab.you') : p?.name || t('collab.someone'),
       color: p?.color ?? 'var(--fg-muted)',
-      when: timeAgo(t, e.updatedAt),
+      when: timeAgo(t, editedAt(e)),
     };
   });
 </script>

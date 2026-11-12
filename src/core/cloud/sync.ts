@@ -1,3 +1,4 @@
+import { editedAt, editedBy } from '../../model/edited';
 import type { Entity } from '../../model/types';
 import type { TripStore } from '../store';
 import { entityToRow, rowToEntity, sameContent, type OutRow, type Row } from './rows';
@@ -156,7 +157,8 @@ export class SyncEngine {
       const local = this.store.getRaw(row.id);
 
       if (this.#outbox.has(row.id) || this.#inflight.has(row.id)) {
-        if (local && !this.#o.isMine(theirs.updatedBy) && !sameContent(local, theirs)) {
+        // Not when theirs only fills in my own edit (routing, elevation): mine replaces it anyway.
+        if (local && !this.#o.isMine(editedBy(theirs)) && !sameContent(local, theirs)) {
           this.#o.onConflict({ kind: 'overwrote', id: row.id, mine: local, theirs });
         }
         continue;
@@ -165,11 +167,13 @@ export class SyncEngine {
         if (local.updatedAt !== theirs.updatedAt || local.updatedBy !== theirs.updatedBy) apply.push(theirs);
         continue;
       }
+      // Someone else's edit, or an app filling in an older version of mine (which drops my newer one).
+      // Not someone's app filling in the version I have: my edit is still there.
       if (
         local &&
-        this.#o.isMine(local.updatedBy) &&
-        !this.#o.isMine(theirs.updatedBy) &&
-        this.#o.now() - local.updatedAt < this.#o.recentMs
+        this.#o.isMine(editedBy(local)) &&
+        (!this.#o.isMine(editedBy(theirs)) || editedAt(theirs) < editedAt(local)) &&
+        this.#o.now() - editedAt(local) < this.#o.recentMs
       ) {
         this.#o.onConflict({ kind: 'overwritten', id: row.id, mine: local, theirs });
       }

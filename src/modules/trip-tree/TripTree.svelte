@@ -26,6 +26,7 @@
   import { addRouteCommand, addStageCommand, deleteRouteCommand, dissolveRouteCommand, moveTopCommand } from '../../lib/route-edits';
   import type { Entity, Group, Route, Segment, Stage, Trip } from '../../model/types';
   import { untrack } from 'svelte';
+  import { editedAt, editedBy } from '../../model/edited';
   import { deleteStage } from './actions';
 
   let { ctx }: { ctx: ModuleContext } = $props();
@@ -62,11 +63,12 @@
   function lastEditor(e: Entity) {
     void $members;
     void $profile;
-    if (!$shared || !e.updatedBy) return null;
-    const mine = ctx.cloud.isMine(e.updatedBy);
-    const p = ctx.cloud.profileOf(e.updatedBy);
+    const by = editedBy(e);
+    if (!$shared || !by) return null;
+    const mine = ctx.cloud.isMine(by);
+    const p = ctx.cloud.profileOf(by);
     const name = (p?.name || t('collab.someone')) + (mine ? ` (${t('collab.you')})` : '');
-    return { color: p?.color ?? 'var(--fg-muted)', title: t('tree.lastEdit', { name, when: timeAgo(t, e.updatedAt) }) };
+    return { color: p?.color ?? 'var(--fg-muted)', title: t('tree.lastEdit', { name, when: timeAgo(t, editedAt(e)) }) };
   }
 
   const trip = $derived.by(() => {

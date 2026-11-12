@@ -1,3 +1,4 @@
+import { editedAt, editedBy } from '../model/edited';
 import { writable, type Readable } from 'svelte/store';
 import type { Draft, Entity } from '../model/types';
 import type { TripStore } from './store';
@@ -62,7 +63,7 @@ export class CommandStack {
   run(cmd: Command): void {
     if (cmd.changes.length === 0) return;
     if (this.locked) return this.locked();
-    this.#write(cmd.changes.map((c) => c.after));
+    this.#write(cmd.changes.map((c) => c.after), true);
     const top = this.#undo.at(-1);
     const merged = !!cmd.mergeKey && top?.mergeKey === cmd.mergeKey && this.#redo.length === 0;
     if (merged) {
@@ -86,7 +87,7 @@ export class CommandStack {
     if (!cmd || !this.#allowed(cmd)) return undefined;
     this.#undo.pop();
     const back = cmd.changes.map((c) => ({ id: c.id, before: c.after, after: c.before ?? { ...c.after, deleted: true } })).reverse();
-    this.#write(back.map((c) => c.after));
+    this.#write(back.map((c) => c.after), true);
     this.#redo.push(cmd);
     this.#publish();
     this.#emit({ label: cmd.label, changes: back }, 'undo', false);
@@ -98,7 +99,7 @@ export class CommandStack {
     const cmd = this.#redo.at(-1);
     if (!cmd || !this.#allowed(cmd)) return undefined;
     this.#redo.pop();
-    this.#write(cmd.changes.map((c) => c.after));
+    this.#write(cmd.changes.map((c) => c.after), true);
     this.#undo.push(cmd);
     this.#publish();
     this.#emit(cmd, 'redo', false);
@@ -111,7 +112,7 @@ export class CommandStack {
    * brings back the old value.
    */
   patch(changes: Change[]): void {
-    if (changes.length && !this.locked) this.#write(changes.map((c) => c.after));
+    if (changes.length && !this.locked) this.#write(changes.map((c) => c.after), false);
   }
 
   /** Ends any pending merge so the next command starts a new undo step. */
@@ -132,11 +133,17 @@ export class CommandStack {
     return this.guard(current);
   }
 
-  #write(entities: Entity[]): void {
+  /** Saves entities; `byHand` also makes the current user their editor (patches keep the previous one). */
+  #write(entities: Entity[], byHand: boolean): void {
     const now = Date.now();
     const by = this.userId();
     this.store.apply(
-      entities.map((e) => ({ ...e, updatedAt: now, updatedBy: by })),
+      entities.map((e) => {
+        if (byHand) return { ...e, updatedAt: now, updatedBy: by, editedAt: now, editedBy: by };
+        const previous = this.store.getRaw(e.id);
+        const editor = previous ? { editedAt: editedAt(previous), editedBy: editedBy(previous) } : { editedAt: now, editedBy: by };
+        return { ...e, ...editor, updatedAt: now, updatedBy: by };
+      }),
       'local',
     );
   }

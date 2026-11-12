@@ -1,5 +1,6 @@
 import type { Entity } from '../../model/types';
 import { defineModule } from '../../core/module';
+import { editedBy } from '../../model/edited';
 import Comments from './Comments.svelte';
 import EditedBy from './EditedBy.svelte';
 import FollowBanner from './FollowBanner.svelte';
@@ -43,7 +44,9 @@ export default defineModule({
       for (const [id, at] of recent) if (now - at > CONFLICT_TOAST_MS) recent.delete(id);
       if (recent.has(c.id) || recent.size >= MAX_CONFLICT_TOASTS) return;
       recent.set(c.id, now);
-      const name = cloud.profileOf(c.theirs.updatedBy)?.name || t('collab.someone');
+      // The person who made the change; if it's an app filling in an older version of mine, the app's user.
+      const author = cloud.isMine(editedBy(c.theirs)) ? c.theirs.updatedBy : editedBy(c.theirs);
+      const name = cloud.profileOf(author)?.name || t('collab.someone');
       const label = ('name' in c.mine && c.mine.name) || t('collab.untitled');
       if (c.kind === 'overwritten') {
         ui.notify(t('collab.conflictOverwritten', { name, label }), 'warn', CONFLICT_TOAST_MS, {

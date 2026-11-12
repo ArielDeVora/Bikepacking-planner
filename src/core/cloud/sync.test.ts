@@ -156,6 +156,47 @@ describe('SyncEngine', () => {
     expect(b.conflicts.map((c) => c.kind)).toEqual(['overwritten']);
   });
 
+  it('does not report an app filling in my edit as someone else\'s change', async () => {
+    const server = new FakeServer();
+    const a = client(server, 'A');
+    const b = client(server, 'B');
+    a.commands.run({ label: 'add', changes: [edits.create(stage('s1', 'V'))] });
+    await a.engine.flush();
+    rename(a, 's1', 'Mine');
+    await a.engine.flush();
+    await Promise.resolve();
+    // B's app fills in data derived from A's edit (as routing or elevation do).
+    b.commands.patch([edits.update<Stage>(b.store, 's1', { notes: 'derived' })]);
+    await b.engine.flush();
+    await Promise.resolve();
+    const s = a.store.get('s1', 'stage')!;
+    expect(s.notes).toBe('derived');
+    expect(s.updatedBy).toBe('B');
+    expect(s.editedBy).toBe('A');
+    expect(a.conflicts).toEqual([]);
+  });
+
+  it('reports an app filling in an older version that drops my newer edit', async () => {
+    const server = new FakeServer();
+    const a = client(server, 'A');
+    const b = client(server, 'B', { realtime: false });
+    a.commands.run({ label: 'add', changes: [edits.create(stage('s1', 'V'))] });
+    await a.engine.flush();
+    await b.engine.pull();
+    // A's newer edit, then B's app fills in the version it has, which lacks it.
+    const later = Date.now() + 1000;
+    const now = Date.now;
+    Date.now = () => later;
+    rename(a, 's1', 'Mine');
+    Date.now = now;
+    await a.engine.flush();
+    b.commands.patch([edits.update<Stage>(b.store, 's1', { notes: 'derived' })]);
+    await b.engine.flush();
+    await Promise.resolve();
+    expect(a.store.get('s1', 'stage')!.name).toBe('s1');
+    expect(a.conflicts.map((c) => c.kind)).toEqual(['overwritten']);
+  });
+
   it('keeps the outbox when offline and sends it later', async () => {
     const server = new FakeServer();
     const a = client(server, 'A');

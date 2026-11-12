@@ -3,6 +3,7 @@ import type { GeoJSONSource } from 'maplibre-gl';
 import { writable } from 'svelte/store';
 import { edits } from '../../core/commands';
 import { defineModule } from '../../core/module';
+import { editedBy } from '../../model/edited';
 import { terrain } from '../../lib/dem';
 import { icons } from '../../lib/icons';
 import type { Segment } from '../../model/types';
@@ -12,7 +13,7 @@ import { applyTerrain, terrainJobs } from './terrain';
 const HOVER = 'profile-hover';
 const RANGE = 'profile-range';
 /** Someone else's legs are filled in here only if they still lack elevation after this long. */
-const STALE_MS = 30_000;
+const STALE_MS = 90_000;
 
 export default defineModule({
   id: 'elevation',
@@ -26,7 +27,7 @@ export default defineModule({
     const recheck = new Map<string, ReturnType<typeof setTimeout>>();
 
     function fill(seg: Segment): void {
-      if (!ctx.cloud.isMine(seg.updatedBy) && Date.now() - seg.updatedAt < STALE_MS) {
+      if (!ctx.cloud.isMine(editedBy(seg)) && Date.now() - seg.updatedAt < STALE_MS) {
         clearTimeout(recheck.get(seg.id));
         recheck.set(seg.id, setTimeout(() => {
           recheck.delete(seg.id);

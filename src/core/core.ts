@@ -3,6 +3,7 @@ import { Map as MapLibreMap, NavigationControl, ScaleControl, setWorkerUrl } fro
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import { writable, type Readable } from 'svelte/store';
 import { newId } from '../model/ids';
+import { editedBy } from '../model/edited';
 import { STAGE_COLORS } from '../config/modes';
 import { keyBetween } from '../model/order';
 import { isPhone } from '../lib/ui/phone';
@@ -99,9 +100,9 @@ export function createCore(container: HTMLElement) {
 
   const commands = new CommandStack(store, () => user.id);
   commands.guard = (current) => {
-    const foreign = current.filter((e) => e.updatedBy && !cloud.isMine(e.updatedBy));
+    const foreign = current.filter((e) => editedBy(e) && !cloud.isMine(editedBy(e)));
     if (!foreign.length) return true;
-    const names = [...new Set(foreign.map((e) => cloud.profileOf(e.updatedBy)?.name || t('collab.someone')))];
+    const names = [...new Set(foreign.map((e) => cloud.profileOf(editedBy(e))?.name || t('collab.someone')))];
     return window.confirm(t('collab.undoOverwrite', { names: names.join(', ') }));
   };
   // History: every action becomes a commit, kept in this browser and, for shared trips, on the server.

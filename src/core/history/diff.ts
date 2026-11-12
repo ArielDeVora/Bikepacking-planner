@@ -33,7 +33,7 @@ export interface Commit {
 }
 
 /** Bookkeeping fields, never part of a diff. */
-const IGNORED = new Set(['updatedAt', 'updatedBy']);
+const IGNORED = new Set(['updatedAt', 'updatedBy', 'editedAt', 'editedBy']);
 
 /**
  * Fields left out of the history because they can be worked out again: a drawn segment's lines
@@ -145,6 +145,6 @@ function withGeometry(next: Entity, previous: Entity): Entity {
 }
 
 function stripMeta(e: Entity): Record<string, unknown> {
-  const { updatedAt: _a, updatedBy: _b, ...rest } = e;
+  const { updatedAt: _a, updatedBy: _b, editedAt: _c, editedBy: _d, ...rest } = e;
   return rest;
 }

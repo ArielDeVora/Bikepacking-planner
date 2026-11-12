@@ -9,6 +9,12 @@ export interface BaseEntity {
   updatedAt: number;
   updatedBy: string;
   deleted: boolean;
+  /**
+   * Who last changed it by hand, and when. Unlike `updatedBy`, not changed by what an app fills in
+   * on its own (routing, elevation), which any member's app may do.
+   */
+  editedAt?: number;
+  editedBy?: string;
 }
 
 export interface Trip extends BaseEntity {
