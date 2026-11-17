@@ -130,6 +130,7 @@ Free Supabase projects pause after a week with little activity. The **Keep Supab
 - [Backups](docs/16-backups.md): nightly encrypted backups of the shared database, and restoring.
 - [Offline](docs/17-offline.md): the planner as a phone app, the map along a stage without a connection, signing in with a code.
 - [Together](docs/18-together.md): read-only follow links and follower suggestions, @mentions, since your last visit, the shared gear checklist and its currencies, badges, side panel search, undo notices, the dark map, the map hover.
+- [Bike setup](docs/19-bike-setup.md): racks, bags and cages on a gravel bike drawn to scale, packing gear into each bag, weights per bag and per wheel.
 - [Spec](docs/SPEC.md)
 
 ## Credits

@@ -11,6 +11,16 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    id: '2026-11-21',
+    title: 'Plan your bike setup',
+    items: [
+      'Bike setup (bike button): tick your racks, bags and bottle cages and drag them onto a gravel bike drawn to scale. Then drag your gear into each bag, or onto “On me” for what you wear.',
+      'See what each bag weighs (each pannier on its own), left against right, how the luggage presses on each wheel, and your loaded bike and climbing totals. Drag the bag itself from your gear list to count its weight.',
+      'It is saved in your browser only, for each trip.',
+      'Place search: when nothing is found, press Enter to search OpenStreetMap too, which also finds names written in other alphabets (such as Бокты for Bokty).',
+    ],
+  },
+  {
     id: '2026-11-20',
     title: 'Badges, search, undo notices, a dark map and suggestions from followers',
     items: [

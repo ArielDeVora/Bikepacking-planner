@@ -21,5 +21,6 @@ export const modules: ModuleLoader[] = [
   () => import('./climate'),
   () => import('./plan'),
   () => import('./gear'),
+  () => import('./bike-setup'),
   () => import('./offline'),
 ];
