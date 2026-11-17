@@ -5,6 +5,7 @@
   import Icon from '../../lib/ui/Icon.svelte';
   import type { LngLat } from '../../model/types';
   import { parseCoordinates, type Photon, type SearchResult } from '../../lib/photon';
+  import { NOMINATIM_SEARCH, NominatimSearch } from '../../lib/nominatim';
 
   let {
     ctx,
@@ -25,6 +26,10 @@
   const touch = isCoarse();
   const DEBOUNCE_MS = 350;
   const MIN_CHARS = 3;
+  const TIMEOUT_MS = 10_000;
+  /** After Photon times out or fails, typing stops searching for this long; Enter still does. */
+  const SLOW_PAUSE_MS = 120_000;
+  const nominatim = new NominatimSearch();
 
   let input: HTMLInputElement;
   let query = $state('');
@@ -32,6 +37,14 @@
   let active = $state(0);
   let open = $state(false);
   let error = $state('');
+  let hint = $state('');
+  let searching = $state<'' | 'photon' | 'osm'>('');
+  /** Where the results shown came from. */
+  let source = $state<'photon' | 'osm'>('photon');
+  let photonSlowUntil = 0;
+  /** A last row under Photon's results to search OpenStreetMap instead. */
+  const osmRow = $derived(NOMINATIM_SEARCH && source === 'photon' && results.length > 0);
+  const lastIndex = $derived(results.length - (osmRow ? 0 : 1));
   /** The query read as coordinates, shown as a single result to jump to. */
   const coords = $derived(parseCoordinates(query));
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -41,7 +54,10 @@
 
   function onInput() {
     clearTimeout(timer);
+    ctrl?.abort();
+    searching = '';
     error = '';
+    hint = '';
     const q = query.trim();
     if (parseCoordinates(q)) {
       results = [];
@@ -52,20 +68,74 @@
       results = [];
       return;
     }
-    timer = setTimeout(() => void run(q), DEBOUNCE_MS);
+    if (Date.now() < photonSlowUntil) {
+      results = [];
+      hint = t('search.pressEnter');
+      return;
+    }
+    timer = setTimeout(() => void run(q, false), DEBOUNCE_MS);
   }
 
-  async function run(q: string) {
+  /** `asked` is true when Enter was pressed: only then may Nominatim be used. */
+  async function run(q: string, asked: boolean) {
+    clearTimeout(timer);
     ctrl?.abort();
-    ctrl = new AbortController();
+    const mine = (ctrl = new AbortController());
+    error = '';
+    hint = '';
+    if (asked && NOMINATIM_SEARCH && Date.now() < photonSlowUntil) return runOsm(q, mine);
+    searching = 'photon';
+    let timedOut = false;
+    const limit = setTimeout(() => {
+      timedOut = true;
+      mine.abort();
+    }, TIMEOUT_MS);
     try {
       const c = ctx.map.getCenter();
-      results = await photon.search(q, [c.lng, c.lat], ctrl.signal);
-      active = 0;
-      open = true;
+      const found = await photon.search(q, [c.lng, c.lat], mine.signal);
+      if (mine !== ctrl) return;
+      if (!found.length && asked && NOMINATIM_SEARCH) return runOsm(q, mine);
+      show(found, 'photon');
     } catch (err) {
-      if ((err as Error).name !== 'AbortError') error = t('search.failed');
+      if (mine !== ctrl) return;
+      if ((err as Error).name === 'AbortError' && !timedOut) return;
+      photonSlowUntil = Date.now() + SLOW_PAUSE_MS;
+      if (asked && NOMINATIM_SEARCH) return runOsm(q, mine);
+      searching = '';
+      if (NOMINATIM_SEARCH) hint = t('search.slow');
+      else error = t('search.failed');
+    } finally {
+      clearTimeout(limit);
     }
+  }
+
+  async function runOsm(q: string, mine: AbortController) {
+    searching = 'osm';
+    try {
+      const found = await nominatim.search(q);
+      if (mine === ctrl) show(found, 'osm');
+    } catch {
+      if (mine !== ctrl) return;
+      searching = '';
+      error = t('search.failed');
+    }
+  }
+
+  function searchOsm(q: string) {
+    clearTimeout(timer);
+    ctrl?.abort();
+    error = '';
+    hint = '';
+    void runOsm(q, (ctrl = new AbortController()));
+  }
+
+  function show(found: SearchResult[], from: 'photon' | 'osm') {
+    searching = '';
+    results = found;
+    source = from;
+    active = 0;
+    open = true;
+    if (!found.length) hint = from === 'photon' && NOMINATIM_SEARCH ? t('search.noResultsTryOsm') : t('search.noResults');
   }
 
   function pick(r: SearchResult) {
@@ -82,15 +152,16 @@
 
   function onKey(e: KeyboardEvent) {
     if (e.key === 'ArrowDown') {
-      active = Math.min(results.length - 1, active + 1);
+      active = Math.min(lastIndex, active + 1);
       e.preventDefault();
     } else if (e.key === 'ArrowUp') {
       active = Math.max(0, active - 1);
       e.preventDefault();
     } else if (e.key === 'Enter') {
       if (coords) jump(coords);
+      else if (osmRow && active === results.length) searchOsm(query.trim());
       else if (results[active]) pick(results[active]!);
-      else if (query.trim().length >= MIN_CHARS) void run(query.trim());
+      else if (query.trim().length >= MIN_CHARS) void run(query.trim(), true);
     } else if (e.key === 'Escape') {
       open = false;
       input.blur();
@@ -132,9 +203,23 @@
           </button>
         </li>
       {/each}
+      {#if osmRow}
+        <li role="option" aria-selected={active === results.length}>
+          <button type="button" class="osm" class:active={active === results.length} onmousedown={(e) => e.preventDefault()} onclick={() => searchOsm(query.trim())}>
+            <span>{t('search.tryOsm', { query: query.trim() })}</span>
+          </button>
+        </li>
+      {/if}
+      {#if source === 'osm'}<li class="source muted">{t('search.fromOsm')}</li>{/if}
     </ul>
   {/if}
-  {#if error}<p class="error">{error}</p>{/if}
+  {#if searching}
+    <p class="status muted" role="status">{searching === 'osm' ? t('search.searchingOsm') : t('search.searching')}</p>
+  {:else if error}
+    <p class="error">{error}</p>
+  {:else if hint && !(open && results.length)}
+    <p class="status muted" role="status">{hint}</p>
+  {/if}
 </div>
 
 <style>
@@ -200,6 +285,18 @@
     background: var(--bg-hover);
   }
 
+  li button.osm {
+    border-top: 1px solid var(--border);
+    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+    color: var(--fg-muted);
+  }
+
+  .source {
+    padding: 4px 8px 2px;
+    font-size: 11px;
+  }
+
+  .status,
   .error {
     margin: 4px 0 0;
     padding: 4px 10px;
@@ -207,5 +304,9 @@
     background: var(--bg);
     color: var(--danger);
     font-size: 12px;
+  }
+
+  .status {
+    color: var(--fg-muted);
   }
 </style>

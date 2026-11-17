@@ -1,3 +1,5 @@
+import { throttled } from '../nominatim';
+
 /**
  * Details for an OSM object: its tags (from Nominatim) and, when it links to Wikipedia or
  * Wikidata, a short summary with a photo.
@@ -22,24 +24,8 @@ export interface WikiSummary {
 }
 
 const NOMINATIM = 'https://nominatim.openstreetmap.org/lookup';
-const MIN_GAP_MS = 1100;
-
 const details = new Map<string, Promise<OsmDetails | null>>();
 const summaries = new Map<string, Promise<WikiSummary | null>>();
-let queue: Promise<unknown> = Promise.resolve();
-let last = 0;
-
-/** Runs requests one after another, at most one per MIN_GAP_MS. */
-function throttled<T>(fn: () => Promise<T>): Promise<T> {
-  const run = queue.then(async () => {
-    const wait = last + MIN_GAP_MS - Date.now();
-    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
-    last = Date.now();
-    return fn();
-  });
-  queue = run.catch(() => {});
-  return run;
-}
 
 export function nominatimUrl(type: OsmType, id: number): string {
   const params = new URLSearchParams({
