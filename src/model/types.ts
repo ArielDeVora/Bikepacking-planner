@@ -277,6 +277,9 @@ export interface Comment extends BaseEntity {
   createdAt: number;
   /** Ids of the members mentioned with "@Name". */
   mentions?: string[];
+  /** For a comment written through a follow link: the name the follower typed. */
+  authorName?: string;
+  followerId?: string;
 }
 
 export type GearStatus = 'needed' | 'bought' | 'packed';

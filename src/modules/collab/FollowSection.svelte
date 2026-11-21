@@ -18,6 +18,11 @@
 
 <p class="small">{t('follow.viewing', { name })}</p>
 <p class="muted small">{t('follow.viewingHint')}</p>
+{#if ctx.follow?.canSuggest || ctx.follow?.canComment}
+  <p class="muted small">
+    {ctx.follow.canSuggest && ctx.follow.canComment ? t('follow.youCanBoth') : ctx.follow.canSuggest ? t('follow.youCanSuggest') : t('follow.youCanComment')}
+  </p>
+{/if}
 {#if $members.length}
   <div class="muted small head">{t('collab.members')}</div>
   <ul>

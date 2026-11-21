@@ -20,11 +20,14 @@
   const { t, cloud } = $derived(ctx);
   const members = $derived(ctx.cloud.members);
 
-  const person = (id: string) => {
+  const person = (id: string, followerName?: string) => {
     void $members;
+    if (id.startsWith('follower:')) return { name: followerName || t('follow.aFollower'), color: '#ae3ec9' };
     const p = cloud.profileOf(id);
     return { name: p?.name || t('collab.someone'), color: p?.color ?? 'var(--fg-muted)' };
   };
+  const followerCounts = (f: SinceSummary['followers'][number]) =>
+    [f.places && t('since.suggested', { n: f.places }), f.comments && t('since.comments', { n: f.comments })].filter(Boolean).join(', ');
 
   const counts = (p: SinceSummary['people'][number]) =>
     [
@@ -49,7 +52,7 @@
     {#if data.mentions.length}
       <ul class="mentions">
         {#each data.mentions.slice(0, 3) as c (c.id)}
-          {@const p = person(c.authorId)}
+          {@const p = person(c.authorId, c.authorName)}
           <li>
             <button type="button" onclick={() => show(c.targetId)}>
               <span class="at">@</span>
@@ -68,10 +71,10 @@
         <li><span class="dot" style:background={who.color}></span><strong>{who.name}</strong> <span class="muted">{counts(p)}</span></li>
       {/each}
     </ul>
-    {#if data.suggestions.length}
+    {#if data.followers.length}
       <ul class="people">
-        {#each data.suggestions as s (s.name)}
-          <li><span class="dot follower"></span><strong>{s.name || t('follow.aFollower')}</strong> <span class="muted">{t('since.suggested', { n: s.count })}</span></li>
+        {#each data.followers as f (f.name)}
+          <li><span class="dot follower"></span><strong>{f.name || t('follow.aFollower')}</strong> <span class="muted">{followerCounts(f)}</span></li>
         {/each}
       </ul>
     {/if}

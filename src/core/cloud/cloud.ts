@@ -380,23 +380,37 @@ export function createCloud(deps: CloudDeps) {
     isSharedLocally,
 
     /**
-     * Follow links of the open trip. `canSuggest` is null where the server doesn't have
-     * suggestions yet (migration 005 not run).
+     * Follow links of the open trip. `canSuggest` and `canComment` are null where the server
+     * doesn't have them yet (migrations 005 and 006 not run).
      */
-    async followLinks(): Promise<{ token: string; createdAt: string; createdBy: string; canSuggest: boolean | null }[]> {
+    async followLinks(): Promise<{ token: string; createdAt: string; createdBy: string; canSuggest: boolean | null; canComment: boolean | null }[]> {
       if (!client) return [];
-      type Row = { token: string; created_at: string; created_by: string; can_suggest?: boolean };
+      type Row = { token: string; created_at: string; created_by: string; can_suggest?: boolean; can_comment?: boolean };
       const query = (columns: string) => client!.from('follow_links').select(columns).eq('trip_id', deps.tripId()).order('created_at');
-      let res = await query('token, created_at, created_by, can_suggest');
+      let res = await query('token, created_at, created_by, can_suggest, can_comment');
+      if (res.error && /can_comment/.test(res.error.message)) res = await query('token, created_at, created_by, can_suggest');
       if (res.error && /can_suggest/.test(res.error.message)) res = await query('token, created_at, created_by');
       if (res.error) throw res.error;
-      return (res.data as unknown as Row[]).map((r) => ({ token: r.token, createdAt: r.created_at, createdBy: r.created_by, canSuggest: r.can_suggest ?? null }));
+      return (res.data as unknown as Row[]).map((r) => ({
+        token: r.token,
+        createdAt: r.created_at,
+        createdBy: r.created_by,
+        canSuggest: r.can_suggest ?? null,
+        canComment: r.can_comment ?? null,
+      }));
     },
 
     /** Lets a link's followers suggest places, or stops it. */
     async setFollowSuggest(token: string, on: boolean): Promise<void> {
       if (!client) throw new Error('Not signed in');
       const { error } = await client.from('follow_links').update({ can_suggest: on }).eq('token', token);
+      if (error) throw error;
+    },
+
+    /** Lets a link's followers comment, or stops it. */
+    async setFollowComment(token: string, on: boolean): Promise<void> {
+      if (!client) throw new Error('Not signed in');
+      const { error } = await client.from('follow_links').update({ can_comment: on }).eq('token', token);
       if (error) throw error;
     },
 

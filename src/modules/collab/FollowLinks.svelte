@@ -7,16 +7,16 @@
   let { ctx }: { ctx: ModuleContext } = $props();
   const { t, cloud, ui } = $derived(ctx);
 
-  let links = $state<{ token: string; createdAt: string; createdBy: string; canSuggest: boolean | null }[]>([]);
+  let links = $state<{ token: string; createdAt: string; createdBy: string; canSuggest: boolean | null; canComment: boolean | null }[]>([]);
   const members = $derived(ctx.cloud.members);
   const maker = (id: string) => {
     void $members;
     return cloud.isMine(id) ? t('collab.you') : cloud.profileOf(id)?.name || t('collab.someone');
   };
 
-  async function toggleSuggest(token: string, on: boolean) {
+  async function toggle(token: string, what: 'suggest' | 'comment', on: boolean) {
     try {
-      await cloud.setFollowSuggest(token, on);
+      await (what === 'suggest' ? cloud.setFollowSuggest(token, on) : cloud.setFollowComment(token, on));
       await load();
     } catch (err) {
       ui.notify(t('follow.failed', { reason: reason(err) }), 'error');
@@ -93,13 +93,20 @@
         </div>
         {#if l.canSuggest !== null}
           <label class="check small" title={t('follow.canSuggestHint')}>
-            <input type="checkbox" checked={l.canSuggest} onchange={(e) => toggleSuggest(l.token, e.currentTarget.checked)} />
+            <input type="checkbox" checked={l.canSuggest} onchange={(e) => toggle(l.token, 'suggest', e.currentTarget.checked)} />
             <span>{t('follow.canSuggest')}</span>
+          </label>
+        {/if}
+        {#if l.canComment !== null}
+          <label class="check small" title={t('follow.canCommentHint')}>
+            <input type="checkbox" checked={l.canComment} onchange={(e) => toggle(l.token, 'comment', e.currentTarget.checked)} />
+            <span>{t('follow.canComment')}</span>
           </label>
         {/if}
       </div>
     {/each}
-    {#if links.some((l) => l.canSuggest === null)}<p class="muted small">{t('follow.suggestMissing')}</p>{/if}
+    {#if links.some((l) => l.canSuggest === null)}<p class="muted small">{t('follow.suggestMissing')}</p>
+    {:else if links.some((l) => l.canComment === null)}<p class="muted small">{t('follow.commentMissing')}</p>{/if}
     <button type="button" class="btn" disabled={busy} onclick={create}>{t('follow.create')}</button>
   {/if}
 </div>

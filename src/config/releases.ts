@@ -11,6 +11,14 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    id: '2026-11-22',
+    title: 'Comments from followers',
+    items: [
+      'Family and friends can comment: turn on “Followers can comment” on a follow link. They write at the bottom of a route’s, stage’s, segment’s or place’s card, under the name they typed once, and can @mention you.',
+      'Their comments show in purple with a “follower” tag. You get a notice when one arrives, and they appear in “Since your last visit”. Any member can delete them; followers can’t change or delete anything.',
+    ],
+  },
+  {
     id: '2026-11-21',
     title: 'Plan your bike setup',
     items: [

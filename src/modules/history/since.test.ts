@@ -39,8 +39,22 @@ describe('since your last visit', () => {
       e('f3', 'poi', '', 50, { followerId: 'y', createdBy: 'follower:y', suggestedBy: 'Léa', name: 'Old' }),
     ];
     const s = sinceLastVisit([...entities, ...suggested], 100, mine);
-    expect(s.suggestions).toEqual([{ name: 'Mum', count: 2 }]);
+    expect(s.followers).toEqual([{ name: 'Mum', places: 2, comments: 0 }]);
     expect(s.latest?.id).toBe('f2');
     expect(isEmpty(sinceLastVisit(suggested, 100, mine))).toBe(false);
+  });
+
+  it('counts comments left through follow links by name, and their mentions of me', () => {
+    const fromFollowers = [
+      e('fc1', 'comment', '', 300, { followerId: 'x', authorId: 'follower:x', authorName: 'Mum', body: 'Lovely!', createdAt: 300 }),
+      e('fc2', 'comment', '', 310, { followerId: 'x', authorId: 'follower:x', authorName: 'Mum', body: '@Me take care', mentions: ['me'], createdAt: 310 }),
+      e('fc3', 'comment', '', 320, { followerId: 'x', authorId: 'follower:x', authorName: 'Mum', body: 'gone', createdAt: 320, deleted: true }),
+      e('fc4', 'comment', '', 50, { followerId: 'y', authorId: 'follower:y', authorName: 'Léa', body: 'old', createdAt: 50 }),
+      e('f1', 'poi', '', 330, { followerId: 'x', createdBy: 'follower:x', suggestedBy: 'Mum', name: 'Lake' }),
+    ];
+    const s = sinceLastVisit(fromFollowers, 100, mine);
+    expect(s.followers).toEqual([{ name: 'Mum', places: 1, comments: 2 }]);
+    expect(s.mentions.map((c) => c.id)).toEqual(['fc2']);
+    expect(s.people).toEqual([]);
   });
 });

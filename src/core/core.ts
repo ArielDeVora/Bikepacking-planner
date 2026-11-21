@@ -239,7 +239,7 @@ export function createCore(container: HTMLElement) {
   let followAccess: FollowAccess | null = null;
   async function loadFollowedTrip(token: string): Promise<void> {
     const follower = await createFollower(token);
-    const [entities, people, canSuggest] = await Promise.all([follower.pull(), follower.members(), follower.canSuggest()]);
+    const [entities, people, allowed] = await Promise.all([follower.pull(), follower.members(), follower.info()]);
     const trip = entities.find((e) => e.type === 'trip' && !e.deleted);
     if (!trip) throw new Error(t('follow.notFound'));
     tripId = trip.id;
@@ -259,13 +259,22 @@ export function createCore(container: HTMLElement) {
     };
     setInterval(() => void refresh(), FOLLOW_REFRESH_MS);
     document.addEventListener('visibilitychange', () => void refresh());
+    const fetchChanges = async () => {
+      const changed = await follower.pull();
+      if (changed.length) store.apply(changed, 'remote');
+    };
     followAccess = {
-      canSuggest,
+      ...allowed,
       async suggest(place, followerName) {
         const id = newId();
         await follower.suggest({ ...place, id }, saveFollower(followerName));
-        const changed = await follower.pull();
-        if (changed.length) store.apply(changed, 'remote');
+        await fetchChanges();
+        return id;
+      },
+      async comment(c, followerName) {
+        const id = newId();
+        await follower.comment({ ...c, id }, saveFollower(followerName));
+        await fetchChanges();
         return id;
       },
     };

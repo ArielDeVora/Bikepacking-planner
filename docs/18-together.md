@@ -50,6 +50,27 @@ the switch, the name, the position and the limits, then inserts the place (and t
 category if needed). It can only insert places: there is no way through it to read, change or delete
 anything.
 
+### Followers commenting
+
+Each link also has a **Followers can comment** switch (off by default; needs
+[`006_follow_comments.sql`](../supabase/migrations/006_follow_comments.sql), run once after 005).
+With it on, followers can comment on everything members can: routes, stages, groups, segments,
+places, zones and border crossings, at the bottom of the item's card.
+
+- Same name as for suggestions: typed once, remembered by their browser ("Not you?" changes it).
+- They can **@mention** members; mentions of anyone else are dropped.
+- They can only **add** comments, never change or delete anything, theirs included. Members can
+  delete followers' comments like their own.
+- Their comments show their name, in purple, with a "follower" tag. Members get a notice for each
+  one while the trip is open, and see them in **Since your last visit** otherwise (with the places
+  they suggested).
+- Limits: 500 comments per follower, 5,000 from all followers on a trip, and 200 an hour from all
+  followers on a trip. Turning the switch off (or stopping the link) ends comments at once.
+
+How it works: `follow_comment`, another `security definer` function, checks the token and the
+switch, the name, the text (up to 2,000 characters), that the item exists in the trip and can be
+commented on, and the limits, then inserts the comment. It can't read, change or delete anything.
+
 ## @mentions in comments
 
 Type `@` in a comment to pick a member of the trip (arrows and Enter or Tab, or click). The

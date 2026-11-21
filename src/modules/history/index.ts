@@ -52,10 +52,16 @@ export default defineModule({
         const c = raw;
         if (c?.type !== 'comment' || c.deleted || notified.has(id)) continue;
         const comment = c as Comment;
-        if (comment.createdAt < startedAt || cloud.isMine(comment.authorId) || !comment.mentions?.some(cloud.isMine)) continue;
+        if (comment.createdAt < startedAt || cloud.isMine(comment.authorId)) continue;
+        // Members hear about every follower comment; other comments only when they mention them.
+        const fromFollower = !!comment.followerId;
+        const mentionsMe = !!comment.mentions?.some(cloud.isMine);
+        if (!fromFollower && !mentionsMe) continue;
+        if (fromFollower && ctx.readOnly) continue;
         notified.add(id);
-        const name = cloud.profileOf(comment.authorId)?.name || t('collab.someone');
-        ui.notify(t('since.mentionedToast', { name, text: comment.body.slice(0, 80) }), 'info', MENTION_TOAST_MS, {
+        const name = fromFollower ? comment.authorName || t('follow.aFollower') : cloud.profileOf(comment.authorId)?.name || t('collab.someone');
+        const message = mentionsMe ? 'since.mentionedToast' : 'since.followerCommentToast';
+        ui.notify(t(message, { name, text: comment.body.slice(0, 80) }), 'info', MENTION_TOAST_MS, {
           label: t('since.show'),
           run: () => ctx.selection.set([comment.targetId]),
         });

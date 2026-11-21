@@ -1,5 +1,7 @@
 <script lang="ts">
   import { edits } from '../../core/commands';
+  import { followerAuthor, savedFollower } from '../../core/cloud/follow';
+  import { FOLLOWER_COLOR } from '../../lib/places/authors';
   import type { ModuleContext } from '../../core/module';
   import { icons } from '../../lib/icons';
   import IconButton from '../../lib/ui/IconButton.svelte';
@@ -18,6 +20,16 @@
   let caret = $state(0);
   let pick = $state(0);
 
+  // Followers comment through their link, under the name their browser remembers.
+  const asFollower = $derived(!!ctx.readOnly && !!ctx.follow?.canComment);
+  const canWrite = $derived(!ctx.readOnly || asFollower);
+  const known = savedFollower();
+  const myFollowerId = known ? followerAuthor(known.id) : null;
+  let who = $state(known?.name ?? '');
+  let editingName = $state(!known);
+  let busy = $state(false);
+  let error = $state('');
+
   const people = $derived<Person[]>($members.map((m) => ({ id: m.id, name: m.name })).filter((p) => p.name));
   const typing = $derived(mentionAt(body, caret));
   const options = $derived(typing ? suggest(people, typing.query) : []);
@@ -30,22 +42,46 @@
       .sort((a, b) => a.createdAt - b.createdAt)
       .map((c) => {
         const p = cloud.profileOf(c.authorId);
+        const follower = c.authorId.startsWith('follower:');
+        const mine = cloud.isMine(c.authorId) || (!!myFollowerId && c.authorId === myFollowerId);
         return {
           c,
           parts: splitMentions(c.body, people),
           forMe: !!c.mentions?.some((m) => cloud.isMine(m)),
-          mine: cloud.isMine(c.authorId),
-          name: cloud.isMine(c.authorId) ? t('collab.you') : p?.name || t('collab.someone'),
-          color: p?.color ?? 'var(--fg-muted)',
+          follower,
+          // Members delete their own comments and followers' ones; followers delete nothing.
+          deletable: !ctx.readOnly && (cloud.isMine(c.authorId) || follower),
+          name: mine ? t('collab.you') : follower ? c.authorName || t('follow.aFollower') : p?.name || t('collab.someone'),
+          color: follower ? FOLLOWER_COLOR : (p?.color ?? 'var(--fg-muted)'),
         };
       });
   });
 
+  async function postAsFollower(text: string, mentioned: string[]) {
+    if (!ctx.follow || !who.trim()) return;
+    busy = true;
+    error = '';
+    try {
+      await ctx.follow.comment({ targetId: id, body: text, mentions: mentioned }, who.trim());
+      body = '';
+      caret = 0;
+      editingName = false;
+    } catch (err) {
+      error = t('comments.failed', { reason: err instanceof Error ? err.message : String(err) });
+    } finally {
+      busy = false;
+    }
+  }
+
   function post(e?: Event) {
     e?.preventDefault();
     const text = body.trim();
-    if (!text) return;
+    if (!text || busy) return;
     const mentioned = findMentions(text, people);
+    if (asFollower) {
+      void postAsFollower(text, mentioned);
+      return;
+    }
     commands.run({
       label: t('cmd.addComment'),
       changes: [
@@ -105,13 +141,14 @@
 
 <section class="comments">
   <h3>{t('comments.title')}{comments.length ? ` (${comments.length})` : ''}</h3>
-  {#each comments as { c, mine, name, color, parts, forMe } (c.id)}
+  {#each comments as { c, deletable, follower, name, color, parts, forMe } (c.id)}
     <article class:for-me={forMe}>
       <header>
         <span class="dot" style:background={color}></span>
         <strong>{name}</strong>
+        {#if follower}<span class="tag">{t('comments.follower')}</span>{/if}
         <span class="muted">{timeAgo(t, c.createdAt)}</span>
-        {#if mine && !ctx.readOnly}
+        {#if deletable}
           <span class="del">
             <IconButton
               icon={icons.trash}
@@ -129,8 +166,18 @@
       </p>
     </article>
   {/each}
-  {#if !ctx.readOnly}
+  {#if canWrite}
   <form onsubmit={post}>
+    {#if asFollower}
+      {#if editingName}
+        <input class="who" bind:value={who} maxlength="60" placeholder={t('comments.yourName')} aria-label={t('suggest.yourName')} />
+      {:else}
+        <p class="as small">
+          {t('comments.as', { name: who })}
+          <button type="button" class="link" onclick={() => (editingName = true)}>{t('suggest.notYou')}</button>
+        </p>
+      {/if}
+    {/if}
     <div class="field">
       <textarea
         rows="2"
@@ -158,7 +205,8 @@
         </ul>
       {/if}
     </div>
-    <button type="submit" disabled={!body.trim()}>{t('comments.post')}</button>
+    {#if error}<p class="error small">{error}</p>{/if}
+    <button type="submit" disabled={!body.trim() || busy || (asFollower && !who.trim())}>{t('comments.post')}</button>
   </form>
   {/if}
 </section>
@@ -254,6 +302,36 @@
   .suggest button.active,
   .suggest button:hover {
     background: var(--bg-hover);
+  }
+
+  .tag {
+    padding: 0 5px;
+    border-radius: 999px;
+    background: color-mix(in srgb, #ae3ec9 15%, transparent);
+    color: #ae3ec9;
+    font-size: 10px;
+  }
+
+  .who {
+    width: 100%;
+  }
+
+  p.as,
+  p.error {
+    margin: 0;
+  }
+
+  p.error {
+    color: var(--danger);
+  }
+
+  .link {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--accent);
+    cursor: pointer;
+    font: inherit;
   }
 
   .mention {

@@ -50,8 +50,11 @@ export interface ModuleContext {
 
 export interface FollowAccess {
   canSuggest: boolean;
+  canComment: boolean;
   /** Adds a place in the follower's own category, then fetches the trip's changes. */
   suggest(place: { name: string; lngLat: [number, number]; notes?: string }, followerName: string): Promise<string>;
+  /** Adds a comment on an item, then fetches the trip's changes. */
+  comment(c: { targetId: string; body: string; mentions: string[] }, followerName: string): Promise<string>;
 }
 
 export interface TripManager {

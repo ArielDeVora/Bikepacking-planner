@@ -40,11 +40,25 @@ export async function createFollower(token: string) {
       return rows.map(rowToEntity);
     },
 
-    /** Whether the link lets its followers suggest places (false where the server can't tell). */
-    async canSuggest(): Promise<boolean> {
+    /** What the link lets its followers do (nothing where the server can't tell). */
+    async info(): Promise<{ canSuggest: boolean; canComment: boolean }> {
       const { data, error } = await client.rpc('follow_link_info', { link: token });
-      if (error) return false;
-      return !!(data as { can_suggest: boolean }[])[0]?.can_suggest;
+      const row = error ? undefined : (data as { can_suggest?: boolean; can_comment?: boolean }[])[0];
+      return { canSuggest: !!row?.can_suggest, canComment: !!row?.can_comment };
+    },
+
+    /** Adds a comment on an item of the trip. */
+    async comment(c: { id: string; targetId: string; body: string; mentions: string[] }, who: Follower): Promise<void> {
+      const { error } = await client.rpc('follow_comment', {
+        link: token,
+        follower: who.id,
+        follower_name: who.name,
+        comment_id: c.id,
+        target: c.targetId,
+        comment_body: c.body,
+        mention_ids: c.mentions,
+      });
+      if (error) throw new Error(error.message);
     },
 
     /** Adds a place to the trip, in this follower's own category. */
@@ -79,6 +93,9 @@ export interface Follower {
 }
 
 const FOLLOWER_KEY = 'bp-follower';
+
+/** How a follower's comments and places name their author. */
+export const followerAuthor = (followerId: string) => `follower:${followerId}`;
 
 export function savedFollower(): Follower | null {
   try {

@@ -15,8 +15,8 @@ export interface SinceSummary {
   mentions: Comment[];
   /** Most recently changed item by someone else, to jump to. */
   latest: Entity | null;
-  /** Places suggested through follow links: how many per follower's name. */
-  suggestions: { name: string; count: number }[];
+  /** What people did through follow links, per follower's name: places suggested, comments left. */
+  followers: { name: string; places: number; comments: number }[];
 }
 
 /** What others did to the trip after `since` (each item counts once: its latest change). */
@@ -24,12 +24,22 @@ export function sinceLastVisit(entities: Entity[], since: number, isMine: (id: s
   const byPerson = new Map<string, PersonActivity>();
   const mentions: Comment[] = [];
   let latest: Entity | null = null;
-  const suggested = new Map<string, number>();
+  const followers = new Map<string, { name: string; places: number; comments: number }>();
+  const follower = (name: string) => {
+    let f = followers.get(name);
+    if (!f) followers.set(name, (f = { name, places: 0, comments: 0 }));
+    return f;
+  };
   for (const e of entities) {
     if (e.type === 'poi' && e.followerId && !e.deleted && e.updatedAt > since && e.createdBy.startsWith('follower:') && !e.editedBy) {
-      const name = e.suggestedBy ?? '';
-      suggested.set(name, (suggested.get(name) ?? 0) + 1);
+      follower(e.suggestedBy ?? '').places++;
       if (!latest || e.updatedAt > editedAt(latest)) latest = e;
+      continue;
+    }
+    if (e.type === 'comment' && e.followerId) {
+      if (e.deleted || e.createdAt <= since) continue;
+      follower(e.authorName ?? '').comments++;
+      if (e.mentions?.some(isMine)) mentions.push(e);
       continue;
     }
     const by = editedBy(e);
@@ -50,8 +60,8 @@ export function sinceLastVisit(entities: Entity[], since: number, isMine: (id: s
     .filter((p) => p.edits + p.comments + p.votes > 0)
     .sort((a, b) => b.edits + b.comments + b.votes - (a.edits + a.comments + a.votes));
   mentions.sort((a, b) => b.createdAt - a.createdAt);
-  const suggestions = [...suggested].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
-  return { people, mentions, latest, suggestions };
+  const byFollower = [...followers.values()].sort((a, b) => b.places + b.comments - (a.places + a.comments));
+  return { people, mentions, latest, followers: byFollower };
 }
 
-export const isEmpty = (s: SinceSummary) => !s.people.length && !s.mentions.length && !s.suggestions.length;
+export const isEmpty = (s: SinceSummary) => !s.people.length && !s.mentions.length && !s.followers.length;
